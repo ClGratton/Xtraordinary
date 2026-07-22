@@ -1,5 +1,12 @@
 package com.xteink.companion.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -366,7 +373,7 @@ private fun DiscoveryHandoff(
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text = device.message ?: stringResource(R.string.discovery_ready_body),
+            text = device.message ?: device.usbMessage ?: stringResource(R.string.discovery_ready_body),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -404,10 +411,11 @@ private fun FirmwareUpdatePanel(
     onCheckFirmware: () -> Unit,
     onFlashFirmware: () -> Unit,
 ) {
+    val canFlash = device.usbConnected || isConnected
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainer,
         shape = MaterialTheme.shapes.large,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().animateContentSize(),
     ) {
         Column(Modifier.padding(18.dp)) {
             Text(stringResource(R.string.firmware_update), style = MaterialTheme.typography.titleLarge)
@@ -415,7 +423,7 @@ private fun FirmwareUpdatePanel(
             Text(
                 text = when {
                     device.latestFirmwareVersion != null -> stringResource(
-                        R.string.latest_firmware_ready,
+                        if (device.usbConnected) R.string.latest_firmware_ready_usb else R.string.latest_firmware_ready,
                         device.latestFirmwareVersion,
                         model,
                     )
@@ -423,6 +431,20 @@ private fun FirmwareUpdatePanel(
                 },
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (device.usbConnected) {
+                Spacer(Modifier.height(12.dp))
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    shape = CircleShape,
+                ) {
+                    Text(
+                        text = stringResource(R.string.x3_connected_usb),
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp),
+                    )
+                }
+            }
             device.firmwareProgress?.let { progress ->
                 Spacer(Modifier.height(12.dp))
                 LinearProgressIndicator(
@@ -431,37 +453,52 @@ private fun FirmwareUpdatePanel(
                 )
             }
             Spacer(Modifier.height(14.dp))
-            when (device.firmwareCheckPhase) {
-                FirmwareCheckPhase.Available -> Button(
-                    onClick = onFlashFirmware,
-                    enabled = isConnected,
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                ) { Text(stringResource(if (isConnected) R.string.flash_latest_firmware else R.string.connect_to_flash)) }
-                FirmwareCheckPhase.Downloading, FirmwareCheckPhase.Transferring -> FilledTonalButton(
-                    onClick = {},
-                    enabled = false,
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                ) { Text(stringResource(R.string.preparing_firmware)) }
-                FirmwareCheckPhase.Complete -> Text(
-                    stringResource(R.string.firmware_restart_message),
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                )
-                FirmwareCheckPhase.UpToDate -> Text(
-                    stringResource(R.string.firmware_up_to_date),
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                )
-                else -> FilledTonalButton(
-                    onClick = onCheckFirmware,
-                    enabled = device.firmwareCheckPhase != FirmwareCheckPhase.Checking,
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                ) {
-                    if (device.firmwareCheckPhase == FirmwareCheckPhase.Checking) {
+            AnimatedContent(
+                targetState = device.firmwareCheckPhase,
+                transitionSpec = {
+                    (fadeIn() + scaleIn(initialScale = 0.96f)) togetherWith
+                        (fadeOut() + scaleOut(targetScale = 0.96f))
+                },
+                label = "firmware action",
+            ) { phase ->
+                when (phase) {
+                    FirmwareCheckPhase.Available -> Button(
+                        onClick = onFlashFirmware,
+                        enabled = canFlash,
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                    ) {
+                        Text(stringResource(if (canFlash) R.string.flash_latest_firmware else R.string.connect_to_flash))
+                    }
+                    FirmwareCheckPhase.Downloading, FirmwareCheckPhase.Transferring -> FilledTonalButton(
+                        onClick = {},
+                        enabled = false,
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                    ) {
                         CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                         Spacer(Modifier.size(10.dp))
+                        Text(device.usbMessage ?: stringResource(R.string.preparing_firmware))
                     }
-                    Text(stringResource(R.string.check_github_firmware))
+                    FirmwareCheckPhase.Complete -> Text(
+                        stringResource(R.string.firmware_restart_message),
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    FirmwareCheckPhase.UpToDate -> Text(
+                        stringResource(R.string.firmware_up_to_date),
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    else -> FilledTonalButton(
+                        onClick = onCheckFirmware,
+                        enabled = phase != FirmwareCheckPhase.Checking,
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                    ) {
+                        if (phase == FirmwareCheckPhase.Checking) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.size(10.dp))
+                        }
+                        Text(stringResource(R.string.check_github_firmware))
+                    }
                 }
             }
         }

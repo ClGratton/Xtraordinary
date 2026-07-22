@@ -8,6 +8,8 @@ import com.xteink.companion.data.BookLibraryRepository
 import com.xteink.companion.data.FirmwareRelease
 import com.xteink.companion.data.FirmwareReleaseRepository
 import com.xteink.companion.data.LinkPhase
+import com.xteink.companion.data.UsbEspFlasher
+import com.xteink.companion.data.UsbFlashPhase
 import com.xteink.companion.protocol.SessionStart
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +23,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     private val _uiState = MutableStateFlow(CompanionUiState())
     val uiState: StateFlow<CompanionUiState> = _uiState.asStateFlow()
     private val companionClient = BluetoothCompanionClient(application)
+    private val usbFlasher = UsbEspFlasher(application)
     private val firmwareReleases = FirmwareReleaseRepository(application)
     private val bookLibrary = BookLibraryRepository(application)
     private var latestRelease: FirmwareRelease? = null
@@ -50,8 +53,36 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
         viewModelScope.launch {
+            usbFlasher.state.collect { usb ->
+                _uiState.update { state ->
+                    val firmwarePhase = when (usb.phase) {
+                        UsbFlashPhase.EnteringBootloader,
+                        UsbFlashPhase.Erasing,
+                        UsbFlashPhase.Writing,
+                        UsbFlashPhase.Verifying,
+                        UsbFlashPhase.Restarting -> FirmwareCheckPhase.Transferring
+                        UsbFlashPhase.Complete -> FirmwareCheckPhase.Complete
+                        UsbFlashPhase.Error -> if (state.device.firmwareCheckPhase == FirmwareCheckPhase.Transferring) {
+                            FirmwareCheckPhase.Error
+                        } else state.device.firmwareCheckPhase
+                        else -> state.device.firmwareCheckPhase
+                    }
+                    state.copy(
+                        device = state.device.copy(
+                            usbConnected = usb.deviceDetected,
+                            usbPhase = usb.phase.name,
+                            usbMessage = usb.message,
+                            firmwareCheckPhase = firmwarePhase,
+                            firmwareProgress = usb.progress ?: state.device.firmwareProgress,
+                        ),
+                    )
+                }
+            }
+        }
+        viewModelScope.launch {
             while (isActive) {
                 delay(1_000)
+                usbFlasher.refresh()
                 _uiState.update { state ->
                     if (state.focus.phase != FocusPhase.Running) return@update state
                     val nextRemaining = (state.focus.remainingSeconds - 1).coerceAtLeast(0)
@@ -283,20 +314,33 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun flashLatestFirmware() {
         val release = latestRelease ?: return
-        if (!_uiState.value.isX3Connected) {
-            _uiState.update { it.copy(notice = UiNotice.DeviceMessage("Connect the device before flashing firmware")) }
+        val useUsb = _uiState.value.device.usbConnected
+        if (!useUsb && !_uiState.value.isX3Connected) {
+            _uiState.update { it.copy(notice = UiNotice.DeviceMessage("Connect the X3 to this phone by USB before flashing")) }
             return
         }
         viewModelScope.launch {
-            _uiState.update { it.copy(device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Downloading)) }
+            _uiState.update {
+                it.copy(device = it.device.copy(
+                    firmwareCheckPhase = FirmwareCheckPhase.Downloading,
+                    firmwareProgress = null,
+                    message = null,
+                ))
+            }
             runCatching {
                 val file = firmwareReleases.downloadVerified(release)
                 _uiState.update { it.copy(device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Transferring)) }
-                companionClient.flashFirmware(release, file)
+                if (useUsb) usbFlasher.flash(file) else companionClient.flashFirmware(release, file)
             }.onSuccess {
                 _uiState.update { it.copy(device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Complete)) }
             }.onFailure(::reportDeviceError)
         }
+    }
+
+    override fun onCleared() {
+        usbFlasher.close()
+        companionClient.disconnect()
+        super.onCleared()
     }
 
     fun setImporting(importing: Boolean) {

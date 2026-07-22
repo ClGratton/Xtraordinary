@@ -127,6 +127,7 @@ Icons are drawn as consistent vector geometry. Pass transfer actions use an upwa
 - Passes and device selection use the same reusable magnetic pager. Resistance is a stable function of displacement, so the same finger position produces the same card position whether the drag is moving outward or returning. The withheld distance smoothly releases after the bump so direct tracking resumes. Every inward or outward threshold crossing emits a crisp click without requiring finger lift; a fast fling that commits before the dragged offset reaches that threshold emits the same click as soon as the pager chooses its new target. Callers pass their own resting and selected container/content colors; the outgoing selection color fades continuously with resisted displacement instead of stepping down when touch begins, while the incoming color remains softened until the page settles at full strength. The small visual wobble occurs only after a card settles at center. Unsupported haptic primitives fall back to semantic Compose feedback.
 - Do not animate continuously while a timer runs.
 - Never imply the X3 updated before a firmware acknowledgement.
+- Initial companion-firmware installation is phone-hosted USB, not BLE: the app must visibly identify the attached X3, request Android USB permission, verify the signed release manifest, show write progress, verify the device flash, and only then report completion. BLE remains the everyday companion transport after bootstrap.
 - Respect Android reduced-motion settings.
 
 ## X3 display rules

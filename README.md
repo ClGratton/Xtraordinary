@@ -9,7 +9,7 @@
 
 Android companion prototype and an XTEINK X3-focused CrossPoint firmware research fork.
 
-The product model is simple: the phone owns integrations and intelligence; XTEINK is the persistent, low-power display and physical control surface on the back of the phone. The app contains Focus, Read, and Tools surfaces, persistent folder-based EPUB sync, a reconciled phone/device library, cached metadata enrichment, and the shared magnetic interaction system. The X3 companion build now adds encrypted BLE commands, a device-owned focus countdown, authoritative SD-card inventory/delete operations, and streaming inactive-slot firmware updates.
+The product model is simple: the phone owns integrations and intelligence; XTEINK is the persistent, low-power display and physical control surface on the back of the phone. The app contains Focus, Read, and Tools surfaces, persistent folder-based EPUB sync, a reconciled phone/device library, cached metadata enrichment, and the shared magnetic interaction system. The X3 companion build adds encrypted BLE commands, a device-owned focus countdown, authoritative SD-card inventory/delete operations, USB bootstrap flashing from Android, and streaming inactive-slot firmware updates.
 
 - [Architecture and implementation plan](docs/architecture-plan.md)
 - [Exact CrossPoint X3 change plan](docs/crosspoint-change-plan.md)
@@ -43,4 +43,4 @@ Set-Location firmware
 pio run -e x3_companion
 ```
 
-Tagged `xtraordinary-v*` builds publish `xtraordinary-x3.bin` and a model-explicit, SHA-256 manifest. The Android app polls the latest GitHub Release, never guesses an asset by filename, and requires the X3 center button to be held when a firmware transfer begins.
+Tagged `xtraordinary-v*` builds publish `xtraordinary-x3.bin` and a model-explicit, SHA-256 manifest. The Android app polls the latest GitHub Release, never guesses an asset by filename, and verifies its size and SHA-256 before writing. For first-time setup, connect the X3 directly to the phone with a USB data cable: Android requests USB-host permission and the app performs the ESP32-C3 bootloader reset, block write, on-device MD5 verification, and restart. Once companion firmware is running, normal app/device communication uses BLE.

@@ -150,6 +150,9 @@ enum class FirmwareCheckPhase { Idle, Checking, Available, UpToDate, Downloading
 data class DeviceUiState(
     val linkPhase: String = "Disconnected",
     val message: String? = null,
+    val usbConnected: Boolean = false,
+    val usbPhase: String = "Disconnected",
+    val usbMessage: String? = null,
     val firmwareVersion: String? = null,
     val libraryRevision: UInt = 0u,
     val firmwareCheckPhase: FirmwareCheckPhase = FirmwareCheckPhase.Idle,
