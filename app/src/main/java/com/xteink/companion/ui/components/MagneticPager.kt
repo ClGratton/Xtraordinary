@@ -60,7 +60,6 @@ internal fun MagneticHorizontalPager(
     val resistanceBlend = remember { Animatable(0f) }
     val snapKick = remember { Animatable(0f) }
     var beyondThreshold by remember { mutableStateOf(false) }
-    var returningToOrigin by remember { mutableStateOf(false) }
     val flingBehavior = PagerDefaults.flingBehavior(
         state = state,
         snapPositionalThreshold = config.threshold,
@@ -72,7 +71,6 @@ internal fun MagneticHorizontalPager(
 
     LaunchedEffect(isDragged) {
         if (isDragged) {
-            returningToOrigin = false
             resistanceBlend.snapTo(1f)
         } else {
             beyondThreshold = false
@@ -91,10 +89,7 @@ internal fun MagneticHorizontalPager(
         pagerState = state,
         isDragged = isDragged,
         config = config,
-        onThresholdChanged = { isBeyondThreshold ->
-            beyondThreshold = isBeyondThreshold
-        },
-        onReturningChanged = { returningToOrigin = it },
+        onThresholdChanged = { beyondThreshold = it },
     ) { direction ->
         snapKick.snapTo(direction * 0.018f)
         snapKick.animateTo(-direction * 0.006f, tween(durationMillis = 70))
@@ -118,7 +113,6 @@ internal fun MagneticHorizontalPager(
                 val displayedProgress = config.displayedProgress(
                     signedProgress = signedDrag,
                     resistance = resistanceBlend.value,
-                    returningToOrigin = returningToOrigin,
                 )
                 translationX = size.width * (signedDrag - displayedProgress)
                 if (page == state.settledPage) translationX += snapKick.value * size.width
@@ -137,7 +131,6 @@ private fun PagerResistanceFeedback(
     isDragged: Boolean,
     config: MagneticSwipeConfig,
     onThresholdChanged: (Boolean) -> Unit,
-    onReturningChanged: (Boolean) -> Unit,
     onCenterSettled: suspend (Float) -> Unit,
 ) {
     val context = LocalContext.current
@@ -157,8 +150,6 @@ private fun PagerResistanceFeedback(
             var lastPosition = dragStartPosition
             var travelSinceTick = 0f
             var samplesUntilTick = 0
-            var returningAfterExit = false
-            var engagedDirection = 1f
             val magneticState = MagneticSwipeState(config)
             if (!vibrator.playPrimitive(context, VibrationEffect.Composition.PRIMITIVE_LOW_TICK, 0.18f)) {
                 fallback.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
@@ -177,9 +168,6 @@ private fun PagerResistanceFeedback(
                         fallback.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
                     }
                     onThresholdChanged(magneticState.isBeyondThreshold)
-                    engagedDirection = thresholdEvent.direction
-                    returningAfterExit = thresholdEvent.transition == MagneticThresholdTransition.Exited
-                    onReturningChanged(returningAfterExit)
                     crossedThresholdAtRelease = magneticState.isBeyondThreshold
                     travelSinceTick = 0f
                     samplesUntilTick = 8
@@ -195,17 +183,6 @@ private fun PagerResistanceFeedback(
                     }
                 } else if (samplesUntilTick > 0) {
                     samplesUntilTick -= 1
-                }
-                if (
-                    returningAfterExit &&
-                    (
-                        progress <= config.freeTravel ||
-                            signedProgress.sign != engagedDirection ||
-                            (distance > 0.001f && movement.sign == engagedDirection)
-                        )
-                ) {
-                    returningAfterExit = false
-                    onReturningChanged(false)
                 }
                 lastPosition = position
             }

@@ -16,16 +16,8 @@ internal data class MagneticSwipeConfig(
         require(resistedTravel > 0f)
     }
 
-    /**
-     * Blends between exact finger tracking and the magnetic curve.
-     * On the return stroke, resistance is mirrored so the card trails the finger
-     * on the original side before converging back to exact tracking near center.
-     */
-    fun displayedProgress(
-        signedProgress: Float,
-        resistance: Float,
-        returningToOrigin: Boolean = false,
-    ): Float {
+    /** Blends between the resisted curve (1) and exact finger tracking (0). */
+    fun displayedProgress(signedProgress: Float, resistance: Float): Float {
         val bounded = signedProgress.coerceIn(-1f, 1f)
         val progress = bounded.absoluteValue
         if (progress <= freeTravel) return bounded
@@ -33,13 +25,7 @@ internal data class MagneticSwipeConfig(
         val constrainedProgress = (progress - freeTravel) / (1f - freeTravel)
         val resistedProgress = freeTravel +
             resistedTravel * sin(constrainedProgress * (PI.toFloat() / 2f))
-        val outwardProgress = resistedProgress.coerceAtMost(progress)
-        val resistedMagnitude = if (returningToOrigin) {
-            (progress + (progress - outwardProgress)).coerceAtMost(threshold)
-        } else {
-            outwardProgress
-        }
-        val resisted = bounded.sign * resistedMagnitude
+        val resisted = bounded.sign * resistedProgress.coerceAtMost(progress)
         return bounded + (resisted - bounded) * resistance.coerceIn(0f, 1f)
     }
 }
