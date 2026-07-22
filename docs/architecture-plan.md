@@ -236,7 +236,7 @@ This cloud path replaces Gemini Nano for live triage. Nano can remain a later fo
 
 - Receives only a user-selected `ACTION_OPEN_DOCUMENT_TREE` URI and persists the read grant.
 - Recursively enumerates EPUB documents through `DocumentsContract`, with depth and document-count bounds.
-- Merges file size and modified time into the library cache at launch; missing entries are marked off-device rather than silently deleted.
+- Merges file size and modified time into the phone-side library cache at launch; missing phone entries are marked unavailable rather than silently deleted. This flag is separate from authoritative X3 SD-card presence.
 - Leaves embedded EPUB metadata authoritative and invokes the cached Open Library fallback only for missing fields.
 
 The app deliberately does not request broad storage permission. Android's Storage Access Framework limits access to the directory tree selected by the user and allows the URI grant to survive restarts. See [Access documents and other files from shared storage](https://developer.android.com/training/data-storage/shared/documents-files).

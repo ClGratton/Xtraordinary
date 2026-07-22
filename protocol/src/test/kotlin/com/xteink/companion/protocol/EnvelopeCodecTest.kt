@@ -54,4 +54,12 @@ class EnvelopeCodecTest {
             EnvelopeCodec.decode(encoded)
         }
     }
+
+    @Test
+    fun libraryMessageWireValuesRemainStable() {
+        assertEquals(MessageType.GetLibrary, MessageType.fromWireValue(0x40u))
+        assertEquals(MessageType.LibraryPage, MessageType.fromWireValue(0x41u))
+        assertEquals(MessageType.DeleteLibraryEntries, MessageType.fromWireValue(0x42u))
+        assertEquals(MessageType.LibraryChanged, MessageType.fromWireValue(0x84u))
+    }
 }

@@ -52,6 +52,7 @@ fun readLibraryPhoneScreenshot() {
     ScreenshotApp(
         state = CompanionUiState(
             surface = CompanionSurface.Read,
+            isX3Connected = true,
             read = ReadUiState(
                 books = listOf(
                     ImportedBookUiState(
@@ -61,6 +62,16 @@ fun readLibraryPhoneScreenshot() {
                         fileName = "left-hand-of-darkness.epub",
                         language = "en",
                         publisher = "Ace Books",
+                        isOnX3 = true,
+                        x3Path = "/Books/left-hand-of-darkness.epub",
+                    ),
+                    ImportedBookUiState(
+                        id = "phone-book",
+                        title = "The Dispossessed",
+                        author = "Ursula K. Le Guin",
+                        fileName = "the-dispossessed.epub",
+                        language = "en",
+                        publisher = "Harper & Row",
                     ),
                 ),
             ),
@@ -148,9 +159,10 @@ private fun ScreenshotApp(state: CompanionUiState) {
             onShowFocus = {},
             onSetReadQuery = {},
             onSetReadSort = {},
-            onSetOnDeviceOnly = {},
+            onSetOnX3Only = {},
             onChooseBookFolder = {},
             onOpenEpub = {},
+            onDeleteBooksFromX3 = {},
             onOpenPasses = {},
             onShowToolHub = {},
             onSelectPass = {},

@@ -42,9 +42,10 @@ fun X3CompanionApp(
     onShowFocus: () -> Unit,
     onSetReadQuery: (String) -> Unit,
     onSetReadSort: (ReadSort) -> Unit,
-    onSetOnDeviceOnly: (Boolean) -> Unit,
+    onSetOnX3Only: (Boolean) -> Unit,
     onChooseBookFolder: () -> Unit,
     onOpenEpub: () -> Unit,
+    onDeleteBooksFromX3: (Set<String>) -> Unit,
     onOpenPasses: () -> Unit,
     onShowToolHub: () -> Unit,
     onSelectPass: (String) -> Unit,
@@ -58,6 +59,8 @@ fun X3CompanionApp(
         UiNotice.FocusStartedWithoutX3 -> stringResource(R.string.focus_started_without_x3)
         UiNotice.PairBeforeSend -> stringResource(R.string.pair_before_send)
         UiNotice.EpubImportFailed -> stringResource(R.string.epub_import_failed)
+        UiNotice.ConnectX3ToDelete -> stringResource(R.string.connect_x3_to_delete)
+        is UiNotice.X3DeleteQueued -> stringResource(R.string.x3_delete_queued, notice.count)
         is UiNotice.BooksImported -> stringResource(
             R.string.books_import_result,
             notice.added,
@@ -101,7 +104,10 @@ fun X3CompanionApp(
                 .fillMaxSize()
                 .padding(scaffoldPadding),
         ) {
-            CompanionTopBar(onShowSettings = { onShowSettings(true) })
+            CompanionTopBar(
+                isX3Connected = state.isX3Connected,
+                onShowSettings = { onShowSettings(true) },
+            )
             Box(modifier = Modifier.weight(1f)) {
                 AnimatedContent(
                     targetState = state.surface to state.toolDestination,
@@ -121,11 +127,13 @@ fun X3CompanionApp(
                         )
                         CompanionSurface.Read -> ReadContent(
                             state = state.read,
+                            isX3Connected = state.isX3Connected,
                             onSetQuery = onSetReadQuery,
                             onSetSort = onSetReadSort,
-                            onSetOnDeviceOnly = onSetOnDeviceOnly,
+                            onSetOnX3Only = onSetOnX3Only,
                             onChooseBookFolder = onChooseBookFolder,
                             onOpenEpub = onOpenEpub,
+                            onDeleteBooksFromX3 = onDeleteBooksFromX3,
                         )
                         CompanionSurface.Tools -> when (toolDestination) {
                             ToolDestination.Hub -> ToolsHubContent(

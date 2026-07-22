@@ -73,7 +73,8 @@ class MainActivity : ComponentActivity() {
                     onShowFocus = viewModel::showFocus,
                     onSetReadQuery = viewModel::setReadQuery,
                     onSetReadSort = viewModel::setReadSort,
-                    onSetOnDeviceOnly = viewModel::setOnDeviceOnly,
+                    onSetOnX3Only = viewModel::setOnX3Only,
+                    onDeleteBooksFromX3 = viewModel::requestDeleteBooksFromX3,
                     onChooseBookFolder = { folderPicker.launch(null) },
                     onOpenEpub = {
                         epubPicker.launch(
@@ -116,7 +117,7 @@ class MainActivity : ComponentActivity() {
                         val existing = merged[id]
                         if (existing != null) {
                             merged[id] = existing.copy(
-                                isOnDevice = true,
+                                isOnPhone = true,
                                 sourceFolderUri = folder.toString(),
                                 fileSizeBytes = candidate.sizeBytes ?: existing.fileSizeBytes,
                                 fileModifiedAtEpochMs = candidate.modifiedAtEpochMs ?: existing.fileModifiedAtEpochMs,
@@ -130,7 +131,7 @@ class MainActivity : ComponentActivity() {
                                 return@forEach
                             }
                             .copy(
-                                isOnDevice = true,
+                                isOnPhone = true,
                                 sourceFolderUri = folder.toString(),
                                 fileSizeBytes = candidate.sizeBytes,
                                 fileModifiedAtEpochMs = candidate.modifiedAtEpochMs,
@@ -149,11 +150,12 @@ class MainActivity : ComponentActivity() {
 
                     merged.replaceAll { _, book ->
                         if (book.sourceFolderUri == folder.toString() && book.id !in scannedIds) {
-                            book.copy(isOnDevice = false)
+                            book.copy(isOnPhone = false)
                         } else {
                             book
                         }
                     }
+
                     val library = merged.values.sortedByDescending { it.importedAtEpochMs }
                     bookLibrary.save(library)
                     FolderSyncOutcome(library, candidates.size, added, failed)

@@ -1,8 +1,10 @@
 package com.xteink.companion.ui.components
 
 import android.graphics.BitmapFactory
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,20 +23,28 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -44,6 +54,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -53,18 +64,23 @@ import com.xteink.companion.ui.ReadSort
 import com.xteink.companion.ui.ReadUiState
 import java.util.Locale
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ReadContent(
     state: ReadUiState,
+    isX3Connected: Boolean,
     onSetQuery: (String) -> Unit,
     onSetSort: (ReadSort) -> Unit,
-    onSetOnDeviceOnly: (Boolean) -> Unit,
+    onSetOnX3Only: (Boolean) -> Unit,
     onChooseBookFolder: () -> Unit,
     onOpenEpub: () -> Unit,
+    onDeleteBooksFromX3: (Set<String>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHapticFeedback.current
-    val visibleBooks = remember(state.books, state.query, state.sort, state.onDeviceOnly) {
+    var selectedBookIds by remember { mutableStateOf(emptySet<String>()) }
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
+    val visibleBooks = remember(state.books, state.query, state.sort, state.onX3Only) {
         val terms = state.query.trim().lowercase().split(Regex("\\s+")).filter { it.isNotBlank() }
         val matching = state.books.filter { book ->
             val haystack = listOfNotNull(
@@ -75,7 +91,7 @@ fun ReadContent(
                 book.isbn,
                 book.fileName,
             ).joinToString(" ").lowercase()
-            terms.all(haystack::contains) && (!state.onDeviceOnly || book.isOnDevice)
+            terms.all(haystack::contains) && (!state.onX3Only || book.isOnX3)
         }
         when (state.sort) {
             ReadSort.Recent -> matching.sortedByDescending {
@@ -88,6 +104,14 @@ fun ReadContent(
             )
         }
     }
+    val visibleIds = visibleBooks.mapTo(linkedSetOf()) { it.id }
+    val selectedOnX3Ids = selectedBookIds.filterTo(linkedSetOf()) { id ->
+        state.books.any { it.id == id && it.isOnX3 }
+    }
+
+    LaunchedEffect(state.books) {
+        selectedBookIds = selectedBookIds.intersect(state.books.mapTo(hashSetOf()) { it.id })
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
@@ -96,7 +120,26 @@ fun ReadContent(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                if (selectedBookIds.isNotEmpty()) {
+                    LibrarySelectionBar(
+                        selectedCount = selectedBookIds.size,
+                        allVisibleSelected = visibleIds.isNotEmpty() && visibleIds.all(selectedBookIds::contains),
+                        canDelete = selectedOnX3Ids.isNotEmpty(),
+                        onSelectAll = {
+                            selectedBookIds = if (visibleIds.all(selectedBookIds::contains)) {
+                                selectedBookIds - visibleIds
+                            } else {
+                                selectedBookIds + visibleIds
+                            }
+                        },
+                        onDelete = {
+                            haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+                            if (isX3Connected) showDeleteConfirmation = true
+                            else onDeleteBooksFromX3(selectedOnX3Ids)
+                        },
+                        onClose = { selectedBookIds = emptySet() },
+                    )
+                } else Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -107,7 +150,11 @@ fun ReadContent(
                             CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                         } else {
                             Text(
-                                pluralStringResource(R.plurals.book_count, state.books.size, state.books.size),
+                                stringResource(
+                                    R.string.book_and_x3_count,
+                                    state.books.size,
+                                    state.books.count { it.isOnX3 },
+                                ),
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -182,19 +229,34 @@ fun ReadContent(
                         )
                     }
                     FilterChip(
-                        selected = state.onDeviceOnly,
+                        selected = state.onX3Only,
                         onClick = {
                             haptics.performHapticFeedback(HapticFeedbackType.ToggleOn)
-                            onSetOnDeviceOnly(!state.onDeviceOnly)
+                            onSetOnX3Only(!state.onX3Only)
                         },
-                        label = { Text(stringResource(R.string.on_device)) },
+                        label = { Text(stringResource(R.string.on_x3)) },
                     )
                 }
             }
             if (visibleBooks.isEmpty()) {
                 item { LibraryEmptyState(hasBooks = state.books.isNotEmpty()) }
             } else {
-                items(visibleBooks, key = { it.id }) { book -> ImportedBookCard(book) }
+                items(visibleBooks, key = { it.id }) { book ->
+                    ImportedBookCard(
+                        book = book,
+                        selectionMode = selectedBookIds.isNotEmpty(),
+                        selected = book.id in selectedBookIds,
+                        onClick = {
+                            if (selectedBookIds.isNotEmpty()) {
+                                selectedBookIds = selectedBookIds.toggle(book.id)
+                            }
+                        },
+                        onLongClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            selectedBookIds = selectedBookIds + book.id
+                        },
+                    )
+                }
             }
             item { ResearchSourcesCard() }
         }
@@ -226,6 +288,91 @@ fun ReadContent(
                 ImportBookIcon()
             }
         }
+    }
+
+    if (showDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = false },
+            title = { Text(stringResource(R.string.delete_books_from_x3_title)) },
+            text = {
+                Text(
+                    pluralStringResource(
+                        R.plurals.delete_books_from_x3_body,
+                        selectedOnX3Ids.size,
+                        selectedOnX3Ids.size,
+                    ),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                        onDeleteBooksFromX3(selectedOnX3Ids)
+                        selectedBookIds = emptySet()
+                        showDeleteConfirmation = false
+                    },
+                ) { Text(stringResource(R.string.delete_from_x3)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun LibrarySelectionBar(
+    selectedCount: Int,
+    allVisibleSelected: Boolean,
+    canDelete: Boolean,
+    onSelectAll: () -> Unit,
+    onDelete: () -> Unit,
+    onClose: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onClose) {
+            Text("×", style = MaterialTheme.typography.headlineMedium)
+        }
+        Text(
+            stringResource(R.string.books_selected, selectedCount),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = onSelectAll) {
+            Text(stringResource(if (allVisibleSelected) R.string.clear_all else R.string.select_all))
+        }
+        IconButton(onClick = onDelete, enabled = canDelete) {
+            TrashIcon(enabled = canDelete)
+        }
+    }
+}
+
+@Composable
+private fun TrashIcon(enabled: Boolean) {
+    val color = if (enabled) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+    Canvas(
+        modifier = Modifier
+            .size(24.dp)
+            .semantics { contentDescription = "Delete selected books from X3" },
+    ) {
+        val stroke = 1.8.dp.toPx()
+        drawLine(color, Offset(size.width * 0.25f, size.height * 0.28f), Offset(size.width * 0.75f, size.height * 0.28f), stroke, StrokeCap.Round)
+        drawLine(color, Offset(size.width * 0.40f, size.height * 0.18f), Offset(size.width * 0.60f, size.height * 0.18f), stroke, StrokeCap.Round)
+        drawRoundRect(
+            color = color,
+            topLeft = Offset(size.width * 0.30f, size.height * 0.34f),
+            size = Size(size.width * 0.40f, size.height * 0.48f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx()),
+            style = Stroke(stroke),
+        )
     }
 }
 
@@ -289,17 +436,31 @@ private fun LibraryEmptyState(hasBooks: Boolean) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ImportedBookCard(book: ImportedBookUiState) {
+private fun ImportedBookCard(
+    book: ImportedBookUiState,
+    selectionMode: Boolean,
+    selected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
     val bitmap = remember(book.coverPath) {
         book.coverPath?.let { path -> BitmapFactory.decodeFile(path)?.asImageBitmap() }
     }
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .alpha(if (book.isOnDevice) 1f else 0.58f),
+            .alpha(if (book.isOnPhone || book.isOnX3) 1f else 0.58f)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .semantics { this.selected = selected },
         color = MaterialTheme.colorScheme.surfaceContainer,
         shape = MaterialTheme.shapes.large,
+        border = if (selected) {
+            androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+        } else {
+            null
+        },
     ) {
         Row(
             modifier = Modifier
@@ -307,10 +468,14 @@ private fun ImportedBookCard(book: ImportedBookUiState) {
                 .height(112.dp)
                 .padding(10.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (selectionMode) {
+                SelectionCircle(selected = selected)
+            }
             Surface(
                 modifier = Modifier
-                    .width(62.dp)
+                    .width(if (selectionMode) 54.dp else 62.dp)
                     .fillMaxHeight(),
                 color = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -361,15 +526,14 @@ private fun ImportedBookCard(book: ImportedBookUiState) {
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    if (book.isOnDevice) {
-                        listOfNotNull(
-                            book.isbn?.let { "ISBN $it" },
-                            book.fileSizeBytes?.let(::formatFileSize),
-                        ).joinToString(" · ").ifBlank {
-                            stringResource(R.string.metadata_from, book.metadataSource)
-                        }
+                    if (book.isOnX3) {
+                        book.x3Path?.let { path ->
+                            stringResource(R.string.on_x3_at, path)
+                        } ?: stringResource(R.string.on_x3)
+                    } else if (book.isOnPhone) {
+                        stringResource(R.string.phone_only)
                     } else {
-                        stringResource(R.string.not_on_device)
+                        stringResource(R.string.book_unavailable)
                     },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
@@ -379,6 +543,27 @@ private fun ImportedBookCard(book: ImportedBookUiState) {
         }
     }
 }
+
+@Composable
+private fun SelectionCircle(selected: Boolean) {
+    val fill = MaterialTheme.colorScheme.primary
+    val outline = MaterialTheme.colorScheme.outline
+    val mark = MaterialTheme.colorScheme.onPrimary
+    Canvas(modifier = Modifier.size(28.dp)) {
+        drawCircle(
+            color = if (selected) fill else Color.Transparent,
+            style = if (selected) androidx.compose.ui.graphics.drawscope.Fill else Stroke(2.dp.toPx()),
+        )
+        if (!selected) drawCircle(color = outline, style = Stroke(2.dp.toPx()))
+        if (selected) {
+            val stroke = 2.dp.toPx()
+            drawLine(mark, Offset(size.width * 0.27f, size.height * 0.52f), Offset(size.width * 0.44f, size.height * 0.68f), stroke, StrokeCap.Round)
+            drawLine(mark, Offset(size.width * 0.44f, size.height * 0.68f), Offset(size.width * 0.75f, size.height * 0.34f), stroke, StrokeCap.Round)
+        }
+    }
+}
+
+private fun Set<String>.toggle(id: String): Set<String> = if (id in this) this - id else this + id
 
 @Composable
 private fun ResearchSourcesCard() {
@@ -419,10 +604,4 @@ private fun ResearchSourcesCard() {
             }
         }
     }
-}
-
-private fun formatFileSize(bytes: Long): String = when {
-    bytes >= 1_000_000 -> String.format(Locale.getDefault(), "%.1f MB", bytes / 1_000_000.0)
-    bytes >= 1_000 -> String.format(Locale.getDefault(), "%.0f KB", bytes / 1_000.0)
-    else -> "$bytes B"
 }

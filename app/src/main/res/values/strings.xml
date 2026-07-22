@@ -47,6 +47,7 @@
     <string name="gate">Gate B12</string>
     <string name="settings_device">X3 device</string>
     <string name="settings_device_value">Not paired</string>
+    <string name="settings_device_connected">Connected</string>
     <string name="settings_notifications">Notification rules</string>
     <string name="settings_notifications_value">Rules not configured</string>
     <string name="settings_gemini">Gemini &amp; privacy</string>
@@ -78,7 +79,8 @@
     <string name="tool_ai_body">Compact summaries, checklists and translations</string>
     <string name="planned">Planned</string>
     <string name="read_title">Read</string>
-    <string name="read_library_subtitle">Your EPUB library, ready for the X3.</string>
+    <string name="read_library_subtitle">Your phone and X3 library in one place.</string>
+    <string name="book_and_x3_count">%1$d books · %2$d on X3</string>
     <plurals name="book_count">
         <item quantity="one">%1$d imported</item>
         <item quantity="other">%1$d imported</item>
@@ -92,11 +94,25 @@
     <string name="sort_recent">Date</string>
     <string name="sort_name">Name</string>
     <string name="sort_size">Size</string>
-    <string name="on_device">On device</string>
+    <string name="on_x3">On X3</string>
+    <string name="on_x3_at">On X3 · %1$s</string>
+    <string name="phone_only">Phone only</string>
+    <string name="book_unavailable">File unavailable</string>
     <string name="choose_book_folder">Choose EPUB folder</string>
     <string name="folder_linked">EPUB folder linked</string>
     <string name="syncing_library">Scanning EPUB folder…</string>
-    <string name="not_on_device">Not on device</string>
+    <string name="books_selected">%1$d selected</string>
+    <string name="select_all">Select all</string>
+    <string name="clear_all">Clear all</string>
+    <string name="delete_books_from_x3_title">Delete from X3?</string>
+    <plurals name="delete_books_from_x3_body">
+        <item quantity="one">This permanently deletes %1$d book from the X3 SD card.</item>
+        <item quantity="other">This permanently deletes %1$d books from the X3 SD card.</item>
+    </plurals>
+    <string name="delete_from_x3">Delete from X3</string>
+    <string name="cancel">Cancel</string>
+    <string name="connect_x3_to_delete">Connect the X3 before deleting books from its SD card.</string>
+    <string name="x3_delete_queued">Delete request queued for %1$d books. They remain visible until the X3 confirms.</string>
     <string name="library_empty">Your library is empty</string>
     <string name="library_empty_body">Link your EPUB folder once for automatic sync, or use the book button to import files.</string>
     <string name="no_matching_books">No books match</string>

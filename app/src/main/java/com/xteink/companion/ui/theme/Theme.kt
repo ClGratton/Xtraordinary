@@ -5,7 +5,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -55,7 +54,7 @@ private val QuietColors = darkColorScheme(
     surfaceContainer = QuietSurfaceContainer,
     surfaceContainerLow = QuietSurfaceLow,
     surfaceVariant = QuietSurfaceVariant,
-    onSurfaceVariant = Color(0xFFC8C9C0),
+    onSurfaceVariant = Color(0xFFC8C8C8),
     outline = QuietOutline,
 )
 
@@ -144,7 +143,6 @@ fun X3CompanionTheme(
     val dynamicColorAvailable = useDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val colorScheme = when {
         dynamicColorAvailable && visualTheme == CompanionVisualTheme.Expressive -> dynamicLightColorScheme(context)
-        dynamicColorAvailable && visualTheme == CompanionVisualTheme.Quiet -> dynamicDarkColorScheme(context)
         visualTheme == CompanionVisualTheme.Expressive -> ExpressiveColors
         else -> QuietColors
     }

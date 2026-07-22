@@ -45,8 +45,9 @@ Read is top-level because reading is core to the X3. Passes is an optional tool,
 
 ### Quiet
 
-- Black and charcoal surfaces with a restrained lime accent.
+- Deterministic black, white, and grayscale surfaces with no dynamic color tint.
 - Exactly the same Focus/Read/Tools hierarchy, geometry, labels, and actions.
+- The XTEINK preview chassis is white with a black wordmark; monochrome artwork crops edge-to-edge inside it without letterboxing.
 - Switching theme preserves the timer, selected pass, carousel page, live/static choice, and back stack.
 
 The theme choice lives in Settings. There is no Normal/Minimal tab, density mode, or separate Quiet screen.
@@ -74,13 +75,15 @@ Opening a tool is nested navigation. Android Back and `Back to Tools` return to 
 ## Read screen
 
 - Read opens directly as the user's library; there is no import hero competing with the books.
+- `On X3` means present on the X3 SD card, never merely present in Android's selected folder. The X3 filesystem is authoritative and is rescanned on connection, so books copied from a PC appear in the app.
+- Long-press enters multi-select with circular selection marks and Select all. Delete is checked when the trash action is pressed, requires an active X3 connection, asks for confirmation, and removes rows only after the device acknowledges the SD-card deletion.
 - Imported-book rows stay compact: one fixed-height cover thumbnail and four single-line metadata levels, so the library remains a scan-friendly list rather than a stack of oversized cards.
 - A clearly visible squircle book-plus action at bottom right opens Android's multi-document picker for one or more EPUBs.
 - `Choose EPUB folder` grants the app persistent read access to one user-selected directory tree. The tree is scanned at launch, so EPUBs already in Files appear without being selected one-by-one.
-- The library, Date/Name/Size sort, On-device filter, embedded covers, and normalized metadata restore automatically at launch.
+- The library, Date/Name/Size sort, On X3 filter, embedded covers, and normalized metadata restore automatically at launch.
 - EPUB metadata and cover art are authoritative. Missing cover, author, publisher, language, or year may be filled with a low-volume Open Library lookup, then cached locally with a seven-day retry throttle.
 - Duplicate document URIs are not added again and the result notice reports already-imported selections. Android's system picker owns its file-row appearance; the app cannot recolor those rows.
-- Missing-field enrichment is internal behavior, never exposed as a user-facing library filter. Books no longer present in the linked folder remain in history but are visibly muted and can be hidden with On device.
+- Missing-field enrichment is internal behavior, never exposed as a user-facing library filter. Phone-folder presence and X3 presence are tracked separately; missing phone files remain in history, while On X3 filters only the device inventory.
 - Research and connectors for Google Play Books, Kindle, Kobo, and Project Gutenberg remain visibly marked planned and separate from owned books.
 - Future connectors use supported sign-in/provider access only. The app never scrapes credentials or bypasses DRM.
 
@@ -97,7 +100,7 @@ Opening a tool is nested navigation. Android Back and `Back to Tools` return to 
 
 ## Color, shape, and type
 
-- On Android 12 and newer, derive both Expressive and Quiet color schemes from the phone's Material dynamic palette. The checked-in coral/lime palettes are deterministic fallbacks for older devices and screenshots.
+- On Android 12 and newer, Expressive derives from the phone's Material dynamic palette. Quiet always uses the checked-in grayscale palette so it remains genuinely monochrome across devices.
 - Never use color alone for connection, urgency, selection, or freshness.
 - The duration surface uses an asymmetric, softly undulating outline rather than a generic rounded rectangle.
 - X3 previews remain rectangular enough to communicate real e-ink geometry.

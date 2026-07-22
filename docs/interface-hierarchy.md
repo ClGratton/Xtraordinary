@@ -18,7 +18,7 @@ App shell
 │  ├─ link one EPUB folder for automatic launch-time sync
 │  ├─ import one or more local EPUBs
 │  ├─ extract embedded metadata locally
-│  ├─ search, Date/Name/Size sort, and On-device filter
+│  ├─ search, Date/Name/Size sort, and On X3 filter
 │  ├─ cached imported books
 │  ├─ cross-library search (planned)
 │  └─ supported library/catalog connectors (planned)
@@ -119,7 +119,7 @@ or: book-plus squircle -> OpenMultipleDocuments
 
 The app does not upload the EPUB, scrape another app's files, request all-files access, or bypass DRM. Android grants access only to the directory the user chooses. The picker can select several documents at once. Duplicate document URIs are skipped and counted; malformed EPUBs add nothing. Since DocumentsUI is owned by Android rather than this app, imported rows cannot be greyed inside the system picker. The in-app library remains the authoritative imported state.
 
-Search, Date/Name/Size sort, and the On-device filter operate on cached local metadata. EPUB fields always win. A missing field may be enriched through a low-volume Open Library Search API request; normalized results and downloaded cover art are cached, and failed lookups are throttled for seven days. Enrichment state is deliberately not a user-facing filter.
+Search and Date/Name/Size sort operate on the merged phone and X3 catalog. On X3 filters only the authoritative device snapshot. EPUB fields always win. A missing field may be enriched through a low-volume Open Library Search API request; normalized results and downloaded cover art are cached, and failed lookups are throttled for seven days. Enrichment state is deliberately not a user-facing filter.
 
 The screen also reserves honest planned surfaces for unified title/author search and opt-in provider connections. Google Play Books, Kindle, Kobo, and Project Gutenberg are discovery targets, not implied working integrations. Purchased collections are shown only when a provider offers supported authorization and access.
 
@@ -184,7 +184,9 @@ Expressive and Quiet render the same hierarchy and states. Theme switching prese
 - Static/Live pane choice;
 - settings/back-stack position.
 
-On Android 12+, Material dynamic light/dark schemes pull their seed colors from the phone. The product palettes remain fallbacks for older Android versions and deterministic screenshot tests.
+On Android 12+, Expressive pulls its Material dynamic light seed from the phone. Quiet stays on the deterministic grayscale palette so it remains monochrome rather than inheriting a wallpaper tint.
+
+`On X3` is a device-inventory filter, not a synonym for Android storage. CrossPoint enumerates the live SD filesystem; the companion requests a paged inventory on connection, merges PC-added files into the phone catalog, and retains rows until device-confirmed deletion. Long-press activates circular multi-select, Select all, connection checking at the trash action, and a destructive confirmation dialog.
 
 ## Artwork and X3 crops
 

@@ -103,12 +103,15 @@ fun ControlDeckFocusContent(
 private fun X3ImageField(visualTheme: CompanionVisualTheme) {
     val description = stringResource(R.string.x3_preview_description)
     val artwork = sceneArtworkFor(visualTheme).phonePreview
+    val quiet = visualTheme == CompanionVisualTheme.Quiet
+    val frameColor = if (quiet) Color.White else Color(0xFF111111)
+    val brandColor = if (quiet) Color.Black else Color.White
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(1.60f)
             .semantics { contentDescription = description },
-        color = Color(0xFF111111),
+        color = frameColor,
         shape = MaterialTheme.shapes.medium,
     ) {
         Column(
@@ -127,12 +130,12 @@ private fun X3ImageField(visualTheme: CompanionVisualTheme) {
                     painter = painterResource(artwork),
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit,
+                    contentScale = ContentScale.Crop,
                 )
             }
             Text(
                 text = stringResource(R.string.x3_brand),
-                color = Color.White,
+                color = brandColor,
                 fontSize = 9.sp,
                 letterSpacing = 1.sp,
                 fontWeight = FontWeight.Bold,

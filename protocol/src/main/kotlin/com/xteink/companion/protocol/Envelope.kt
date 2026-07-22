@@ -20,10 +20,14 @@ enum class MessageType(val wireValue: UByte) {
     ResumeSession(0x22u),
     StopSession(0x23u),
     PinSceneAndSleep(0x30u),
+    GetLibrary(0x40u),
+    LibraryPage(0x41u),
+    DeleteLibraryEntries(0x42u),
     Ack(0x80u),
     Nack(0x81u),
     ButtonEvent(0x82u),
     StatusChanged(0x83u),
+    LibraryChanged(0x84u),
     Error(0xFFu),
     ;
 

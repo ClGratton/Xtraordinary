@@ -155,6 +155,9 @@ Required phone-to-X3 messages:
 HELLO
 GET_CAPABILITIES
 GET_STATUS
+GET_LIBRARY
+LIBRARY_PAGE
+DELETE_LIBRARY_ENTRIES
 BEGIN_SCENE
 SCENE_CHUNK
 COMMIT_SCENE
@@ -180,11 +183,24 @@ STATUS_CHANGED
 ACTION_INVOKED
 SESSION_FINISHED
 SCENE_RENDERED
+LIBRARY_CHANGED
 LOW_BATTERY
 PROTOCOL_ERROR
 ```
 
 Commands are idempotent by `message_id` plus object `revision`. After reconnect, Android must call `GET_STATUS` before mutating a running session. The X3 never starts focus on connect, boot, tilt, or notification receipt.
+
+### Device library authority
+
+CrossPoint's native reader does not maintain a master catalog. `FileBrowserActivity` enumerates the live SD directory when a folder opens, while per-book metadata and rendering caches live under `/.crosspoint/`. The current web client follows the same model through `/api/files`, `/upload`, and `/delete`.
+
+The companion app therefore treats the X3 filesystem as authoritative for `On X3`:
+
+- `GET_LIBRARY` requests a bounded recursive scan of supported book files, excluding hidden and system directories. `LIBRARY_PAGE` streams path, format, byte size, cached title and author when available, and a cheap device fingerprint in pages rather than allocating one unbounded manifest.
+- Android merges that snapshot with its phone-side imports. A book copied to the SD card from a PC appears after the next connection or refresh even if the phone has never imported it.
+- The device increments a persisted library revision after app upload or delete, native deletion, web upload or delete, and SD remount. `LIBRARY_CHANGED` invalidates the phone snapshot; manual PC changes are discovered by the remount scan.
+- `DELETE_LIBRARY_ENTRIES` carries normalized paths plus the snapshot fingerprint and is rejected on mismatch. Android keeps rows visible until the X3 acknowledges deletion and returns the new library revision.
+- Inventory and deletion use bonded BLE because they are small control operations. EPUB transfer may reuse the existing authenticated Wi-Fi and WebSocket path after an explicit, time-limited escalation. Making the web server the only library client would require Wi-Fi setup and would not provide reliable background reconciliation.
 
 ## Rendering behavior
 

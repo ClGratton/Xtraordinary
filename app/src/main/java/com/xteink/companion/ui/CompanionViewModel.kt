@@ -83,7 +83,10 @@ class CompanionViewModel : ViewModel() {
     fun endFocus() {
         _uiState.update { state ->
             state.copy(
-                focus = state.focus.copy(phase = FocusPhase.Review),
+                focus = state.focus.copy(
+                    phase = FocusPhase.Setup,
+                    remainingSeconds = state.focus.selectedMinutes * 60,
+                ),
             )
         }
     }
@@ -168,8 +171,19 @@ class CompanionViewModel : ViewModel() {
         _uiState.update { it.copy(read = it.read.copy(sort = sort)) }
     }
 
-    fun setOnDeviceOnly(enabled: Boolean) {
-        _uiState.update { it.copy(read = it.read.copy(onDeviceOnly = enabled)) }
+    fun setOnX3Only(enabled: Boolean) {
+        _uiState.update { it.copy(read = it.read.copy(onX3Only = enabled)) }
+    }
+
+    fun requestDeleteBooksFromX3(bookIds: Set<String>) {
+        if (bookIds.isEmpty()) return
+        _uiState.update { state ->
+            if (!state.isX3Connected) {
+                state.copy(notice = UiNotice.ConnectX3ToDelete)
+            } else {
+                state.copy(notice = UiNotice.X3DeleteQueued(bookIds.size))
+            }
+        }
     }
 
     fun setImporting(importing: Boolean) {

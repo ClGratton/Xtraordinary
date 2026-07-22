@@ -6,10 +6,11 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.provider.Settings
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -46,6 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
@@ -73,6 +75,7 @@ import com.xteink.companion.ui.TicketUiState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlin.math.absoluteValue
+import kotlin.math.sign
 
 @Composable
 fun PassesToolContent(
@@ -89,15 +92,20 @@ fun PassesToolContent(
         initialPage = selectedIndex,
         pageCount = { ticket.passes.size },
     )
+    val snapKick = remember { Animatable(0f) }
     val flingBehavior = PagerDefaults.flingBehavior(
         state = pagerState,
         snapPositionalThreshold = 0.42f,
         snapAnimationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMediumLow,
+            dampingRatio = 0.78f,
+            stiffness = Spring.StiffnessHigh,
         ),
     )
-    PagerResistanceHaptics(pagerState)
+    PagerResistanceFeedback(pagerState) { direction ->
+        snapKick.snapTo(direction * 0.018f)
+        snapKick.animateTo(-direction * 0.006f, tween(durationMillis = 70))
+        snapKick.animateTo(0f, tween(durationMillis = 100))
+    }
 
     LaunchedEffect(pagerState.settledPage) {
         ticket.passes.getOrNull(pagerState.settledPage)?.let { onSelectPass(it.id) }
@@ -141,10 +149,13 @@ fun PassesToolContent(
                 val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
                     .absoluteValue
                     .coerceIn(0f, 1f)
-                val resistance = 1f - pageOffset
-                scaleX = 0.985f + resistance * 0.015f
-                    scaleY = 0.985f + resistance * 0.015f
-                },
+                val dragProgress = pagerState.currentPageOffsetFraction.absoluteValue.coerceIn(0f, 1f)
+                val resistance = (1f - dragProgress) * (1f - dragProgress) * 0.28f
+                translationX = pagerState.currentPageOffsetFraction * size.width * resistance
+                if (page == pagerState.settledPage) translationX += snapKick.value * size.width
+                scaleX = 1f - pageOffset * 0.014f
+                scaleY = 1f - pageOffset * 0.010f
+            },
             )
         }
         PassModeChooser(
@@ -170,38 +181,45 @@ fun PassesToolContent(
 }
 
 @Composable
-private fun PagerResistanceHaptics(pagerState: PagerState) {
+private fun PagerResistanceFeedback(
+    pagerState: PagerState,
+    onReleaseSnap: suspend (Float) -> Unit,
+) {
     val context = LocalContext.current
     val fallback = LocalHapticFeedback.current
     val isDragged by pagerState.interactionSource.collectIsDraggedAsState()
     var dragSessionActive by remember { mutableStateOf(false) }
+    var releaseDirection by remember { mutableFloatStateOf(1f) }
     val vibrator = remember(context) { context.touchVibrator() }
 
     LaunchedEffect(isDragged) {
         if (isDragged) {
             dragSessionActive = true
-            if (!vibrator.playPrimitive(context, VibrationEffect.Composition.PRIMITIVE_TICK, 0.52f)) {
+            var lastTickOffset = 0f
+            if (!vibrator.playPrimitive(context, VibrationEffect.Composition.PRIMITIVE_LOW_TICK, 0.48f)) {
                 fallback.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
             }
             while (isDragged) {
-                val progress = ((pagerState.settledPage - pagerState.currentPage) +
-                    pagerState.currentPageOffsetFraction).absoluteValue.coerceIn(0f, 1f)
-                if (progress > 0.015f) {
-                    val scale = 0.28f + progress * 0.66f
-                    val intervalMs = (88f - progress * 44f).toLong()
+                val signedOffset = ((pagerState.settledPage - pagerState.currentPage) +
+                    pagerState.currentPageOffsetFraction).coerceIn(-1f, 1f)
+                val progress = signedOffset.absoluteValue
+                if (progress > 0.01f) releaseDirection = signedOffset.sign
+                val distancePerTick = 0.055f - progress * 0.035f
+                if ((signedOffset - lastTickOffset).absoluteValue >= distancePerTick) {
+                    val scale = 0.48f + progress * 0.50f
                     if (!vibrator.playPrimitive(context, VibrationEffect.Composition.PRIMITIVE_LOW_TICK, scale)) {
                         fallback.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
                     }
-                    delay(intervalMs)
-                } else {
-                    delay(36)
+                    lastTickOffset = signedOffset
                 }
+                delay(12)
             }
         } else if (dragSessionActive) {
             snapshotFlow { pagerState.isScrollInProgress }.first { scrolling -> !scrolling }
-            if (!vibrator.playPrimitive(context, VibrationEffect.Composition.PRIMITIVE_CLICK, 1f)) {
+            if (!vibrator.playSnap(context)) {
                 fallback.performHapticFeedback(HapticFeedbackType.GestureEnd)
             }
+            onReleaseSnap(releaseDirection)
             dragSessionActive = false
         }
     }
@@ -225,6 +243,25 @@ private fun Vibrator.playPrimitive(context: Context, primitive: Int, scale: Floa
     vibrate(
         VibrationEffect.startComposition()
             .addPrimitive(primitive, scale.coerceIn(0f, 1f))
+            .compose(),
+    )
+    return true
+}
+
+private fun Vibrator.playSnap(context: Context): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || !hasVibrator()) return false
+    val touchEnabled = Settings.System.getInt(
+        context.contentResolver,
+        Settings.System.HAPTIC_FEEDBACK_ENABLED,
+        1,
+    ) != 0
+    val lowTick = VibrationEffect.Composition.PRIMITIVE_LOW_TICK
+    val click = VibrationEffect.Composition.PRIMITIVE_CLICK
+    if (!touchEnabled || !areAllPrimitivesSupported(lowTick, click)) return false
+    vibrate(
+        VibrationEffect.startComposition()
+            .addPrimitive(lowTick, 0.72f)
+            .addPrimitive(click, 1f, 20)
             .compose(),
     )
     return true
@@ -430,16 +467,12 @@ private fun PassModeOption(
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHapticFeedback.current
-    val height by animateDpAsState(
-        targetValue = if (selected) 170.dp else 106.dp,
-        label = "$title height",
-    )
     Surface(
         onClick = {
             if (!selected) haptics.performHapticFeedback(HapticFeedbackType.ToggleOn)
             onSelect()
         },
-        modifier = modifier.height(height),
+        modifier = modifier.height(170.dp),
         color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
         contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
         shape = MaterialTheme.shapes.large,
@@ -454,7 +487,7 @@ private fun PassModeOption(
                 text = body,
                 style = MaterialTheme.typography.labelMedium,
                 color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = if (selected) 2 else 1,
+                maxLines = 2,
             )
             if (selected) {
                 Spacer(modifier = Modifier.weight(1f))

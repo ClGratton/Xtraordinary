@@ -44,6 +44,7 @@ import com.xteink.companion.ui.CompanionVisualTheme
 
 @Composable
 fun CompanionTopBar(
+    isX3Connected: Boolean,
     onShowSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -72,7 +73,9 @@ fun CompanionTopBar(
                         style = MaterialTheme.typography.labelLarge,
                     )
                     Text(
-                        text = stringResource(R.string.settings_device_value),
+                        text = stringResource(
+                            if (isX3Connected) R.string.settings_device_connected else R.string.settings_device_value,
+                        ),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -195,7 +198,7 @@ fun BookOutlineIcon(
 @Composable
 private fun FocusTabIcon() {
     val color = MaterialTheme.colorScheme.onSurface
-    Canvas(modifier = Modifier.size(24.dp)) {
+    Canvas(modifier = Modifier.size(22.dp)) {
         drawCircle(color = color, style = Stroke(2.dp.toPx()))
         drawLine(color, center, Offset(center.x, 5.dp.toPx()), 2.dp.toPx(), StrokeCap.Round)
         drawLine(color, center, Offset(size.width - 6.dp.toPx(), center.y), 2.dp.toPx(), StrokeCap.Round)

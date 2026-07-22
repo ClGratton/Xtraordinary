@@ -117,7 +117,9 @@ data class ImportedBookUiState(
     val importedAtEpochMs: Long = 0L,
     val lastMetadataLookupEpochMs: Long? = null,
     val fileModifiedAtEpochMs: Long? = null,
-    val isOnDevice: Boolean = true,
+    val isOnPhone: Boolean = true,
+    val isOnX3: Boolean = false,
+    val x3Path: String? = null,
     val sourceFolderUri: String? = null,
 )
 
@@ -131,7 +133,7 @@ data class ReadUiState(
     val books: List<ImportedBookUiState> = emptyList(),
     val query: String = "",
     val sort: ReadSort = ReadSort.Recent,
-    val onDeviceOnly: Boolean = false,
+    val onX3Only: Boolean = false,
     val importing: Boolean = false,
     val syncing: Boolean = false,
     val folderLinked: Boolean = false,
@@ -144,6 +146,7 @@ data class CompanionUiState(
     val focus: FocusUiState = FocusUiState(),
     val read: ReadUiState = ReadUiState(),
     val ticket: TicketUiState = TicketUiState(),
+    val isX3Connected: Boolean = false,
     val settingsVisible: Boolean = false,
     val notice: UiNotice? = null,
 )
@@ -152,6 +155,8 @@ sealed interface UiNotice {
     data object FocusStartedWithoutX3 : UiNotice
     data object PairBeforeSend : UiNotice
     data object EpubImportFailed : UiNotice
+    data object ConnectX3ToDelete : UiNotice
+    data class X3DeleteQueued(val count: Int) : UiNotice
     data class BooksImported(
         val added: Int,
         val duplicates: Int,

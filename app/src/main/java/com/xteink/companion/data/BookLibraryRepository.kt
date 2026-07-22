@@ -61,7 +61,9 @@ class BookLibraryRepository(context: Context) {
         put("importedAtEpochMs", importedAtEpochMs)
         putNullable("lastMetadataLookupEpochMs", lastMetadataLookupEpochMs)
         putNullable("fileModifiedAtEpochMs", fileModifiedAtEpochMs)
-        put("isOnDevice", isOnDevice)
+        put("isOnPhone", isOnPhone)
+        put("isOnX3", isOnX3)
+        putNullable("x3Path", x3Path)
         putNullable("sourceFolderUri", sourceFolderUri)
     }
 
@@ -86,7 +88,9 @@ class BookLibraryRepository(context: Context) {
         importedAtEpochMs = optLong("importedAtEpochMs"),
         lastMetadataLookupEpochMs = nullableLong("lastMetadataLookupEpochMs"),
         fileModifiedAtEpochMs = nullableLong("fileModifiedAtEpochMs"),
-        isOnDevice = if (has("isOnDevice")) optBoolean("isOnDevice") else true,
+        isOnPhone = optBoolean("isOnPhone", true),
+        isOnX3 = optBoolean("isOnX3", false),
+        x3Path = nullableString("x3Path"),
         sourceFolderUri = nullableString("sourceFolderUri"),
     )
 
