@@ -46,9 +46,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -75,6 +72,9 @@ import kotlinx.coroutines.delay
 import kotlin.math.absoluteValue
 import kotlin.math.sign
 
+private const val PassSnapThreshold = 0.42f
+private const val PassSnapResetThreshold = 0.32f
+
 @Composable
 fun PassesToolContent(
     ticket: TicketUiState,
@@ -93,7 +93,7 @@ fun PassesToolContent(
     val snapKick = remember { Animatable(0f) }
     val flingBehavior = PagerDefaults.flingBehavior(
         state = pagerState,
-        snapPositionalThreshold = 0.42f,
+        snapPositionalThreshold = PassSnapThreshold,
         snapAnimationSpec = spring(
             dampingRatio = 0.78f,
             stiffness = Spring.StiffnessHigh,
@@ -181,51 +181,62 @@ fun PassesToolContent(
 @Composable
 private fun PagerResistanceFeedback(
     pagerState: PagerState,
-    onSnapStarted: suspend (Float) -> Unit,
+    onThresholdSnap: suspend (Float) -> Unit,
 ) {
     val context = LocalContext.current
     val fallback = LocalHapticFeedback.current
     val isDragged by pagerState.interactionSource.collectIsDraggedAsState()
-    var dragSessionActive by remember { mutableStateOf(false) }
-    var releaseDirection by remember { mutableFloatStateOf(1f) }
     val vibrator = remember(context) { context.touchVibrator() }
 
     LaunchedEffect(isDragged) {
         if (isDragged) {
-            dragSessionActive = true
+            val dragStartPosition = pagerState.currentPage + pagerState.currentPageOffsetFraction
             var lastPosition = pagerState.currentPage + pagerState.currentPageOffsetFraction
             var travelSinceTick = 0f
-            var cumulativeTravel = 0f
+            var thresholdLatched = false
             if (!vibrator.playPrimitive(context, VibrationEffect.Composition.PRIMITIVE_LOW_TICK, 0.18f)) {
-                fallback.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
+                fallback.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
             }
             while (isDragged) {
                 val position = pagerState.currentPage + pagerState.currentPageOffsetFraction
                 val movement = position - lastPosition
                 val distance = movement.absoluteValue
-                if (distance > 0.001f) releaseDirection = movement.sign
-                cumulativeTravel = (cumulativeTravel + distance).coerceAtMost(1f)
+                val signedProgress = position - dragStartPosition
+                val progress = signedProgress.absoluteValue
                 travelSinceTick += distance
 
-                val distancePerTick = 0.065f - cumulativeTravel * 0.037f
-                if (travelSinceTick >= distancePerTick) {
-                    // The drag only builds tension. The full-strength hit belongs to release.
-                    val scale = 0.18f + cumulativeTravel * 0.44f
-                    if (!vibrator.playPrimitive(context, VibrationEffect.Composition.PRIMITIVE_LOW_TICK, scale)) {
+                if (!thresholdLatched && progress >= PassSnapThreshold) {
+                    thresholdLatched = true
+                    if (!vibrator.playSnapThreshold(context)) {
+                        fallback.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
+                    }
+                    onThresholdSnap(signedProgress.sign)
+                } else if (thresholdLatched && progress < PassSnapResetThreshold) {
+                    thresholdLatched = false
+                    travelSinceTick = 0f
+                    if (!vibrator.playPrimitive(
+                            context,
+                            VibrationEffect.Composition.PRIMITIVE_LOW_TICK,
+                            0.30f,
+                        )
+                    ) {
                         fallback.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
                     }
-                    travelSinceTick = 0f
+                } else if (!thresholdLatched) {
+                    val approach = (progress / PassSnapThreshold).coerceIn(0f, 1f)
+                    val distancePerTick = 0.065f - approach * 0.037f
+                    if (travelSinceTick >= distancePerTick) {
+                        // Build tension up to the detent without competing with its full-strength hit.
+                        val scale = 0.18f + approach * 0.44f
+                        if (!vibrator.playPrimitive(context, VibrationEffect.Composition.PRIMITIVE_LOW_TICK, scale)) {
+                            fallback.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
+                        }
+                        travelSinceTick = 0f
+                    }
                 }
                 lastPosition = position
                 delay(12)
             }
-        } else if (dragSessionActive) {
-            // Fire at finger-up, when the spring starts, rather than after the card reaches center.
-            if (!vibrator.playSnap(context)) {
-                fallback.performHapticFeedback(HapticFeedbackType.GestureEnd)
-            }
-            dragSessionActive = false
-            onSnapStarted(releaseDirection)
         }
     }
 }
@@ -253,7 +264,7 @@ private fun Vibrator.playPrimitive(context: Context, primitive: Int, scale: Floa
     return true
 }
 
-private fun Vibrator.playSnap(context: Context): Boolean {
+private fun Vibrator.playSnapThreshold(context: Context): Boolean {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || !hasVibrator()) return false
     val touchEnabled = Settings.System.getInt(
         context.contentResolver,
