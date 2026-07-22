@@ -2,6 +2,7 @@ package com.xteink.companion.ui.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,8 +14,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.IconButton
@@ -294,12 +297,14 @@ fun SendToX3Icon(
 fun SettingsSheet(
     visualTheme: CompanionVisualTheme,
     onSetVisualTheme: (CompanionVisualTheme) -> Unit,
+    onOpenSetup: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         SettingsSheetContent(
             visualTheme = visualTheme,
             onSetVisualTheme = onSetVisualTheme,
+            onOpenSetup = onOpenSetup,
             onDismiss = onDismiss,
         )
     }
@@ -309,12 +314,14 @@ fun SettingsSheet(
 fun SettingsSheetContent(
     visualTheme: CompanionVisualTheme,
     onSetVisualTheme: (CompanionVisualTheme) -> Unit,
+    onOpenSetup: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp)
             .padding(bottom = 28.dp),
     ) {
@@ -347,6 +354,29 @@ fun SettingsSheetContent(
                 onClick = { onSetVisualTheme(CompanionVisualTheme.Quiet) },
                 modifier = Modifier.weight(1f),
             )
+        }
+        Spacer(Modifier.height(12.dp))
+        Surface(
+            onClick = onOpenSetup,
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            shape = MaterialTheme.shapes.medium,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.run_setup_again), style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        stringResource(R.string.run_setup_again_body),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text("›", style = MaterialTheme.typography.headlineMedium)
+            }
         }
         Spacer(Modifier.height(12.dp))
         SettingsValue(stringResource(R.string.settings_device), stringResource(R.string.settings_device_value))
@@ -391,7 +421,17 @@ private fun SettingsValue(label: String, value: String) {
         horizontalArrangement = Arrangement.spacedBy(20.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-        Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.width(132.dp),
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
     }
 }

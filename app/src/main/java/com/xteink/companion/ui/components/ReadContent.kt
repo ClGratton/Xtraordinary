@@ -168,11 +168,6 @@ fun ReadContent(
                             )
                         }
                     }
-                    Text(
-                        text = stringResource(R.string.read_library_subtitle, deviceLabel),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                     Box(
                         modifier = Modifier.fillMaxWidth().height(48.dp),
                         contentAlignment = Alignment.CenterStart,

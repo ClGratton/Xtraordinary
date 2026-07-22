@@ -10,6 +10,10 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -20,6 +24,7 @@ import com.xteink.companion.data.OpenLibraryMetadataClient
 import com.xteink.companion.ui.CompanionViewModel
 import com.xteink.companion.ui.CompanionVisualTheme
 import com.xteink.companion.ui.X3CompanionApp
+import com.xteink.companion.ui.components.SetupScreen
 import com.xteink.companion.ui.theme.X3CompanionTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -40,6 +45,10 @@ class MainActivity : ComponentActivity() {
         if (linkedFolder != null) syncLinkedFolder(showNotice = false) else refreshMissingBookMetadata()
         setContent {
             val state by viewModel.uiState.collectAsStateWithLifecycle()
+            val setupPreferences = remember { getSharedPreferences("xtraordinary_setup", MODE_PRIVATE) }
+            var setupComplete by rememberSaveable {
+                mutableStateOf(setupPreferences.getBoolean("setup_complete", false))
+            }
             val epubPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
                 if (uris.isNotEmpty()) importEpubs(uris)
             }
@@ -60,40 +69,56 @@ class MainActivity : ComponentActivity() {
                 }
             }
             X3CompanionTheme(visualTheme = state.visualTheme) {
-                X3CompanionApp(
-                    state = state,
-                    onSetVisualTheme = viewModel::setVisualTheme,
-                    onSetDuration = viewModel::setDuration,
-                    onStartFocus = viewModel::startFocus,
-                    onTogglePause = viewModel::togglePause,
-                    onEndFocus = viewModel::endFocus,
-                    onResetFocus = viewModel::resetFocus,
-                    onShowTools = viewModel::showTools,
-                    onShowRead = viewModel::showRead,
-                    onShowFocus = viewModel::showFocus,
-                    onSetReadQuery = viewModel::setReadQuery,
-                    onSetReadSort = viewModel::setReadSort,
-                    onSetReadService = viewModel::setReadService,
-                    onSetOnX3Only = viewModel::setOnX3Only,
-                    onDeleteBooksFromX3 = viewModel::requestDeleteBooksFromX3,
-                    onChooseBookFolder = { folderPicker.launch(null) },
-                    onOpenEpub = {
-                        epubPicker.launch(
-                            arrayOf(
-                                "application/epub+zip",
-                                "application/zip",
-                                "application/octet-stream",
-                            ),
-                        )
-                    },
-                    onOpenPasses = viewModel::openPasses,
-                    onShowToolHub = viewModel::showToolHub,
-                    onSelectPass = viewModel::selectPass,
-                    onSetTicketMode = viewModel::setTicketMode,
-                    onSendTicket = viewModel::sendTicket,
-                    onShowSettings = viewModel::showSettings,
-                    onDismissNotice = viewModel::dismissNotice,
-                )
+                if (setupComplete) {
+                    X3CompanionApp(
+                        state = state,
+                        onSetVisualTheme = viewModel::setVisualTheme,
+                        onSetDuration = viewModel::setDuration,
+                        onStartFocus = viewModel::startFocus,
+                        onTogglePause = viewModel::togglePause,
+                        onEndFocus = viewModel::endFocus,
+                        onResetFocus = viewModel::resetFocus,
+                        onShowTools = viewModel::showTools,
+                        onShowRead = viewModel::showRead,
+                        onShowFocus = viewModel::showFocus,
+                        onSetReadQuery = viewModel::setReadQuery,
+                        onSetReadSort = viewModel::setReadSort,
+                        onSetReadService = viewModel::setReadService,
+                        onSetOnX3Only = viewModel::setOnX3Only,
+                        onDeleteBooksFromX3 = viewModel::requestDeleteBooksFromX3,
+                        onChooseBookFolder = { folderPicker.launch(null) },
+                        onOpenEpub = {
+                            epubPicker.launch(
+                                arrayOf(
+                                    "application/epub+zip",
+                                    "application/zip",
+                                    "application/octet-stream",
+                                ),
+                            )
+                        },
+                        onOpenPasses = viewModel::openPasses,
+                        onShowToolHub = viewModel::showToolHub,
+                        onSelectPass = viewModel::selectPass,
+                        onSetTicketMode = viewModel::setTicketMode,
+                        onSendTicket = viewModel::sendTicket,
+                        onShowSettings = viewModel::showSettings,
+                        onOpenSetup = {
+                            viewModel.showSettings(false)
+                            setupPreferences.edit().putBoolean("setup_complete", false).apply()
+                            setupComplete = false
+                        },
+                        onDismissNotice = viewModel::dismissNotice,
+                    )
+                } else {
+                    SetupScreen(
+                        folderLinked = state.read.folderLinked,
+                        onChooseBookFolder = { folderPicker.launch(null) },
+                        onFinish = {
+                            setupPreferences.edit().putBoolean("setup_complete", true).apply()
+                            setupComplete = true
+                        },
+                    )
+                }
             }
         }
     }

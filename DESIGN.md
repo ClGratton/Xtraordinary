@@ -35,6 +35,10 @@ Tools
 
 Read is top-level because reading is core to the X3. Passes is an optional tool, not a tab. Focus contains only focus controls. Settings is opened from the compact X3 status row and does not become another tab.
 
+## First-run setup
+
+Setup is a skippable three-page magnetic carousel: Welcome, Library, and Device. Its selected and neighboring pages use pastel surface-container tones rather than saturated accent color. Welcome owns the concise value proposition, Library opens the real EPUB folder picker, and Device hands off to the shared X3/X4/X4 Pro connection flow. Completion persists, and Settings can replay setup without creating a fourth top-level destination.
+
 ## Themes, not modes
 
 ### Expressive
@@ -78,7 +82,7 @@ Opening a tool is nested navigation. Android Back and `Back to Tools` return to 
 
 ## Read screen
 
-- Read opens directly as the user's library; there is no import hero competing with the books.
+- Read opens directly as the user's library; there is no import hero or explanatory subtitle competing with the books.
 - The `On <model>` filter names the connected or last-known XTEINK model; it is never a hardcoded X3 label and never means merely present in Android's selected folder. The device filesystem is authoritative and is rescanned on connection, so books copied from a PC appear in the app.
 - Long-press enters multi-select with circular selection marks and inline Select all. The book-plus action is replaced by a trash action at bottom right, while Clear all appears at bottom left and is the single way to leave selection mode. Delete is checked when trash is pressed, requires an active device connection, asks for confirmation, and removes rows only after the device acknowledges the SD-card deletion.
 - Entering multi-select preserves the Read heading, search/filter positions, card bounds, and cover size. Only the fixed-height folder-action slot changes to the selected count and inline Select all; selection marks overlay the covers instead of reflowing the rows.

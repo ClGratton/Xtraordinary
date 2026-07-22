@@ -15,6 +15,7 @@ import com.xteink.companion.ui.components.SettingsSheetContent
 import com.xteink.companion.ui.components.DeviceConnectionSheetContent
 import com.xteink.companion.ui.components.DeviceSetupStep
 import com.xteink.companion.ui.components.ReadContent
+import com.xteink.companion.ui.components.SetupScreen
 import com.xteink.companion.ui.theme.X3CompanionTheme
 
 @PreviewTest
@@ -22,6 +23,47 @@ import com.xteink.companion.ui.theme.X3CompanionTheme
 @Composable
 fun expressiveFocusPhoneScreenshot() {
     ScreenshotApp(state = CompanionUiState())
+}
+
+@PreviewTest
+@Preview(name = "First-run setup", widthDp = 412, heightDp = 915, showBackground = true)
+@Composable
+fun firstRunSetupScreenshot() {
+    X3CompanionTheme(visualTheme = CompanionVisualTheme.Expressive, useDynamicColor = false) {
+        SetupScreen(
+            folderLinked = false,
+            onChooseBookFolder = {},
+            onFinish = {},
+        )
+    }
+}
+
+@PreviewTest
+@Preview(name = "Setup library", widthDp = 412, heightDp = 915, showBackground = true)
+@Composable
+fun setupLibraryScreenshot() {
+    X3CompanionTheme(visualTheme = CompanionVisualTheme.Expressive, useDynamicColor = false) {
+        SetupScreen(
+            folderLinked = false,
+            onChooseBookFolder = {},
+            onFinish = {},
+            initialPage = 1,
+        )
+    }
+}
+
+@PreviewTest
+@Preview(name = "Setup device", widthDp = 412, heightDp = 915, showBackground = true)
+@Composable
+fun setupDeviceScreenshot() {
+    X3CompanionTheme(visualTheme = CompanionVisualTheme.Expressive, useDynamicColor = false) {
+        SetupScreen(
+            folderLinked = false,
+            onChooseBookFolder = {},
+            onFinish = {},
+            initialPage = 2,
+        )
+    }
 }
 
 @PreviewTest
@@ -165,6 +207,7 @@ fun settingsThemesScreenshot() {
                 SettingsSheetContent(
                     visualTheme = CompanionVisualTheme.Expressive,
                     onSetVisualTheme = {},
+                    onOpenSetup = {},
                     onDismiss = {},
                     modifier = Modifier.padding(top = 20.dp),
                 )
@@ -235,6 +278,7 @@ private fun ScreenshotApp(state: CompanionUiState) {
             onSetTicketMode = {},
             onSendTicket = {},
             onShowSettings = {},
+            onOpenSetup = {},
             onDismissNotice = {},
         )
     }

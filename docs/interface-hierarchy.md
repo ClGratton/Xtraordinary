@@ -53,6 +53,8 @@ Android share target (planned)
 
 There are exactly three permanent tabs: Focus, Read, and Tools. Reading is core to the X3, while Passes remains nested inside Tools because many users will never use it. Quiet is a theme and never creates another navigation branch.
 
+Before the app shell, first-run setup presents three horizontally snapping pages: Welcome, Library, and Device. The carousel uses pastel surface-container selection rather than accent color. Setup is skippable, persists completion, opens the real EPUB folder picker, reuses the X3/X4/X4 Pro connection flow, and can be replayed from Settings.
+
 ## Focus
 
 ### Setup

@@ -58,6 +58,7 @@ fun X3CompanionApp(
     onSetTicketMode: (TicketMode) -> Unit,
     onSendTicket: () -> Unit,
     onShowSettings: (Boolean) -> Unit,
+    onOpenSetup: () -> Unit,
     onDismissNotice: () -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -173,6 +174,7 @@ fun X3CompanionApp(
         SettingsSheet(
             visualTheme = state.visualTheme,
             onSetVisualTheme = onSetVisualTheme,
+            onOpenSetup = onOpenSetup,
             onDismiss = { onShowSettings(false) },
         )
     }
