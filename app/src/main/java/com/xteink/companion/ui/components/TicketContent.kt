@@ -73,15 +73,14 @@ import com.xteink.companion.ui.TicketMode
 import com.xteink.companion.ui.TicketUiState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
-import kotlin.math.PI
 import kotlin.math.absoluteValue
 import kotlin.math.sign
-import kotlin.math.sin
 
-private const val PassSnapThreshold = 0.42f
-private const val PassSnapResetThreshold = 0.32f
-private const val PassFreeTravel = 0.08f
-private const val PassResistedTravel = 0.48f
+private val PassMagneticSwipe = MagneticSwipeConfig(
+    threshold = 0.42f,
+    freeTravel = 0.08f,
+    resistedTravel = 0.48f,
+)
 
 @Composable
 fun PassesToolContent(
@@ -103,7 +102,7 @@ fun PassesToolContent(
     val snapKick = remember { Animatable(0f) }
     val flingBehavior = PagerDefaults.flingBehavior(
         state = pagerState,
-        snapPositionalThreshold = PassSnapThreshold,
+        snapPositionalThreshold = PassMagneticSwipe.threshold,
         snapAnimationSpec = spring(
             dampingRatio = 0.78f,
             stiffness = Spring.StiffnessHigh,
@@ -166,10 +165,9 @@ fun PassesToolContent(
                         .coerceIn(0f, 1f)
                     val signedDrag = ((pagerState.currentPage - pagerState.settledPage) +
                         pagerState.currentPageOffsetFraction).coerceIn(-1f, 1f)
-                    val rawProgress = signedDrag.absoluteValue
-                    val resistedProgress = resistedPassDragProgress(rawProgress)
-                    val resistedDistance = rawProgress - resistedProgress
-                    translationX = signedDrag.sign * size.width * resistedDistance * resistanceRelease.value
+                    val displayedProgress = PassMagneticSwipe.displayedProgress(signedDrag)
+                    val resistedDistance = signedDrag - displayedProgress
+                    translationX = size.width * resistedDistance * resistanceRelease.value
                     if (page == pagerState.settledPage) translationX += snapKick.value * size.width
                     scaleX = 1f - pageOffset * 0.014f
                     scaleY = 1f - pageOffset * 0.010f
@@ -216,7 +214,8 @@ private fun PagerResistanceFeedback(
             val dragStartPosition = pagerState.currentPage + pagerState.currentPageOffsetFraction
             var lastPosition = pagerState.currentPage + pagerState.currentPageOffsetFraction
             var travelSinceTick = 0f
-            var thresholdLatched = false
+            var samplesUntilTick = 0
+            val magneticState = MagneticSwipeState(PassMagneticSwipe)
             if (!vibrator.playPrimitive(context, VibrationEffect.Composition.PRIMITIVE_LOW_TICK, 0.18f)) {
                 fallback.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
             }
@@ -229,24 +228,15 @@ private fun PagerResistanceFeedback(
                 if (distance > 0.001f) releaseDirection = movement.sign
                 travelSinceTick += distance
 
-                if (!thresholdLatched && progress >= PassSnapThreshold) {
-                    thresholdLatched = true
+                val thresholdEvent = magneticState.update(signedProgress)
+                if (thresholdEvent != null) {
                     if (!vibrator.playSnapThreshold(context)) {
                         fallback.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
                     }
-                } else if (thresholdLatched && progress < PassSnapResetThreshold) {
-                    thresholdLatched = false
                     travelSinceTick = 0f
-                    if (!vibrator.playPrimitive(
-                            context,
-                            VibrationEffect.Composition.PRIMITIVE_LOW_TICK,
-                            0.30f,
-                        )
-                    ) {
-                        fallback.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
-                    }
-                } else if (!thresholdLatched) {
-                    val approach = (progress / PassSnapThreshold).coerceIn(0f, 1f)
+                    samplesUntilTick = 8
+                } else if (!magneticState.isBeyondThreshold && samplesUntilTick == 0) {
+                    val approach = (progress / PassMagneticSwipe.threshold).coerceIn(0f, 1f)
                     val distancePerTick = 0.065f - approach * 0.037f
                     if (travelSinceTick >= distancePerTick) {
                         // Build tension up to the detent without competing with its full-strength hit.
@@ -256,6 +246,8 @@ private fun PagerResistanceFeedback(
                         }
                         travelSinceTick = 0f
                     }
+                } else if (samplesUntilTick > 0) {
+                    samplesUntilTick -= 1
                 }
                 lastPosition = position
                 delay(12)
@@ -266,13 +258,6 @@ private fun PagerResistanceFeedback(
             onCenterSettled(releaseDirection)
         }
     }
-}
-
-private fun resistedPassDragProgress(rawProgress: Float): Float {
-    val progress = rawProgress.coerceIn(0f, 1f)
-    if (progress <= PassFreeTravel) return progress
-    val constrainedProgress = (progress - PassFreeTravel) / (1f - PassFreeTravel)
-    return PassFreeTravel + PassResistedTravel * sin(constrainedProgress * (PI.toFloat() / 2f))
 }
 
 @Suppress("DEPRECATION")

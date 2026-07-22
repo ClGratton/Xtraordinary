@@ -146,13 +146,15 @@ private fun X3ImageField(visualTheme: CompanionVisualTheme) {
 
 private val DurationDeckShape = GenericShape { size, _ ->
     moveTo(0f, size.height * 0.22f)
-    cubicTo(0f, size.height * 0.06f, size.width * 0.08f, 0f, size.width * 0.23f, size.height * 0.01f)
-    cubicTo(size.width * 0.46f, size.height * 0.075f, size.width * 0.65f, 0f, size.width * 0.83f, size.height * 0.01f)
-    cubicTo(size.width * 0.95f, size.height * 0.02f, size.width, size.height * 0.11f, size.width, size.height * 0.25f)
+    cubicTo(0f, size.height * 0.07f, size.width * 0.08f, 0f, size.width * 0.22f, size.height * 0.01f)
+    cubicTo(size.width * 0.34f, size.height * 0.018f, size.width * 0.38f, size.height * 0.065f, size.width * 0.50f, size.height * 0.065f)
+    cubicTo(size.width * 0.62f, size.height * 0.065f, size.width * 0.70f, size.height * 0.018f, size.width * 0.82f, size.height * 0.01f)
+    cubicTo(size.width * 0.93f, size.height * 0.003f, size.width, size.height * 0.11f, size.width, size.height * 0.25f)
     lineTo(size.width, size.height * 0.76f)
     cubicTo(size.width, size.height * 0.92f, size.width * 0.93f, size.height, size.width * 0.79f, size.height)
-    cubicTo(size.width * 0.56f, size.height * 0.94f, size.width * 0.35f, size.height * 0.97f, size.width * 0.16f, size.height)
-    cubicTo(size.width * 0.05f, size.height, 0f, size.height * 0.91f, 0f, size.height * 0.77f)
+    cubicTo(size.width * 0.67f, size.height, size.width * 0.62f, size.height * 0.95f, size.width * 0.50f, size.height * 0.95f)
+    cubicTo(size.width * 0.38f, size.height * 0.95f, size.width * 0.28f, size.height, size.width * 0.16f, size.height)
+    cubicTo(size.width * 0.07f, size.height, 0f, size.height * 0.91f, 0f, size.height * 0.77f)
     close()
 }
 
