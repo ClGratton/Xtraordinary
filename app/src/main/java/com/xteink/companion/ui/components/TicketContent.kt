@@ -46,7 +46,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,11 +72,16 @@ import com.xteink.companion.ui.BoardingPassUiState
 import com.xteink.companion.ui.TicketMode
 import com.xteink.companion.ui.TicketUiState
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlin.math.PI
 import kotlin.math.absoluteValue
 import kotlin.math.sign
+import kotlin.math.sin
 
 private const val PassSnapThreshold = 0.42f
 private const val PassSnapResetThreshold = 0.32f
+private const val PassFreeTravel = 0.08f
+private const val PassResistedTravel = 0.48f
 
 @Composable
 fun PassesToolContent(
@@ -90,6 +98,8 @@ fun PassesToolContent(
         initialPage = selectedIndex,
         pageCount = { ticket.passes.size },
     )
+    val isPagerDragged by pagerState.interactionSource.collectIsDraggedAsState()
+    val resistanceRelease = remember { Animatable(0f) }
     val snapKick = remember { Animatable(0f) }
     val flingBehavior = PagerDefaults.flingBehavior(
         state = pagerState,
@@ -99,7 +109,14 @@ fun PassesToolContent(
             stiffness = Spring.StiffnessHigh,
         ),
     )
-    PagerResistanceFeedback(pagerState) { direction ->
+    LaunchedEffect(isPagerDragged) {
+        if (isPagerDragged) {
+            resistanceRelease.snapTo(1f)
+        } else {
+            resistanceRelease.animateTo(0f, tween(durationMillis = 110))
+        }
+    }
+    PagerResistanceFeedback(pagerState, isPagerDragged) { direction ->
         snapKick.snapTo(direction * 0.018f)
         snapKick.animateTo(-direction * 0.006f, tween(durationMillis = 70))
         snapKick.animateTo(0f, tween(durationMillis = 100))
@@ -138,22 +155,25 @@ fun PassesToolContent(
             state = pagerState,
             contentPadding = PaddingValues(horizontal = 48.dp),
             pageSpacing = 10.dp,
-        flingBehavior = flingBehavior,
-        modifier = Modifier.fillMaxWidth(),
-    ) { page ->
-        PassControlCard(
-            pass = ticket.passes[page],
-            modifier = Modifier.graphicsLayer {
-                val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
-                    .absoluteValue
-                    .coerceIn(0f, 1f)
-                val dragProgress = pagerState.currentPageOffsetFraction.absoluteValue.coerceIn(0f, 1f)
-                val resistance = (1f - dragProgress) * (1f - dragProgress) * 0.28f
-                translationX = pagerState.currentPageOffsetFraction * size.width * resistance
-                if (page == pagerState.settledPage) translationX += snapKick.value * size.width
-                scaleX = 1f - pageOffset * 0.014f
-                scaleY = 1f - pageOffset * 0.010f
-            },
+            flingBehavior = flingBehavior,
+            modifier = Modifier.fillMaxWidth(),
+        ) { page ->
+            PassControlCard(
+                pass = ticket.passes[page],
+                modifier = Modifier.graphicsLayer {
+                    val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
+                        .absoluteValue
+                        .coerceIn(0f, 1f)
+                    val signedDrag = ((pagerState.currentPage - pagerState.settledPage) +
+                        pagerState.currentPageOffsetFraction).coerceIn(-1f, 1f)
+                    val rawProgress = signedDrag.absoluteValue
+                    val resistedProgress = resistedPassDragProgress(rawProgress)
+                    val resistedDistance = rawProgress - resistedProgress
+                    translationX = signedDrag.sign * size.width * resistedDistance * resistanceRelease.value
+                    if (page == pagerState.settledPage) translationX += snapKick.value * size.width
+                    scaleX = 1f - pageOffset * 0.014f
+                    scaleY = 1f - pageOffset * 0.010f
+                },
             )
         }
         PassModeChooser(
@@ -181,15 +201,18 @@ fun PassesToolContent(
 @Composable
 private fun PagerResistanceFeedback(
     pagerState: PagerState,
-    onThresholdSnap: suspend (Float) -> Unit,
+    isDragged: Boolean,
+    onCenterSettled: suspend (Float) -> Unit,
 ) {
     val context = LocalContext.current
     val fallback = LocalHapticFeedback.current
-    val isDragged by pagerState.interactionSource.collectIsDraggedAsState()
+    var dragSessionActive by remember { mutableStateOf(false) }
+    var releaseDirection by remember { mutableFloatStateOf(1f) }
     val vibrator = remember(context) { context.touchVibrator() }
 
     LaunchedEffect(isDragged) {
         if (isDragged) {
+            dragSessionActive = true
             val dragStartPosition = pagerState.currentPage + pagerState.currentPageOffsetFraction
             var lastPosition = pagerState.currentPage + pagerState.currentPageOffsetFraction
             var travelSinceTick = 0f
@@ -203,6 +226,7 @@ private fun PagerResistanceFeedback(
                 val distance = movement.absoluteValue
                 val signedProgress = position - dragStartPosition
                 val progress = signedProgress.absoluteValue
+                if (distance > 0.001f) releaseDirection = movement.sign
                 travelSinceTick += distance
 
                 if (!thresholdLatched && progress >= PassSnapThreshold) {
@@ -210,7 +234,6 @@ private fun PagerResistanceFeedback(
                     if (!vibrator.playSnapThreshold(context)) {
                         fallback.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
                     }
-                    onThresholdSnap(signedProgress.sign)
                 } else if (thresholdLatched && progress < PassSnapResetThreshold) {
                     thresholdLatched = false
                     travelSinceTick = 0f
@@ -237,8 +260,19 @@ private fun PagerResistanceFeedback(
                 lastPosition = position
                 delay(12)
             }
+        } else if (dragSessionActive) {
+            snapshotFlow { pagerState.isScrollInProgress }.first { scrolling -> !scrolling }
+            dragSessionActive = false
+            onCenterSettled(releaseDirection)
         }
     }
+}
+
+private fun resistedPassDragProgress(rawProgress: Float): Float {
+    val progress = rawProgress.coerceIn(0f, 1f)
+    if (progress <= PassFreeTravel) return progress
+    val constrainedProgress = (progress - PassFreeTravel) / (1f - PassFreeTravel)
+    return PassFreeTravel + PassResistedTravel * sin(constrainedProgress * (PI.toFloat() / 2f))
 }
 
 @Suppress("DEPRECATION")
