@@ -274,7 +274,6 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                                 FirmwareCheckPhase.Available
                             },
                             latestFirmwareVersion = release.version,
-                            message = "${release.version} is ready for ${release.model}",
                         ))
                     }
                 }
