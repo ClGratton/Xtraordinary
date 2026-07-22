@@ -167,8 +167,8 @@ private fun DurationControlDeck(
     var lastHapticMinute by remember { mutableIntStateOf(focus.selectedMinutes) }
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         shape = DurationDeckShape,
     ) {
         BoxWithConstraints {

@@ -64,6 +64,8 @@ Order is fixed:
 
 The image field is visual content, not a second timer or editable task field. The duration appears once. Starting Focus is explicit and never happens merely because the device pairs or the phone is placed face-down.
 
+Expressive Focus uses the same pastel surface balance as Read and Tools: the duration deck is a quiet surface-container tint, while saturated primary color is reserved for the slider state and main action.
+
 When no hardware is paired, the status reads `Devices / None connected` rather than naming an X3 that is not present. Tapping it opens the device manager on its empty state. `Connect a device` progressively reveals a snapping X3, X4, and X4 Pro model carousel, device preparation, and the discovery handoff. The UI does not claim Bluetooth discovery works before the companion firmware service exists.
 
 After Start, the primary action performs a short mitosis transition into two equal sibling controls: Pause/Resume and Stop. Stop is never hidden in an overflow menu, and the transition runs once per state change rather than continuously.
@@ -78,8 +80,8 @@ Opening a tool is nested navigation. Android Back and `Back to Tools` return to 
 
 - Read opens directly as the user's library; there is no import hero competing with the books.
 - The `On <model>` filter names the connected or last-known XTEINK model; it is never a hardcoded X3 label and never means merely present in Android's selected folder. The device filesystem is authoritative and is rescanned on connection, so books copied from a PC appear in the app.
-- Long-press enters multi-select with circular selection marks and Select all. Delete is checked when the trash action is pressed, requires an active X3 connection, asks for confirmation, and removes rows only after the device acknowledges the SD-card deletion.
-- Entering multi-select preserves the Read heading, search/filter positions, card bounds, and cover size. The compact selection actions replace only the fixed-height folder-action slot, while selection marks overlay the covers instead of reflowing the rows.
+- Long-press enters multi-select with circular selection marks and inline Select all. The book-plus action is replaced by a trash action at bottom right, while Clear all appears at bottom left and is the single way to leave selection mode. Delete is checked when trash is pressed, requires an active device connection, asks for confirmation, and removes rows only after the device acknowledges the SD-card deletion.
+- Entering multi-select preserves the Read heading, search/filter positions, card bounds, and cover size. Only the fixed-height folder-action slot changes to the selected count and inline Select all; selection marks overlay the covers instead of reflowing the rows.
 - Imported-book rows stay compact: one fixed-height cover thumbnail and four single-line metadata levels, so the library remains a scan-friendly list rather than a stack of oversized cards.
 - A clearly visible squircle book-plus action at bottom right opens Android's multi-document picker for one or more EPUBs.
 - `Choose EPUB folder` grants the app persistent read access to one user-selected directory tree. The tree is scanned at launch, so EPUBs already in Files appear without being selected one-by-one.
@@ -87,7 +89,7 @@ Opening a tool is nested navigation. Android Back and `Back to Tools` return to 
 - EPUB metadata and cover art are authoritative. Missing cover, author, publisher, language, or year may be filled with a low-volume Open Library lookup, then cached locally with a seven-day retry throttle.
 - Duplicate document URIs are not added again and the result notice reports already-imported selections. Android's system picker owns its file-row appearance; the app cannot recolor those rows.
 - Missing-field enrichment is internal behavior, never exposed as a user-facing library filter. Phone-folder presence and X3 presence are tracked separately; missing phone files remain in history, while On X3 filters only the device inventory.
-- Service filtering is one compact dropdown in the single horizontally scrolling filter row. It lists Local EPUB plus unlinked future providers without spawning another filter chip. A dismissible reminder chip opens account settings; the library does not carry a large speculative Research & sources card.
+- Date/Name/Size are one mutually exclusive Sort dropdown. Service is a second dropdown and device presence remains a toggle, so all controls fit in one row without duplicate sort chips. A full-width dismissible Library services reminder card below the books mirrors the previous Research & sources hierarchy and opens Settings.
 - Future connectors use supported sign-in/provider access only. The app never scrapes credentials or bypasses DRM.
 
 ## Passes & codes
@@ -117,6 +119,7 @@ Icons are drawn as consistent vector geometry. Pass transfer actions use an upwa
 ## Motion
 
 - Use short fades for destination changes and restrained spring motion for direct manipulation.
+- Stateful controls must transform from the control already on screen: split, morph, slide, or collapse with physical continuity. Do not make replacement actions simply appear or disappear; the motion should explain what the control became, as in the Focus action mitosis.
 - Passes and device selection use the same reusable magnetic pager. Resistance is a stable function of displacement, so the same finger position produces the same card position whether the drag is moving outward or returning. The withheld distance smoothly releases after the bump so direct tracking resumes. Every inward or outward threshold crossing emits a crisp click without requiring finger lift; a fast fling that commits before the dragged offset reaches that threshold emits the same click as soon as the pager chooses its new target. Callers pass their own resting and selected container/content colors; the outgoing selection color fades continuously with resisted displacement instead of stepping down when touch begins, while the incoming color remains softened until the page settles at full strength. The small visual wobble occurs only after a card settles at center. Unsupported haptic primitives fall back to semantic Compose feedback.
 - Do not animate continuously while a timer runs.
 - Never imply the X3 updated before a firmware acknowledgement.
