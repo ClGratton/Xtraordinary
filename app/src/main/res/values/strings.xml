@@ -2,6 +2,25 @@
 <resources>
     <string name="app_name">Xtraordinary</string>
     <string name="demo_status">X3</string>
+    <string name="devices_title">Devices</string>
+    <string name="back">Back</string>
+    <string name="close">Close</string>
+    <string name="no_connected_devices">No connected devices</string>
+    <string name="no_connected_devices_body">Connect an XTEINK display to manage its library, scenes, and controls.</string>
+    <string name="connect_a_device">Connect a device</string>
+    <string name="choose_device">Choose your device</string>
+    <string name="choose_device_body">Swipe to the model printed on your device.</string>
+    <string name="xteink_device">XTEINK device</string>
+    <string name="continue_with_device">Continue with %1$s</string>
+    <string name="prepare_device">Prepare your %1$s</string>
+    <string name="prepare_device_power">Turn on the device.</string>
+    <string name="prepare_device_companion">Open Settings, then Companion on the device.</string>
+    <string name="prepare_device_nearby">Keep it unlocked and close to this phone.</string>
+    <string name="device_is_ready">My device is ready</string>
+    <string name="ready_to_find_device">Ready to find your %1$s</string>
+    <string name="discovery_not_available">Bluetooth discovery is not connected in this prototype yet. This step will search only after the companion firmware service is available.</string>
+    <string name="search_nearby">Search nearby</string>
+    <string name="device_outline_description">XTEINK device outline</string>
     <string name="settings">Settings</string>
     <string name="focus_tab">Focus</string>
     <string name="tools_tab">Tools</string>
@@ -9,6 +28,8 @@
     <string name="duration_format">%1$02d:00</string>
     <string name="time_format_hint">mm:ss</string>
     <string name="open_settings">Open settings</string>
+    <string name="open_devices">Open devices</string>
+    <string name="open_connected_device">Open connected device</string>
     <string name="x3_preview_description">Preview of the scene that will appear on the X3</string>
     <string name="x3_brand">XTEINK</string>
     <string name="close_settings">Close settings</string>
@@ -42,8 +63,8 @@
     <string name="sample_boarding_pass_description">Sample X3 boarding pass preview for flight AZ 123, boarding at gate B12 at 18:40. The displayed code is not scannable.</string>
     <string name="sample">SAMPLE</string>
     <string name="gate">Gate B12</string>
-    <string name="settings_device">X3 device</string>
-    <string name="settings_device_value">Not paired</string>
+    <string name="settings_device">Devices</string>
+    <string name="settings_device_value">None connected</string>
     <string name="settings_device_connected">Connected</string>
     <string name="settings_notifications">Notification rules</string>
     <string name="settings_notifications_value">Rules not configured</string>

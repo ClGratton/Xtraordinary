@@ -12,6 +12,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.android.tools.screenshot.PreviewTest
 import com.xteink.companion.ui.components.SettingsSheetContent
+import com.xteink.companion.ui.components.DeviceConnectionSheetContent
+import com.xteink.companion.ui.components.DeviceSetupStep
 import com.xteink.companion.ui.theme.X3CompanionTheme
 
 @PreviewTest
@@ -136,6 +138,41 @@ fun settingsThemesScreenshot() {
                     visualTheme = CompanionVisualTheme.Expressive,
                     onSetVisualTheme = {},
                     onDismiss = {},
+                    modifier = Modifier.padding(top = 20.dp),
+                )
+            }
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Devices empty", widthDp = 412, heightDp = 915, showBackground = true)
+@Composable
+fun devicesEmptyScreenshot() {
+    DeviceSheetScreenshot(step = DeviceSetupStep.Devices)
+}
+
+@PreviewTest
+@Preview(name = "Device model picker", widthDp = 412, heightDp = 915, showBackground = true)
+@Composable
+fun deviceModelPickerScreenshot() {
+    DeviceSheetScreenshot(step = DeviceSetupStep.ChooseModel)
+}
+
+@Composable
+private fun DeviceSheetScreenshot(step: DeviceSetupStep) {
+    X3CompanionTheme(visualTheme = CompanionVisualTheme.Expressive, useDynamicColor = false) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = MaterialTheme.shapes.extraLarge,
+            ) {
+                DeviceConnectionSheetContent(
+                    onDismiss = {},
+                    initialStep = step,
                     modifier = Modifier.padding(top = 20.dp),
                 )
             }

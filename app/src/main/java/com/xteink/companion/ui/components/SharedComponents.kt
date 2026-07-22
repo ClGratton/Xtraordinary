@@ -45,10 +45,14 @@ import com.xteink.companion.ui.CompanionVisualTheme
 @Composable
 fun CompanionTopBar(
     isX3Connected: Boolean,
+    onShowDevices: () -> Unit,
     onShowSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val settingsDescription = stringResource(R.string.open_settings)
+    val devicesDescription = stringResource(
+        if (isX3Connected) R.string.open_connected_device else R.string.open_devices,
+    )
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -58,8 +62,12 @@ fun CompanionTopBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Surface(
+            onClick = onShowDevices,
             color = MaterialTheme.colorScheme.surfaceContainer,
             shape = MaterialTheme.shapes.medium,
+            modifier = Modifier.semantics {
+                contentDescription = devicesDescription
+            },
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
@@ -69,7 +77,9 @@ fun CompanionTopBar(
                 DeviceOutlineIcon()
                 Column {
                     Text(
-                        text = stringResource(R.string.demo_status),
+                        text = stringResource(
+                            if (isX3Connected) R.string.demo_status else R.string.devices_title,
+                        ),
                         style = MaterialTheme.typography.labelLarge,
                     )
                     Text(

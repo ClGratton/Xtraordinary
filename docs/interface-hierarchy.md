@@ -8,7 +8,7 @@ The phone app uses the expressive control-deck interface from concept B. Concept
 
 ```text
 App shell
-├─ X3 status + Settings
+├─ device status + Settings
 ├─ Focus tab
 │  ├─ X3 image field
 │  ├─ duration control
@@ -59,12 +59,14 @@ There are exactly three permanent tabs: Focus, Read, and Tools. Reading is core 
 
 The screen is the concept-B control deck:
 
-1. X3 status and Settings.
+1. Device status and Settings.
 2. A real monochrome image field representing the content to send to the rear display.
 3. One large duration control.
 4. One full-width Start focus action; active sessions split it into Pause/Resume and Stop.
 
 The image field is not a duplicate timer. Starting Focus is always explicit; pairing or placing the phone face-down never starts it.
+
+With no paired hardware, the status surface reads `Devices / None connected`. Tapping it first shows the real empty device list, not a fictional X3 row. `Connect a device` advances to a horizontally snapping X3, X4, and X4 Pro selector, concise preparation steps, and the Bluetooth discovery handoff. The discovery action stays unavailable until the companion firmware service and Android BLE layer are implemented.
 
 ### Active session
 
@@ -197,7 +199,7 @@ Phone artwork and X3 output are not the same bitmap. `SceneArtwork` maps a full 
 | Expressive | full landscape lighthouse | wide horizontal lighthouse crop |
 | Quiet | full landscape astronaut | X3-ready astronaut crop |
 
-Both phone previews use one fixed landscape frame, so switching themes cannot change the screen's geometry. The phone keeps a white physical XTEINK frame with black branding outside the artwork in both visual themes. The eventual renderer consumes `x3PayloadCrop`, converts it to one-bit physical framebuffer order, and never resizes the already-approved phone composition as a shortcut.
+Both phone previews use one fixed landscape frame, so switching themes cannot change the screen's geometry. Expressive uses the active Material tonal palette for the physical XTEINK frame and branding; Quiet keeps the enclosure white with black branding. The eventual renderer consumes `x3PayloadCrop`, converts it to one-bit physical framebuffer order, and never resizes the already-approved phone composition as a shortcut.
 
 The exact concept-board slices are retained as [lighthouse](assets/concept-lighthouse-reference.png) and [astronaut](assets/concept-astronaut-reference.png) references; production payload assets are normalized to the physical X3 dimensions.
 

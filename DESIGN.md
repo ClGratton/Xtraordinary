@@ -56,13 +56,15 @@ The theme choice lives in Settings. There is no Normal/Minimal tab, density mode
 
 Order is fixed:
 
-1. compact X3 connection state and Settings;
+1. compact device connection state and Settings;
 2. the actual monochrome image field that will be sent to the X3;
 3. one organic duration surface with large time, increment/decrement controls, and slider;
 4. one full-width Start/Pause/Resume action that splits to expose Stop only during an active session;
 5. Focus/Read/Tools navigation.
 
 The image field is visual content, not a second timer or editable task field. The duration appears once. Starting Focus is explicit and never happens merely because the device pairs or the phone is placed face-down.
+
+When no hardware is paired, the status reads `Devices / None connected` rather than naming an X3 that is not present. Tapping it opens the device manager on its empty state. `Connect a device` progressively reveals a snapping X3, X4, and X4 Pro model carousel, device preparation, and the discovery handoff. The UI does not claim Bluetooth discovery works before the companion firmware service exists.
 
 After Start, the primary action performs a short mitosis transition into two equal sibling controls: Pause/Resume and Stop. Stop is never hidden in an overflow menu, and the transition runs once per state change rather than continuously.
 

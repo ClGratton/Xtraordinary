@@ -100,12 +100,16 @@ fun ControlDeckFocusContent(
 private fun X3ImageField(visualTheme: CompanionVisualTheme) {
     val description = stringResource(R.string.x3_preview_description)
     val artwork = sceneArtworkFor(visualTheme).phonePreview
+    val frameColor = if (visualTheme == CompanionVisualTheme.Quiet) Color.White
+    else MaterialTheme.colorScheme.secondaryContainer
+    val brandColor = if (visualTheme == CompanionVisualTheme.Quiet) Color.Black
+    else MaterialTheme.colorScheme.onSecondaryContainer
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(1.60f)
             .semantics { contentDescription = description },
-        color = Color.White,
+        color = frameColor,
         shape = MaterialTheme.shapes.medium,
     ) {
         Column(
@@ -129,7 +133,7 @@ private fun X3ImageField(visualTheme: CompanionVisualTheme) {
             }
             Text(
                 text = stringResource(R.string.x3_brand),
-                color = Color.Black,
+                color = brandColor,
                 fontSize = 9.sp,
                 letterSpacing = 1.sp,
                 fontWeight = FontWeight.Bold,
@@ -282,6 +286,11 @@ private fun FocusDeckActions(
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "focus action gap",
     )
+    val actionHeight by animateDpAsState(
+        targetValue = if (active) 60.dp else 64.dp,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "focus action height",
+    )
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(splitGap),
@@ -299,7 +308,7 @@ private fun FocusDeckActions(
             },
             modifier = Modifier
                 .weight(1f)
-                .height(60.dp),
+                .height(actionHeight),
             shape = RoundedCornerShape(actionCorner),
         ) {
             when (phase) {

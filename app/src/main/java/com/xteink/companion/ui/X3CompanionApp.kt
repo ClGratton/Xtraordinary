@@ -16,13 +16,18 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.xteink.companion.R
 import com.xteink.companion.ui.components.CompanionNavigation
 import com.xteink.companion.ui.components.CompanionTopBar
 import com.xteink.companion.ui.components.ControlDeckFocusContent
+import com.xteink.companion.ui.components.DeviceConnectionSheet
 import com.xteink.companion.ui.components.PassesToolContent
 import com.xteink.companion.ui.components.ReadContent
 import com.xteink.companion.ui.components.SettingsSheet
@@ -55,6 +60,7 @@ fun X3CompanionApp(
     onDismissNotice: () -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    var devicesVisible by rememberSaveable { mutableStateOf(false) }
     val noticeText = when (val notice = state.notice) {
         UiNotice.FocusStartedWithoutX3 -> stringResource(R.string.focus_started_without_x3)
         UiNotice.PairBeforeSend -> stringResource(R.string.pair_before_send)
@@ -82,8 +88,12 @@ fun X3CompanionApp(
         }
     }
 
-    BackHandler(enabled = state.settingsVisible || state.toolDestination != ToolDestination.Hub) {
-        if (state.settingsVisible) onShowSettings(false) else onShowToolHub()
+    BackHandler(enabled = devicesVisible || state.settingsVisible || state.toolDestination != ToolDestination.Hub) {
+        when {
+            devicesVisible -> devicesVisible = false
+            state.settingsVisible -> onShowSettings(false)
+            else -> onShowToolHub()
+        }
     }
 
     Scaffold(
@@ -106,6 +116,7 @@ fun X3CompanionApp(
         ) {
             CompanionTopBar(
                 isX3Connected = state.isX3Connected,
+                onShowDevices = { devicesVisible = true },
                 onShowSettings = { onShowSettings(true) },
             )
             Box(modifier = Modifier.weight(1f)) {
@@ -159,5 +170,8 @@ fun X3CompanionApp(
             onSetVisualTheme = onSetVisualTheme,
             onDismiss = { onShowSettings(false) },
         )
+    }
+    if (devicesVisible) {
+        DeviceConnectionSheet(onDismiss = { devicesVisible = false })
     }
 }
