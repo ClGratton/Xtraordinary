@@ -2,7 +2,7 @@
 
 Android companion prototype and an XTEINK X3-focused CrossPoint firmware research fork.
 
-The product model is simple: the phone owns integrations and intelligence; the X3 is the persistent, low-power display and physical control surface on the back of the phone. The prototype now contains Focus, Read, and Tools surfaces, a persistent EPUB library with multi-file import and cached metadata enrichment, a multi-pass carousel, Expressive/Quiet theming, haptic duration controls, and a tested versioned protocol module. BLE transfer and firmware integration remain planned.
+The product model is simple: the phone owns integrations and intelligence; the X3 is the persistent, low-power display and physical control surface on the back of the phone. The prototype now contains Focus, Read, and Tools surfaces, persistent folder-based EPUB sync plus multi-file import, cached metadata enrichment, a resistance-haptic pass carousel, phone-derived Material color, separate phone/X3 artwork crops, and a tested versioned protocol module. BLE transfer and firmware integration remain planned.
 
 - [Architecture and implementation plan](docs/architecture-plan.md)
 - [Exact CrossPoint X3 change plan](docs/crosspoint-change-plan.md)

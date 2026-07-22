@@ -38,6 +38,12 @@ class BookLibraryRepository(context: Context) {
         preferences.edit { putString(BooksKey, array.toString()) }
     }
 
+    fun linkedFolderUri(): String? = preferences.getString(FolderKey, null)
+
+    fun setLinkedFolderUri(uri: String) {
+        preferences.edit { putString(FolderKey, uri) }
+    }
+
     private fun ImportedBookUiState.toJson() = JSONObject().apply {
         put("id", id)
         put("title", title)
@@ -54,6 +60,9 @@ class BookLibraryRepository(context: Context) {
         put("metadataSource", metadataSource)
         put("importedAtEpochMs", importedAtEpochMs)
         putNullable("lastMetadataLookupEpochMs", lastMetadataLookupEpochMs)
+        putNullable("fileModifiedAtEpochMs", fileModifiedAtEpochMs)
+        put("isOnDevice", isOnDevice)
+        putNullable("sourceFolderUri", sourceFolderUri)
     }
 
     private fun JSONObject.toBook() = ImportedBookUiState(
@@ -76,6 +85,9 @@ class BookLibraryRepository(context: Context) {
         metadataSource = optString("metadataSource", "EPUB"),
         importedAtEpochMs = optLong("importedAtEpochMs"),
         lastMetadataLookupEpochMs = nullableLong("lastMetadataLookupEpochMs"),
+        fileModifiedAtEpochMs = nullableLong("fileModifiedAtEpochMs"),
+        isOnDevice = if (has("isOnDevice")) optBoolean("isOnDevice") else true,
+        sourceFolderUri = nullableString("sourceFolderUri"),
     )
 
     private fun JSONObject.putNullable(key: String, value: Any?) {
@@ -93,5 +105,6 @@ class BookLibraryRepository(context: Context) {
 
     private companion object {
         const val BooksKey = "books"
+        const val FolderKey = "linked_folder_uri"
     }
 }

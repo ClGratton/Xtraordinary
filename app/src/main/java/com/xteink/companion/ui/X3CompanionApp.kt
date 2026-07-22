@@ -41,7 +41,9 @@ fun X3CompanionApp(
     onShowRead: () -> Unit,
     onShowFocus: () -> Unit,
     onSetReadQuery: (String) -> Unit,
-    onSetReadFilter: (ReadFilter) -> Unit,
+    onSetReadSort: (ReadSort) -> Unit,
+    onSetOnDeviceOnly: (Boolean) -> Unit,
+    onChooseBookFolder: () -> Unit,
     onOpenEpub: () -> Unit,
     onOpenPasses: () -> Unit,
     onShowToolHub: () -> Unit,
@@ -61,6 +63,11 @@ fun X3CompanionApp(
             notice.added,
             notice.duplicates,
             notice.failed,
+        )
+        is UiNotice.FolderSynced -> stringResource(
+            R.string.folder_sync_result,
+            notice.found,
+            notice.added,
         )
         null -> null
     }
@@ -104,6 +111,7 @@ fun X3CompanionApp(
                     when (surface) {
                         CompanionSurface.Focus -> ControlDeckFocusContent(
                             focus = state.focus,
+                            visualTheme = state.visualTheme,
                             onSetDuration = onSetDuration,
                             onStartFocus = onStartFocus,
                             onTogglePause = onTogglePause,
@@ -114,7 +122,9 @@ fun X3CompanionApp(
                         CompanionSurface.Read -> ReadContent(
                             state = state.read,
                             onSetQuery = onSetReadQuery,
-                            onSetFilter = onSetReadFilter,
+                            onSetSort = onSetReadSort,
+                            onSetOnDeviceOnly = onSetOnDeviceOnly,
+                            onChooseBookFolder = onChooseBookFolder,
                             onOpenEpub = onOpenEpub,
                         )
                         CompanionSurface.Tools -> when (toolDestination) {

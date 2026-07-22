@@ -4,6 +4,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -36,10 +37,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
@@ -50,12 +51,15 @@ import androidx.compose.ui.unit.sp
 import com.xteink.companion.R
 import com.xteink.companion.ui.FocusPhase
 import com.xteink.companion.ui.FocusUiState
+import com.xteink.companion.ui.CompanionVisualTheme
+import com.xteink.companion.ui.sceneArtworkFor
 import java.util.Locale
 import kotlin.math.roundToInt
 
 @Composable
 fun ControlDeckFocusContent(
     focus: FocusUiState,
+    visualTheme: CompanionVisualTheme,
     onSetDuration: (Int) -> Unit,
     onStartFocus: () -> Unit,
     onTogglePause: () -> Unit,
@@ -64,34 +68,45 @@ fun ControlDeckFocusContent(
     onSendScene: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp)
-            .padding(top = 4.dp, bottom = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        X3ImageField()
-        DurationControlDeck(focus = focus, onSetDuration = onSetDuration)
-        FocusDeckActions(
-            phase = focus.phase,
-            onStartFocus = onStartFocus,
-            onTogglePause = onTogglePause,
-            onEndFocus = onEndFocus,
-            onResetFocus = onResetFocus,
-            onSendScene = onSendScene,
-        )
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val imageAspect = 1.60f
+        val imageHeight = maxWidth / imageAspect
+        val durationHeight = (maxHeight - imageHeight - 168.dp).coerceIn(270.dp, 304.dp)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
+                .padding(top = 4.dp, bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            X3ImageField(visualTheme = visualTheme)
+            DurationControlDeck(
+                focus = focus,
+                onSetDuration = onSetDuration,
+                modifier = Modifier.height(durationHeight),
+            )
+            FocusDeckActions(
+                phase = focus.phase,
+                onStartFocus = onStartFocus,
+                onTogglePause = onTogglePause,
+                onEndFocus = onEndFocus,
+                onResetFocus = onResetFocus,
+                onSendScene = onSendScene,
+            )
+            SendSceneRow(onSendScene = onSendScene)
+        }
     }
 }
 
 @Composable
-private fun X3ImageField() {
+private fun X3ImageField(visualTheme: CompanionVisualTheme) {
     val description = stringResource(R.string.x3_preview_description)
+    val artwork = sceneArtworkFor(visualTheme).phonePreview
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(1.52f)
+            .aspectRatio(1.60f)
             .semantics { contentDescription = description },
         color = Color(0xFF111111),
         shape = MaterialTheme.shapes.medium,
@@ -108,7 +123,12 @@ private fun X3ImageField() {
                 color = Color.White,
                 shape = RoundedCornerShape(14.dp),
             ) {
-                EInkLighthouseArtwork(modifier = Modifier.fillMaxSize())
+                Image(
+                    painter = painterResource(artwork),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                )
             }
             Text(
                 text = stringResource(R.string.x3_brand),
@@ -117,80 +137,6 @@ private fun X3ImageField() {
                 letterSpacing = 1.sp,
                 fontWeight = FontWeight.Bold,
             )
-        }
-    }
-}
-
-@Composable
-private fun EInkLighthouseArtwork(modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val ink = Color.Black
-        val fine = 1.2.dp.toPx()
-        val medium = 2.dp.toPx()
-        val horizon = size.height * 0.63f
-
-        drawLine(ink, Offset(0f, horizon), Offset(size.width, horizon), medium)
-
-        val island = Path().apply {
-            moveTo(size.width * 0.39f, horizon)
-            cubicTo(
-                size.width * 0.48f,
-                size.height * 0.54f,
-                size.width * 0.62f,
-                size.height * 0.53f,
-                size.width * 0.73f,
-                horizon,
-            )
-            close()
-        }
-        drawPath(island, ink)
-
-        drawRect(
-            color = ink,
-            topLeft = Offset(size.width * 0.535f, size.height * 0.26f),
-            size = Size(size.width * 0.075f, size.height * 0.31f),
-            style = Stroke(width = medium),
-        )
-        drawLine(ink, Offset(size.width * 0.525f, size.height * 0.26f), Offset(size.width * 0.62f, size.height * 0.26f), medium)
-        drawLine(ink, Offset(size.width * 0.54f, size.height * 0.22f), Offset(size.width * 0.615f, size.height * 0.22f), medium)
-        drawLine(ink, Offset(size.width * 0.54f, size.height * 0.22f), Offset(size.width * 0.575f, size.height * 0.16f), medium)
-        drawLine(ink, Offset(size.width * 0.615f, size.height * 0.22f), Offset(size.width * 0.575f, size.height * 0.16f), medium)
-        drawCircle(ink, radius = size.width * 0.013f, center = Offset(size.width * 0.575f, size.height * 0.245f))
-
-        val house = Path().apply {
-            moveTo(size.width * 0.62f, horizon)
-            lineTo(size.width * 0.62f, size.height * 0.48f)
-            lineTo(size.width * 0.76f, size.height * 0.48f)
-            lineTo(size.width * 0.76f, horizon)
-            close()
-        }
-        drawPath(house, ink, style = Stroke(width = medium))
-        drawLine(ink, Offset(size.width * 0.60f, size.height * 0.48f), Offset(size.width * 0.69f, size.height * 0.40f), medium)
-        drawLine(ink, Offset(size.width * 0.69f, size.height * 0.40f), Offset(size.width * 0.79f, size.height * 0.48f), medium)
-
-        listOf(0.70f, 0.76f, 0.82f, 0.88f).forEachIndexed { index, yFraction ->
-            val y = size.height * yFraction
-            val amplitude = size.height * (0.020f + index * 0.004f)
-            val wave = Path().apply {
-                moveTo(0f, y)
-                var x = 0f
-                while (x < size.width) {
-                    quadraticTo(x + size.width * 0.035f, y - amplitude, x + size.width * 0.07f, y)
-                    quadraticTo(x + size.width * 0.105f, y + amplitude, x + size.width * 0.14f, y)
-                    x += size.width * 0.14f
-                }
-            }
-            drawPath(wave, ink, style = Stroke(width = fine, cap = StrokeCap.Round))
-        }
-
-        listOf(
-            Offset(0.24f, 0.25f),
-            Offset(0.34f, 0.34f),
-            Offset(0.80f, 0.28f),
-        ).forEach { bird ->
-            val center = Offset(size.width * bird.x, size.height * bird.y)
-            drawLine(ink, center, center + Offset(-10.dp.toPx(), -4.dp.toPx()), fine, StrokeCap.Round)
-            drawLine(ink, center, center + Offset(10.dp.toPx(), -4.dp.toPx()), fine, StrokeCap.Round)
         }
     }
 }
@@ -211,20 +157,25 @@ private val DurationDeckShape = GenericShape { size, _ ->
 private fun DurationControlDeck(
     focus: FocusUiState,
     onSetDuration: (Int) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val editable = focus.phase == FocusPhase.Setup
     val haptics = LocalHapticFeedback.current
     var lastHapticMinute by remember { mutableIntStateOf(focus.selectedMinutes) }
     Surface(
+        modifier = modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.primaryContainer,
         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         shape = DurationDeckShape,
     ) {
         BoxWithConstraints {
-            val timerFontSize = (maxWidth.value * 0.225f).coerceIn(72f, 88f).sp
+            val timerFontSize = minOf(maxWidth.value * 0.23f, maxHeight.value * 0.34f)
+                .coerceIn(78f, 94f).sp
             Column(
-                modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 18.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -262,30 +213,92 @@ private fun DurationControlDeck(
                         )
                     }
                 }
-                Slider(
-                    value = focus.selectedMinutes.toFloat(),
-                    onValueChange = { value ->
-                        val snappedMinute = ((value / 5f).roundToInt() * 5).coerceIn(5, 60)
-                        if (snappedMinute != lastHapticMinute) {
-                            haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                            lastHapticMinute = snappedMinute
-                            onSetDuration(snappedMinute)
+                Column {
+                    Slider(
+                        value = focus.selectedMinutes.toFloat(),
+                        onValueChange = { value ->
+                            val snappedMinute = ((value / 5f).roundToInt() * 5).coerceIn(5, 60)
+                            if (snappedMinute != lastHapticMinute) {
+                                haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                                lastHapticMinute = snappedMinute
+                                onSetDuration(snappedMinute)
+                            }
+                        },
+                        enabled = editable,
+                        valueRange = 5f..60f,
+                        steps = 10,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        listOf("5m", "25m", "45m", "60m").forEach {
+                            Text(it, style = MaterialTheme.typography.labelMedium)
                         }
-                    },
-                    enabled = editable,
-                    valueRange = 5f..60f,
-                    steps = 10,
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    listOf("5m", "25m", "45m", "60m").forEach {
-                        Text(it, style = MaterialTheme.typography.labelMedium)
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SendSceneRow(onSendScene: () -> Unit) {
+    val haptics = LocalHapticFeedback.current
+    Surface(
+        onClick = {
+            haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+            onSendScene()
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(60.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        shape = MaterialTheme.shapes.extraLarge,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            PaperPlaneIcon()
+            Column(modifier = Modifier.weight(1f)) {
+                Text(stringResource(R.string.send_to_x3), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(R.string.send_to_x3_body),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.72f),
+                    maxLines = 1,
+                )
+            }
+            Text("›", style = MaterialTheme.typography.headlineSmall)
+        }
+    }
+}
+
+@Composable
+private fun PaperPlaneIcon() {
+    val color = MaterialTheme.colorScheme.onSecondaryContainer
+    Canvas(modifier = Modifier.size(28.dp)) {
+        val plane = Path().apply {
+            moveTo(size.width * 0.10f, size.height * 0.48f)
+            lineTo(size.width * 0.88f, size.height * 0.12f)
+            lineTo(size.width * 0.62f, size.height * 0.88f)
+            lineTo(size.width * 0.43f, size.height * 0.57f)
+            close()
+            moveTo(size.width * 0.43f, size.height * 0.57f)
+            lineTo(size.width * 0.88f, size.height * 0.12f)
+        }
+        drawPath(
+            path = plane,
+            color = color,
+            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                width = 2.dp.toPx(),
+                cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                join = androidx.compose.ui.graphics.StrokeJoin.Round,
+            ),
+        )
     }
 }
 

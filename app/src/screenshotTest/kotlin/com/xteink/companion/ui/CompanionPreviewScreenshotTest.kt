@@ -112,7 +112,7 @@ fun expressiveFocusLargeTextScreenshot() {
 @Preview(name = "Settings themes", widthDp = 412, heightDp = 915, showBackground = true)
 @Composable
 fun settingsThemesScreenshot() {
-    X3CompanionTheme(visualTheme = CompanionVisualTheme.Expressive) {
+    X3CompanionTheme(visualTheme = CompanionVisualTheme.Expressive, useDynamicColor = false) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.BottomCenter,
@@ -134,7 +134,7 @@ fun settingsThemesScreenshot() {
 
 @Composable
 private fun ScreenshotApp(state: CompanionUiState) {
-    X3CompanionTheme(visualTheme = state.visualTheme) {
+    X3CompanionTheme(visualTheme = state.visualTheme, useDynamicColor = false) {
         X3CompanionApp(
             state = state,
             onSetVisualTheme = {},
@@ -147,7 +147,9 @@ private fun ScreenshotApp(state: CompanionUiState) {
             onShowRead = {},
             onShowFocus = {},
             onSetReadQuery = {},
-            onSetReadFilter = {},
+            onSetReadSort = {},
+            onSetOnDeviceOnly = {},
+            onChooseBookFolder = {},
             onOpenEpub = {},
             onOpenPasses = {},
             onShowToolHub = {},

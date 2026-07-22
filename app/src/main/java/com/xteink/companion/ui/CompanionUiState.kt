@@ -116,19 +116,25 @@ data class ImportedBookUiState(
     val metadataSource: String = "EPUB",
     val importedAtEpochMs: Long = 0L,
     val lastMetadataLookupEpochMs: Long? = null,
+    val fileModifiedAtEpochMs: Long? = null,
+    val isOnDevice: Boolean = true,
+    val sourceFolderUri: String? = null,
 )
 
-enum class ReadFilter {
-    All,
-    WithCover,
-    NeedsDetails,
+enum class ReadSort {
+    Recent,
+    Name,
+    Size,
 }
 
 data class ReadUiState(
     val books: List<ImportedBookUiState> = emptyList(),
     val query: String = "",
-    val filter: ReadFilter = ReadFilter.All,
+    val sort: ReadSort = ReadSort.Recent,
+    val onDeviceOnly: Boolean = false,
     val importing: Boolean = false,
+    val syncing: Boolean = false,
+    val folderLinked: Boolean = false,
 )
 
 data class CompanionUiState(
@@ -151,4 +157,5 @@ sealed interface UiNotice {
         val duplicates: Int,
         val failed: Int,
     ) : UiNotice
+    data class FolderSynced(val found: Int, val added: Int) : UiNotice
 }

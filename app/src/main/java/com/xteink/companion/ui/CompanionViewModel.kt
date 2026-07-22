@@ -164,12 +164,33 @@ class CompanionViewModel : ViewModel() {
         _uiState.update { it.copy(read = it.read.copy(query = query.take(80))) }
     }
 
-    fun setReadFilter(filter: ReadFilter) {
-        _uiState.update { it.copy(read = it.read.copy(filter = filter)) }
+    fun setReadSort(sort: ReadSort) {
+        _uiState.update { it.copy(read = it.read.copy(sort = sort)) }
+    }
+
+    fun setOnDeviceOnly(enabled: Boolean) {
+        _uiState.update { it.copy(read = it.read.copy(onDeviceOnly = enabled)) }
     }
 
     fun setImporting(importing: Boolean) {
         _uiState.update { it.copy(read = it.read.copy(importing = importing)) }
+    }
+
+    fun setLibrarySyncState(syncing: Boolean, folderLinked: Boolean? = null) {
+        _uiState.update { state ->
+            state.copy(
+                read = state.read.copy(
+                    syncing = syncing,
+                    folderLinked = folderLinked ?: state.read.folderLinked,
+                ),
+            )
+        }
+    }
+
+    fun reportFolderSync(found: Int, added: Int) {
+        _uiState.update {
+            it.copy(surface = CompanionSurface.Read, notice = UiNotice.FolderSynced(found, added))
+        }
     }
 
     fun reportImportResult(added: Int, duplicates: Int, failed: Int) {

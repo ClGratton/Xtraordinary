@@ -19,22 +19,25 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -46,7 +49,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.xteink.companion.R
 import com.xteink.companion.ui.ImportedBookUiState
-import com.xteink.companion.ui.ReadFilter
+import com.xteink.companion.ui.ReadSort
 import com.xteink.companion.ui.ReadUiState
 import java.util.Locale
 
@@ -54,14 +57,16 @@ import java.util.Locale
 fun ReadContent(
     state: ReadUiState,
     onSetQuery: (String) -> Unit,
-    onSetFilter: (ReadFilter) -> Unit,
+    onSetSort: (ReadSort) -> Unit,
+    onSetOnDeviceOnly: (Boolean) -> Unit,
+    onChooseBookFolder: () -> Unit,
     onOpenEpub: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHapticFeedback.current
-    val filteredBooks = remember(state.books, state.query, state.filter) {
+    val visibleBooks = remember(state.books, state.query, state.sort, state.onDeviceOnly) {
         val terms = state.query.trim().lowercase().split(Regex("\\s+")).filter { it.isNotBlank() }
-        state.books.filter { book ->
+        val matching = state.books.filter { book ->
             val haystack = listOfNotNull(
                 book.title,
                 book.author,
@@ -70,41 +75,65 @@ fun ReadContent(
                 book.isbn,
                 book.fileName,
             ).joinToString(" ").lowercase()
-            val matchesQuery = terms.all(haystack::contains)
-            val matchesFilter = when (state.filter) {
-                ReadFilter.All -> true
-                ReadFilter.WithCover -> book.coverPath != null
-                ReadFilter.NeedsDetails -> book.coverPath == null || book.author == "Unknown author" ||
-                    book.publisher == null || book.language == null
+            terms.all(haystack::contains) && (!state.onDeviceOnly || book.isOnDevice)
+        }
+        when (state.sort) {
+            ReadSort.Recent -> matching.sortedByDescending {
+                it.fileModifiedAtEpochMs ?: it.importedAtEpochMs
             }
-            matchesQuery && matchesFilter
+            ReadSort.Name -> matching.sortedBy { it.title.lowercase(Locale.ROOT) }
+            ReadSort.Size -> matching.sortedWith(
+                compareByDescending<ImportedBookUiState> { it.fileSizeBytes != null }
+                    .thenByDescending { it.fileSizeBytes ?: 0L },
+            )
         }
     }
 
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, top = 6.dp, end = 16.dp, bottom = 94.dp),
+            contentPadding = PaddingValues(start = 16.dp, top = 6.dp, end = 16.dp, bottom = 106.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Bottom,
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(stringResource(R.string.read_title), style = MaterialTheme.typography.headlineLarge)
-                        Text(
-                            pluralStringResource(R.plurals.book_count, state.books.size, state.books.size),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        if (state.syncing) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text(
+                                pluralStringResource(R.plurals.book_count, state.books.size, state.books.size),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                     Text(
                         text = stringResource(R.string.read_library_subtitle),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    AssistChip(
+                        onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+                            onChooseBookFolder()
+                        },
+                        label = {
+                            Text(
+                                stringResource(
+                                    when {
+                                        state.syncing -> R.string.syncing_library
+                                        state.folderLinked -> R.string.folder_linked
+                                        else -> R.string.choose_book_folder
+                                    },
+                                ),
+                            )
+                        },
                     )
                 }
             }
@@ -124,44 +153,54 @@ fun ReadContent(
                         .fillMaxWidth()
                         .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    ReadFilter.entries.forEach { filter ->
-                        val selected = state.filter == filter
+                    Text(
+                        stringResource(R.string.sort_books),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    ReadSort.entries.forEach { sort ->
+                        val selected = state.sort == sort
                         FilterChip(
                             selected = selected,
                             onClick = {
                                 if (!selected) haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                                onSetFilter(filter)
+                                onSetSort(sort)
                             },
                             label = {
                                 Text(
                                     stringResource(
-                                        when (filter) {
-                                            ReadFilter.All -> R.string.filter_all
-                                            ReadFilter.WithCover -> R.string.filter_with_covers
-                                            ReadFilter.NeedsDetails -> R.string.filter_needs_details
+                                        when (sort) {
+                                            ReadSort.Recent -> R.string.sort_recent
+                                            ReadSort.Name -> R.string.sort_name
+                                            ReadSort.Size -> R.string.sort_size
                                         },
                                     ),
                                 )
                             },
                         )
                     }
+                    FilterChip(
+                        selected = state.onDeviceOnly,
+                        onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.ToggleOn)
+                            onSetOnDeviceOnly(!state.onDeviceOnly)
+                        },
+                        label = { Text(stringResource(R.string.on_device)) },
+                    )
                 }
             }
-            if (filteredBooks.isEmpty()) {
-                item {
-                    LibraryEmptyState(hasBooks = state.books.isNotEmpty())
-                }
+            if (visibleBooks.isEmpty()) {
+                item { LibraryEmptyState(hasBooks = state.books.isNotEmpty()) }
             } else {
-                items(filteredBooks, key = { it.id }) { book ->
-                    ImportedBookCard(book)
-                }
+                items(visibleBooks, key = { it.id }) { book -> ImportedBookCard(book) }
             }
             item { ResearchSourcesCard() }
         }
 
         val importDescription = stringResource(R.string.import_epubs)
-        SmallFloatingActionButton(
+        FloatingActionButton(
             onClick = {
                 if (!state.importing) {
                     haptics.performHapticFeedback(HapticFeedbackType.Confirm)
@@ -171,14 +210,15 @@ fun ReadContent(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(18.dp)
+                .size(68.dp)
                 .semantics { contentDescription = importDescription },
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
-            shape = MaterialTheme.shapes.large,
+            shape = RoundedCornerShape(22.dp),
         ) {
             if (state.importing) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(22.dp),
+                    modifier = Modifier.size(24.dp),
                     color = MaterialTheme.colorScheme.onPrimary,
                     strokeWidth = 2.dp,
                 )
@@ -192,33 +232,33 @@ fun ReadContent(
 @Composable
 private fun ImportBookIcon() {
     val color = MaterialTheme.colorScheme.onPrimary
-    Canvas(modifier = Modifier.size(28.dp)) {
-        val stroke = 1.9.dp.toPx()
+    Canvas(modifier = Modifier.size(31.dp)) {
+        val stroke = 2.dp.toPx()
         drawRoundRect(
             color = color,
-            topLeft = Offset(size.width * 0.12f, size.height * 0.16f),
-            size = Size(size.width * 0.55f, size.height * 0.70f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.5.dp.toPx()),
+            topLeft = Offset(size.width * 0.10f, size.height * 0.15f),
+            size = Size(size.width * 0.56f, size.height * 0.72f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(3.dp.toPx()),
             style = Stroke(width = stroke),
         )
         drawLine(
             color = color,
-            start = Offset(size.width * 0.24f, size.height * 0.17f),
-            end = Offset(size.width * 0.24f, size.height * 0.85f),
+            start = Offset(size.width * 0.23f, size.height * 0.16f),
+            end = Offset(size.width * 0.23f, size.height * 0.86f),
             strokeWidth = stroke,
             cap = StrokeCap.Round,
         )
         drawLine(
             color = color,
-            start = Offset(size.width * 0.72f, size.height * 0.36f),
-            end = Offset(size.width * 0.96f, size.height * 0.36f),
+            start = Offset(size.width * 0.70f, size.height * 0.37f),
+            end = Offset(size.width * 0.98f, size.height * 0.37f),
             strokeWidth = stroke,
             cap = StrokeCap.Round,
         )
         drawLine(
             color = color,
-            start = Offset(size.width * 0.84f, size.height * 0.24f),
-            end = Offset(size.width * 0.84f, size.height * 0.48f),
+            start = Offset(size.width * 0.84f, size.height * 0.23f),
+            end = Offset(size.width * 0.84f, size.height * 0.51f),
             strokeWidth = stroke,
             cap = StrokeCap.Round,
         )
@@ -227,10 +267,7 @@ private fun ImportBookIcon() {
 
 @Composable
 private fun LibraryEmptyState(hasBooks: Boolean) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        shape = MaterialTheme.shapes.large,
-    ) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = MaterialTheme.shapes.large) {
         Row(
             modifier = Modifier.padding(18.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -258,20 +295,22 @@ private fun ImportedBookCard(book: ImportedBookUiState) {
         book.coverPath?.let { path -> BitmapFactory.decodeFile(path)?.asImageBitmap() }
     }
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(if (book.isOnDevice) 1f else 0.58f),
         color = MaterialTheme.colorScheme.surfaceContainer,
         shape = MaterialTheme.shapes.large,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(132.dp)
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                .height(112.dp)
+                .padding(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Surface(
                 modifier = Modifier
-                    .width(76.dp)
+                    .width(62.dp)
                     .fillMaxHeight(),
                 color = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -287,7 +326,7 @@ private fun ImportedBookCard(book: ImportedBookUiState) {
                 } else {
                     Box(contentAlignment = Alignment.Center) {
                         BookOutlineIcon(
-                            modifier = Modifier.size(34.dp),
+                            modifier = Modifier.size(28.dp),
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                         )
                     }
@@ -295,12 +334,12 @@ private fun ImportedBookCard(book: ImportedBookUiState) {
             }
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
                     book.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 2,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
@@ -322,16 +361,16 @@ private fun ImportedBookCard(book: ImportedBookUiState) {
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    listOfNotNull(
-                        book.isbn?.let { "ISBN $it" },
-                        book.fileSizeBytes?.let(::formatFileSize),
-                    ).joinToString(" · ").ifBlank { stringResource(R.string.local_epub) },
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
-                Text(
-                    stringResource(R.string.metadata_from, book.metadataSource),
+                    if (book.isOnDevice) {
+                        listOfNotNull(
+                            book.isbn?.let { "ISBN $it" },
+                            book.fileSizeBytes?.let(::formatFileSize),
+                        ).joinToString(" · ").ifBlank {
+                            stringResource(R.string.metadata_from, book.metadataSource)
+                        }
+                    } else {
+                        stringResource(R.string.not_on_device)
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                     maxLines = 1,
@@ -343,14 +382,8 @@ private fun ImportedBookCard(book: ImportedBookUiState) {
 
 @Composable
 private fun ResearchSourcesCard() {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = MaterialTheme.shapes.large,
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.large) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -375,10 +408,7 @@ private fun ResearchSourcesCard() {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 listOf("Play Books", "Kindle", "Kobo", "Gutenberg").forEach { source ->
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        shape = MaterialTheme.shapes.extraLarge,
-                    ) {
+                    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = MaterialTheme.shapes.extraLarge) {
                         Text(
                             source,
                             style = MaterialTheme.typography.labelMedium,

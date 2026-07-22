@@ -9,6 +9,7 @@
     <string name="display_duration">Display duration</string>
     <string name="duration_format">%1$02d:00</string>
     <string name="time_format_hint">mm:ss</string>
+    <string name="send_to_x3">Send to X3</string>
     <string name="send_to_x3_body">Send this scene without starting it</string>
     <string name="open_settings">Open settings</string>
     <string name="x3_preview_description">Preview of the scene that will appear on the X3</string>
@@ -84,13 +85,20 @@
     </plurals>
     <string name="epub_import_failed">That file could not be read as an EPUB.</string>
     <string name="books_import_result">Library updated · added %1$d · already here %2$d · unreadable %3$d</string>
+    <string name="folder_sync_result">Folder scanned · found %1$d EPUBs · added %2$d</string>
     <string name="import_epubs">Import EPUB files</string>
     <string name="search_your_library">Search title, author or metadata</string>
-    <string name="filter_all">All</string>
-    <string name="filter_with_covers">With covers</string>
-    <string name="filter_needs_details">Needs details</string>
+    <string name="sort_books">Sort</string>
+    <string name="sort_recent">Date</string>
+    <string name="sort_name">Name</string>
+    <string name="sort_size">Size</string>
+    <string name="on_device">On device</string>
+    <string name="choose_book_folder">Choose EPUB folder</string>
+    <string name="folder_linked">EPUB folder linked</string>
+    <string name="syncing_library">Scanning EPUB folder…</string>
+    <string name="not_on_device">Not on device</string>
     <string name="library_empty">Your library is empty</string>
-    <string name="library_empty_body">Use the book button to choose one or more EPUBs from the phone.</string>
+    <string name="library_empty_body">Link your EPUB folder once for automatic sync, or use the book button to import files.</string>
     <string name="no_matching_books">No books match</string>
     <string name="change_library_filters">Try another search or filter.</string>
     <string name="book_cover_description">Cover of %1$s</string>

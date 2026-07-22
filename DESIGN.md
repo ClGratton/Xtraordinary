@@ -58,7 +58,7 @@ Order is fixed:
 1. compact X3 connection state and Settings;
 2. the actual monochrome image field that will be sent to the X3;
 3. one organic `Display duration` surface with large time, increment/decrement controls, and slider;
-4. one dominant Start/Pause/Resume action and a compact send-to-X3 action;
+4. one dominant Start/Pause/Resume action, a compact transfer action, and the full-width Send to X3 row;
 5. Focus/Read/Tools navigation.
 
 The image field is visual content, not a second timer or editable task field. The duration appears once. Starting Focus is explicit and never happens merely because the device pairs or the phone is placed face-down.
@@ -74,11 +74,13 @@ Opening a tool is nested navigation. Android Back and `Back to Tools` return to 
 ## Read screen
 
 - Read opens directly as the user's library; there is no import hero competing with the books.
-- A small book-plus action at bottom right opens Android's multi-document picker for one or more EPUBs.
-- The library, filters, embedded covers, and normalized metadata restore automatically at launch.
+- Imported-book rows stay compact: one fixed-height cover thumbnail and four single-line metadata levels, so the library remains a scan-friendly list rather than a stack of oversized cards.
+- A clearly visible squircle book-plus action at bottom right opens Android's multi-document picker for one or more EPUBs.
+- `Choose EPUB folder` grants the app persistent read access to one user-selected directory tree. The tree is scanned at launch, so EPUBs already in Files appear without being selected one-by-one.
+- The library, Date/Name/Size sort, On-device filter, embedded covers, and normalized metadata restore automatically at launch.
 - EPUB metadata and cover art are authoritative. Missing cover, author, publisher, language, or year may be filled with a low-volume Open Library lookup, then cached locally with a seven-day retry throttle.
 - Duplicate document URIs are not added again and the result notice reports already-imported selections. Android's system picker owns its file-row appearance; the app cannot recolor those rows.
-- Local title/author/metadata search and All / With covers / Needs details filters work now.
+- Missing-field enrichment is internal behavior, never exposed as a user-facing library filter. Books no longer present in the linked folder remain in history but are visibly muted and can be hidden with On device.
 - Research and connectors for Google Play Books, Kindle, Kobo, and Project Gutenberg remain visibly marked planned and separate from owned books.
 - Future connectors use supported sign-in/provider access only. The app never scrapes credentials or bypasses DRM.
 
@@ -95,7 +97,7 @@ Opening a tool is nested navigation. Android Back and `Back to Tools` return to 
 
 ## Color, shape, and type
 
-- Use fixed product palettes so Expressive and Quiet remain intentional across devices.
+- On Android 12 and newer, derive both Expressive and Quiet color schemes from the phone's Material dynamic palette. The checked-in coral/lime palettes are deterministic fallbacks for older devices and screenshots.
 - Never use color alone for connection, urgency, selection, or freshness.
 - The duration surface uses an asymmetric, softly undulating outline rather than a generic rounded rectangle.
 - X3 previews remain rectangular enough to communicate real e-ink geometry.
@@ -104,12 +106,12 @@ Opening a tool is nested navigation. Android Back and `Back to Tools` return to 
 
 ## Icons
 
-Icons are drawn as consistent vector geometry. `Send to X3` uses an upward transfer arrow leaving a tray, never a Unicode approximation. The same icon is shared by Focus and Passes.
+Icons are drawn as consistent vector geometry. Compact transfer buttons use an upward arrow leaving a tray; the descriptive Send to X3 row uses a paper plane. Passes reuse the transfer icon.
 
 ## Motion
 
 - Use short fades for destination changes and restrained spring motion for direct manipulation.
-- The pass carousel follows the finger and snaps to a card.
+- The pass carousel follows the finger, emits progressively stronger and faster low ticks as resistance builds, then gives one crisp click when the page snaps. Unsupported haptic primitives fall back to semantic Compose feedback.
 - Do not animate continuously while a timer runs.
 - Never imply the X3 updated before a firmware acknowledgement.
 - Respect Android reduced-motion settings.
@@ -117,6 +119,7 @@ Icons are drawn as consistent vector geometry. `Send to X3` uses an upward trans
 ## X3 display rules
 
 - Phone UI may be expressive; the X3 scene stays pure black and white.
+- Each scene has two deliberate assets: a full composition shown in the phone preview and an independent display-shaped crop packed for the X3. Both phone compositions use the same landscape preview geometry: full landscape lighthouse and full landscape astronaut. Their X3 payload crops remain independent assets prepared for the physical display.
 - Barcode quiet zones and module size take priority over decoration.
 - Live flight data never overlaps or resizes the code region.
 - Static passes can be committed as the final e-ink image and then power the X3 down.

@@ -15,9 +15,11 @@ App shell
 │  ├─ Start / Pause / Resume
 │  └─ Send current scene to X3
 ├─ Read tab
-│  ├─ import local EPUB
+│  ├─ link one EPUB folder for automatic launch-time sync
+│  ├─ import one or more local EPUBs
 │  ├─ extract embedded metadata locally
-│  ├─ imported books
+│  ├─ search, Date/Name/Size sort, and On-device filter
+│  ├─ cached imported books
 │  ├─ cross-library search (planned)
 │  └─ supported library/catalog connectors (planned)
 └─ Tools tab
@@ -97,11 +99,16 @@ The hub exposes optional companion functions without forcing them into the app's
 
 ## Read
 
-The working path is library-first and uses Android's system multi-document picker:
+The working path is library-first and supports both a persistent folder grant and Android's system multi-document picker:
 
 ```text
-Read library -> small Import action -> OpenMultipleDocuments
--> copy persistent read access when available
+Read library -> Choose EPUB folder -> OpenDocumentTree
+-> persist read access to that user-selected directory tree
+-> scan its EPUBs now and on later launches
+-> merge new, changed, and no-longer-present files into the cached library
+
+or: book-plus squircle -> OpenMultipleDocuments
+-> select one or more individual EPUBs
 -> inspect META-INF/container.xml
 -> locate the OPF package
 -> extract cover / title / author / language / publisher / date / ISBN
@@ -110,9 +117,9 @@ Read library -> small Import action -> OpenMultipleDocuments
 -> restore the library automatically on future launches
 ```
 
-The app does not upload the EPUB, scrape another app's files, or bypass DRM. The picker can select several documents at once. Duplicate document URIs are skipped and counted; malformed EPUBs add nothing. Since DocumentsUI is owned by Android rather than this app, imported rows cannot be greyed inside the system picker. The in-app library remains the authoritative imported state.
+The app does not upload the EPUB, scrape another app's files, request all-files access, or bypass DRM. Android grants access only to the directory the user chooses. The picker can select several documents at once. Duplicate document URIs are skipped and counted; malformed EPUBs add nothing. Since DocumentsUI is owned by Android rather than this app, imported rows cannot be greyed inside the system picker. The in-app library remains the authoritative imported state.
 
-Search and All / With covers / Needs details filters operate on cached local metadata. EPUB fields always win. A missing field may be enriched through a low-volume Open Library Search API request; normalized results and downloaded cover art are cached, and failed lookups are throttled for seven days.
+Search, Date/Name/Size sort, and the On-device filter operate on cached local metadata. EPUB fields always win. A missing field may be enriched through a low-volume Open Library Search API request; normalized results and downloaded cover art are cached, and failed lookups are throttled for seven days. Enrichment state is deliberately not a user-facing filter.
 
 The screen also reserves honest planned surfaces for unified title/author search and opt-in provider connections. Google Play Books, Kindle, Kobo, and Project Gutenberg are discovery targets, not implied working integrations. Purchased collections are shown only when a provider offers supported authorization and access.
 
@@ -121,6 +128,8 @@ The screen also reserves honest planned surfaces for unified title/author search
 ### Collection interaction
 
 The complete pass card is the carousel page. There is no route chip or ticket selector above it. The viewport reveals an edge of the next card, and after the first page it also reveals the previous card edge. A horizontal swipe selects another pass; details below follow the settled page.
+
+While the finger drags, supported Pixel-class devices use Android's documented `PRIMITIVE_LOW_TICK` resistance pattern with intensity and cadence proportional to displacement. Release ends the repeating effect; the settled page produces one `PRIMITIVE_CLICK`. Semantic haptic fallbacks cover devices without those primitives.
 
 Each card contains:
 
@@ -175,6 +184,21 @@ Expressive and Quiet render the same hierarchy and states. Theme switching prese
 - Static/Live pane choice;
 - settings/back-stack position.
 
+On Android 12+, Material dynamic light/dark schemes pull their seed colors from the phone. The product palettes remain fallbacks for older Android versions and deterministic screenshot tests.
+
+## Artwork and X3 crops
+
+Phone artwork and X3 output are not the same bitmap. `SceneArtwork` maps a full phone composition to an independently prepared e-ink crop:
+
+| Theme | Phone preview | X3 payload crop |
+|---|---|---|
+| Expressive | full landscape lighthouse | wide horizontal lighthouse crop |
+| Quiet | full landscape astronaut | X3-ready astronaut crop |
+
+Both phone previews use one fixed landscape frame, so switching themes cannot change the screen's geometry. The phone keeps the black physical XTEINK frame and label outside the artwork. The eventual renderer consumes `x3PayloadCrop`, converts it to one-bit physical framebuffer order, and never resizes the already-approved phone composition as a shortcut.
+
+The exact concept-board slices are retained as [lighthouse](assets/concept-lighthouse-reference.png) and [astronaut](assets/concept-astronaut-reference.png) references; production payload assets are normalized to the physical X3 dimensions.
+
 ## X3 / CrossPoint hierarchy
 
 ```text
@@ -207,3 +231,6 @@ CrossPoint does not gain a launcher full of phone features or a hard-coded Pomod
 - [Firebase AI Logic](https://firebase.google.com/docs/ai-logic)
 - [Firebase AI Logic structured output](https://firebase.google.com/docs/ai-logic/generate-structured-output)
 - [Gemini API key security](https://ai.google.dev/gemini-api/docs/api-key)
+- [Android Storage Access Framework directory grants](https://developer.android.com/training/data-storage/shared/documents-files)
+- [Android custom haptic effects: Resist with low ticks](https://developer.android.com/develop/ui/views/haptics/custom-haptic-effects)
+- [Material 3 dynamic color in Compose](https://developer.android.com/develop/ui/compose/designsystems/material3)

@@ -15,6 +15,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.xteink.companion.data.BookLibraryRepository
 import com.xteink.companion.data.EpubMetadataReader
+import com.xteink.companion.data.EpubFolderScanner
 import com.xteink.companion.data.OpenLibraryMetadataClient
 import com.xteink.companion.ui.CompanionViewModel
 import com.xteink.companion.ui.CompanionVisualTheme
@@ -34,11 +35,22 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         bookLibrary = BookLibraryRepository(this)
         viewModel.restoreBooks(bookLibrary.load())
-        refreshMissingBookMetadata()
+        val linkedFolder = bookLibrary.linkedFolderUri()
+        viewModel.setLibrarySyncState(syncing = linkedFolder != null, folderLinked = linkedFolder != null)
+        if (linkedFolder != null) syncLinkedFolder(showNotice = false) else refreshMissingBookMetadata()
         setContent {
             val state by viewModel.uiState.collectAsStateWithLifecycle()
             val epubPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
                 if (uris.isNotEmpty()) importEpubs(uris)
+            }
+            val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+                if (uri != null) {
+                    runCatching {
+                        contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    bookLibrary.setLinkedFolderUri(uri.toString())
+                    syncLinkedFolder(showNotice = true)
+                }
             }
             SideEffect {
                 val lightSystemBars = state.visualTheme == CompanionVisualTheme.Expressive
@@ -60,7 +72,9 @@ class MainActivity : ComponentActivity() {
                     onShowRead = viewModel::showRead,
                     onShowFocus = viewModel::showFocus,
                     onSetReadQuery = viewModel::setReadQuery,
-                    onSetReadFilter = viewModel::setReadFilter,
+                    onSetReadSort = viewModel::setReadSort,
+                    onSetOnDeviceOnly = viewModel::setOnDeviceOnly,
+                    onChooseBookFolder = { folderPicker.launch(null) },
                     onOpenEpub = {
                         epubPicker.launch(
                             arrayOf(
@@ -78,6 +92,81 @@ class MainActivity : ComponentActivity() {
                     onShowSettings = viewModel::showSettings,
                     onDismissNotice = viewModel::dismissNotice,
                 )
+            }
+        }
+    }
+
+    private fun syncLinkedFolder(showNotice: Boolean) {
+        val folder = bookLibrary.linkedFolderUri()?.let(android.net.Uri::parse) ?: return
+        lifecycleScope.launch {
+            viewModel.setLibrarySyncState(syncing = true, folderLinked = true)
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val candidates = EpubFolderScanner.scan(this@MainActivity, folder)
+                    val current = bookLibrary.load()
+                    val merged = current.associateByTo(linkedMapOf()) { it.id }
+                    val scannedIds = mutableSetOf<String>()
+                    var added = 0
+                    var failed = 0
+                    var enrichmentBudget = 10
+
+                    candidates.forEach { candidate ->
+                        val id = EpubMetadataReader.idForUri(candidate.uri)
+                        scannedIds += id
+                        val existing = merged[id]
+                        if (existing != null) {
+                            merged[id] = existing.copy(
+                                isOnDevice = true,
+                                sourceFolderUri = folder.toString(),
+                                fileSizeBytes = candidate.sizeBytes ?: existing.fileSizeBytes,
+                                fileModifiedAtEpochMs = candidate.modifiedAtEpochMs ?: existing.fileModifiedAtEpochMs,
+                            )
+                            return@forEach
+                        }
+
+                        val parsed = runCatching { EpubMetadataReader.read(this@MainActivity, candidate.uri) }
+                            .getOrElse {
+                                failed += 1
+                                return@forEach
+                            }
+                            .copy(
+                                isOnDevice = true,
+                                sourceFolderUri = folder.toString(),
+                                fileSizeBytes = candidate.sizeBytes,
+                                fileModifiedAtEpochMs = candidate.modifiedAtEpochMs,
+                            )
+                        val enriched = if (enrichmentBudget > 0 && OpenLibraryMetadataClient.shouldEnrich(parsed)) {
+                            enrichmentBudget -= 1
+                            runCatching { OpenLibraryMetadataClient.enrich(this@MainActivity, parsed) }
+                                .getOrElse { parsed.copy(lastMetadataLookupEpochMs = System.currentTimeMillis()) }
+                                .also { delay(1_100) }
+                        } else {
+                            parsed
+                        }
+                        merged[id] = enriched
+                        added += 1
+                    }
+
+                    merged.replaceAll { _, book ->
+                        if (book.sourceFolderUri == folder.toString() && book.id !in scannedIds) {
+                            book.copy(isOnDevice = false)
+                        } else {
+                            book
+                        }
+                    }
+                    val library = merged.values.sortedByDescending { it.importedAtEpochMs }
+                    bookLibrary.save(library)
+                    FolderSyncOutcome(library, candidates.size, added, failed)
+                }
+            }
+            result.onSuccess { outcome ->
+                viewModel.restoreBooks(outcome.library)
+                viewModel.setLibrarySyncState(syncing = false, folderLinked = true)
+                if (showNotice) viewModel.reportFolderSync(outcome.found, outcome.added)
+                refreshMissingBookMetadata()
+            }.onFailure {
+                viewModel.setLibrarySyncState(syncing = false, folderLinked = false)
+                viewModel.reportEpubImportFailure()
             }
         }
     }
@@ -146,6 +235,13 @@ class MainActivity : ComponentActivity() {
         val library: List<com.xteink.companion.ui.ImportedBookUiState>,
         val added: Int,
         val duplicates: Int,
+        val failed: Int,
+    )
+
+    private data class FolderSyncOutcome(
+        val library: List<com.xteink.companion.ui.ImportedBookUiState>,
+        val found: Int,
+        val added: Int,
         val failed: Int,
     )
 }

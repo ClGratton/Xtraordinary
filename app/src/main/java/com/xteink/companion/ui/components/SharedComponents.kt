@@ -206,19 +206,22 @@ private fun FocusTabIcon() {
 private fun ToolsTabIcon() {
     val color = MaterialTheme.colorScheme.onSurface
     Canvas(modifier = Modifier.size(24.dp)) {
-        val cell = 8.dp.toPx()
-        val gap = 3.dp.toPx()
+        val cell = size.minDimension * 0.31f
+        val gap = size.minDimension * 0.14f
+        val grid = cell * 2f + gap
+        val insetX = (size.width - grid) / 2f
+        val insetY = (size.height - grid) / 2f
         listOf(
-            Offset(1.dp.toPx(), 1.dp.toPx()),
-            Offset(cell + gap, 1.dp.toPx()),
-            Offset(1.dp.toPx(), cell + gap),
-            Offset(cell + gap, cell + gap),
+            Offset(insetX, insetY),
+            Offset(insetX + cell + gap, insetY),
+            Offset(insetX, insetY + cell + gap),
+            Offset(insetX + cell + gap, insetY + cell + gap),
         ).forEach { origin ->
             drawRoundRect(
                 color = color,
                 topLeft = origin,
                 size = androidx.compose.ui.geometry.Size(cell, cell),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx()),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(cell * 0.26f),
                 style = Stroke(1.8.dp.toPx()),
             )
         }

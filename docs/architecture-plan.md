@@ -165,7 +165,7 @@ The prototype uses two Gradle modules rather than an elaborate multi-module grap
 ```text
 app/                           Compose UI and Android integration
   ui/                          Focus, Read, Tools, themes, passes, settings
-  data/                        EPUB/cover reader, persistent library cache, Open Library fallback; future Room migration
+  data/                        EPUB/cover reader, SAF folder scanner, persistent cache, Open Library fallback
   focus/                       FocusCoordinator and session state machine
   device/                      CDM association, GATT client, reconnect policy
   notifications/               NotificationListenerService and action adapter
@@ -226,10 +226,20 @@ This cloud path replaces Gemini Nano for live triage. Nano can remain a later fo
 
 `SceneRenderer`
 
-- Renders a deterministic 528 x 792 one-bit portrait canvas and an on-phone preview.
+- Keeps the full phone composition separate from the approved X3 payload crop; `SceneArtwork` makes both resource choices explicit.
+- Renders the crop into a deterministic 528 x 792 one-bit portrait canvas while the app preview uses the full artwork inside the physical XTEINK frame.
 - Packs it into the physical 792 x 528 framebuffer order advertised by the X3 capability response.
 - Produces full scenes, region bitmaps, and optional digit glyph assets.
 - Uses a small shared design system for e-ink typography, quiet zones, borders, and refresh-safe motion.
+
+`EpubFolderScanner`
+
+- Receives only a user-selected `ACTION_OPEN_DOCUMENT_TREE` URI and persists the read grant.
+- Recursively enumerates EPUB documents through `DocumentsContract`, with depth and document-count bounds.
+- Merges file size and modified time into the library cache at launch; missing entries are marked off-device rather than silently deleted.
+- Leaves embedded EPUB metadata authoritative and invokes the cached Open Library fallback only for missing fields.
+
+The app deliberately does not request broad storage permission. Android's Storage Access Framework limits access to the directory tree selected by the user and allows the URI grant to survive restarts. See [Access documents and other files from shared storage](https://developer.android.com/training/data-storage/shared/documents-files).
 
 `ShareReceiverActivity`
 
@@ -533,6 +543,18 @@ Exit gate: pairing/reconnect is stable, the reader still opens books, no heap le
 - Evaluate true X3 PTL window refresh; advertise it only after physical DTM/ghosting regression tests pass.
 - Evaluate Gemini outcomes against user feedback and the rules-only baseline without increasing false interruptions.
 - Add authenticated, time-limited Wi-Fi escalation only if BLE scene/asset transfer is measurably inadequate.
+
+### Delivery track: phone-assisted firmware updates
+
+This is feasible and should be the normal update path after one compatible Xtraordinary/CrossPoint build is installed. The repository already uses dual OTA app partitions and upstream CrossPoint already has firmware-update plumbing, so the companion app does not need to invent unsafe in-place flashing.
+
+- CI builds a versioned firmware artifact from an approved commit, then publishes a signed manifest containing the hardware target, version, image length, SHA-256 digest, minimum compatible bootloader/app version, and download URL. The phone never flashes an arbitrary live branch.
+- The Android app downloads and verifies the signed manifest and image, shows the exact version and device target, then transfers the image to the X3's existing updater over a local authenticated channel. The X3 verifies target, size, signature, and digest before writing only the inactive OTA slot.
+- The device marks the new slot pending, reboots, confirms a successful health check, and rolls back automatically if the new firmware fails to boot. The app reports progress from device acknowledgements rather than assuming success after upload.
+- A first-time bootstrap still requires the existing USB/web-flasher path. Factory USB-locked units must complete CrossPoint's supported unlock/recovery procedure first; the app must detect and explain that state instead of attempting a risky bypass.
+- A later Android USB-host/esptool implementation may make first install possible from a USB-OTG cable, but it is a separate, hardware-tested recovery feature. It is not required for the safer day-to-day phone update flow.
+
+Release gate: update, interrupted transfer, bad signature, wrong hardware target, failed boot, rollback, low battery, and loss of phone connectivity all pass on physical X3 hardware before the feature is offered to normal users.
 
 ## Verification matrix
 
