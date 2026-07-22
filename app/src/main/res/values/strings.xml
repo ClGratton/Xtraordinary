@@ -6,11 +6,8 @@
     <string name="focus_tab">Focus</string>
     <string name="tools_tab">Tools</string>
     <string name="read_tab">Read</string>
-    <string name="display_duration">Display duration</string>
     <string name="duration_format">%1$02d:00</string>
     <string name="time_format_hint">mm:ss</string>
-    <string name="send_to_x3">Send to X3</string>
-    <string name="send_to_x3_body">Send this scene without starting it</string>
     <string name="open_settings">Open settings</string>
     <string name="x3_preview_description">Preview of the scene that will appear on the X3</string>
     <string name="x3_brand">XTEINK</string>

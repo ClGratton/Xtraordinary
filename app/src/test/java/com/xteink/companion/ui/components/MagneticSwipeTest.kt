@@ -13,17 +13,19 @@ class MagneticSwipeTest {
     )
 
     @Test
-    fun followsFingerBeforeAndAfterTheMagneticBump() {
-        assertEquals(0.05f, config.displayedProgress(0.05f), 0.0001f)
-        assertTrue(config.displayedProgress(0.30f) < 0.30f)
-        assertEquals(0.42f, config.displayedProgress(0.42f), 0.0001f)
-        assertEquals(0.80f, config.displayedProgress(0.80f), 0.0001f)
+    fun blendsSmoothlyFromResistanceToFingerTracking() {
+        assertEquals(0.05f, config.displayedProgress(0.05f, resistance = 1f), 0.0001f)
+        assertTrue(config.displayedProgress(0.30f, resistance = 1f) < 0.30f)
+        val halfway = config.displayedProgress(0.42f, resistance = 0.5f)
+        assertTrue(halfway < 0.42f)
+        assertTrue(halfway > config.displayedProgress(0.42f, resistance = 1f))
+        assertEquals(0.80f, config.displayedProgress(0.80f, resistance = 0f), 0.0001f)
     }
 
     @Test
     fun preservesResistanceAndReleaseInBothDirections() {
-        assertTrue(config.displayedProgress(-0.30f) > -0.30f)
-        assertEquals(-0.42f, config.displayedProgress(-0.42f), 0.0001f)
+        assertTrue(config.displayedProgress(-0.30f, resistance = 1f) > -0.30f)
+        assertEquals(-0.42f, config.displayedProgress(-0.42f, resistance = 0f), 0.0001f)
     }
 
     @Test

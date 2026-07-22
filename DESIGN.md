@@ -58,8 +58,8 @@ Order is fixed:
 
 1. compact X3 connection state and Settings;
 2. the actual monochrome image field that will be sent to the X3;
-3. one organic `Display duration` surface with large time, increment/decrement controls, and slider;
-4. one dominant Start/Pause/Resume action, a compact transfer action, and the full-width Send to X3 row;
+3. one organic duration surface with large time, increment/decrement controls, and slider;
+4. one full-width Start/Pause/Resume action that splits to expose Stop only during an active session;
 5. Focus/Read/Tools navigation.
 
 The image field is visual content, not a second timer or editable task field. The duration appears once. Starting Focus is explicit and never happens merely because the device pairs or the phone is placed face-down.
@@ -109,12 +109,12 @@ Opening a tool is nested navigation. Android Back and `Back to Tools` return to 
 
 ## Icons
 
-Icons are drawn as consistent vector geometry. Compact transfer buttons use an upward arrow leaving a tray; the descriptive Send to X3 row uses a paper plane. Passes reuse the transfer icon.
+Icons are drawn as consistent vector geometry. Pass transfer actions use an upward arrow leaving a tray.
 
 ## Motion
 
 - Use short fades for destination changes and restrained spring motion for direct manipulation.
-- The pass carousel follows the finger, emits progressively stronger and faster low ticks as resistance builds, then gives one crisp click when the page snaps. Unsupported haptic primitives fall back to semantic Compose feedback.
+- The pass carousel follows the finger, builds magnetic resistance before its commit threshold, and smoothly releases the withheld distance after the bump so direct tracking resumes. Every inward or outward threshold crossing emits a crisp click without requiring finger lift; the small visual wobble occurs only after a card settles at center. Unsupported haptic primitives fall back to semantic Compose feedback.
 - Do not animate continuously while a timer runs.
 - Never imply the X3 updated before a firmware acknowledgement.
 - Respect Android reduced-motion settings.

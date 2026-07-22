@@ -123,7 +123,6 @@ fun X3CompanionApp(
                             onTogglePause = onTogglePause,
                             onEndFocus = onEndFocus,
                             onResetFocus = onResetFocus,
-                            onSendScene = onSendTicket,
                         )
                         CompanionSurface.Read -> ReadContent(
                             state = state.read,

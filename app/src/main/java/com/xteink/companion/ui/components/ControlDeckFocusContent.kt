@@ -65,7 +65,6 @@ fun ControlDeckFocusContent(
     onTogglePause: () -> Unit,
     onEndFocus: () -> Unit,
     onResetFocus: () -> Unit,
-    onSendScene: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
@@ -92,9 +91,7 @@ fun ControlDeckFocusContent(
                 onTogglePause = onTogglePause,
                 onEndFocus = onEndFocus,
                 onResetFocus = onResetFocus,
-                onSendScene = onSendScene,
             )
-            SendSceneRow(onSendScene = onSendScene)
         }
     }
 }
@@ -189,10 +186,6 @@ private fun DurationControlDeck(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = stringResource(R.string.display_duration).uppercase(),
-                            style = MaterialTheme.typography.labelMedium,
-                        )
-                        Text(
                             text = when (focus.phase) {
                                 FocusPhase.Setup -> stringResource(R.string.duration_format, focus.selectedMinutes)
                                 else -> formatSeconds(focus.remainingSeconds)
@@ -248,66 +241,6 @@ private fun DurationControlDeck(
 }
 
 @Composable
-private fun SendSceneRow(onSendScene: () -> Unit) {
-    val haptics = LocalHapticFeedback.current
-    Surface(
-        onClick = {
-            haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-            onSendScene()
-        },
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(60.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        shape = MaterialTheme.shapes.extraLarge,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            PaperPlaneIcon()
-            Column(modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.send_to_x3), style = MaterialTheme.typography.titleMedium)
-                Text(
-                    stringResource(R.string.send_to_x3_body),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.72f),
-                    maxLines = 1,
-                )
-            }
-            Text("›", style = MaterialTheme.typography.headlineSmall)
-        }
-    }
-}
-
-@Composable
-private fun PaperPlaneIcon() {
-    val color = MaterialTheme.colorScheme.onSecondaryContainer
-    Canvas(modifier = Modifier.size(28.dp)) {
-        val plane = Path().apply {
-            moveTo(size.width * 0.10f, size.height * 0.48f)
-            lineTo(size.width * 0.88f, size.height * 0.12f)
-            lineTo(size.width * 0.62f, size.height * 0.88f)
-            lineTo(size.width * 0.43f, size.height * 0.57f)
-            close()
-            moveTo(size.width * 0.43f, size.height * 0.57f)
-            lineTo(size.width * 0.88f, size.height * 0.12f)
-        }
-        drawPath(
-            path = plane,
-            color = color,
-            style = androidx.compose.ui.graphics.drawscope.Stroke(
-                width = 2.dp.toPx(),
-                cap = androidx.compose.ui.graphics.StrokeCap.Round,
-                join = androidx.compose.ui.graphics.StrokeJoin.Round,
-            ),
-        )
-    }
-}
-
-@Composable
 private fun DurationStepButton(label: String, enabled: Boolean, onClick: () -> Unit) {
     val haptics = LocalHapticFeedback.current
     FilledTonalButton(
@@ -330,9 +263,7 @@ private fun FocusDeckActions(
     onTogglePause: () -> Unit,
     onEndFocus: () -> Unit,
     onResetFocus: () -> Unit,
-    onSendScene: () -> Unit,
 ) {
-    val sendDescription = stringResource(R.string.send_to_x3_body)
     val haptics = LocalHapticFeedback.current
     val active = phase == FocusPhase.Running || phase == FocusPhase.Paused
     val splitProgress by animateFloatAsState(
@@ -355,80 +286,63 @@ private fun FocusDeckActions(
     )
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(splitGap),
     ) {
-        Row(
-            modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(splitGap),
+        Button(
+            onClick = {
+                haptics.performHapticFeedback(
+                    if (active) HapticFeedbackType.ToggleOn else HapticFeedbackType.Confirm,
+                )
+                when (phase) {
+                    FocusPhase.Setup -> onStartFocus
+                    FocusPhase.Running, FocusPhase.Paused -> onTogglePause
+                    FocusPhase.Review -> onResetFocus
+                }.invoke()
+            },
+            modifier = Modifier
+                .weight(1f)
+                .height(60.dp),
+            shape = RoundedCornerShape(actionCorner),
         ) {
-            Button(
+            when (phase) {
+                FocusPhase.Setup, FocusPhase.Review -> PlayTriangleIcon(modifier = Modifier.padding(end = 8.dp))
+                FocusPhase.Running -> PauseIcon(modifier = Modifier.padding(end = 7.dp))
+                FocusPhase.Paused -> PlayTriangleIcon(modifier = Modifier.padding(end = 7.dp))
+            }
+            Text(
+                text = when (phase) {
+                    FocusPhase.Setup -> stringResource(R.string.start_focus)
+                    FocusPhase.Running -> stringResource(R.string.pause_focus)
+                    FocusPhase.Paused -> stringResource(R.string.resume_focus)
+                    FocusPhase.Review -> stringResource(R.string.start_another)
+                },
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+            )
+        }
+        if (splitProgress > 0.001f) {
+            FilledTonalButton(
                 onClick = {
-                    haptics.performHapticFeedback(
-                        if (active) HapticFeedbackType.ToggleOn else HapticFeedbackType.Confirm,
-                    )
-                    when (phase) {
-                        FocusPhase.Setup -> onStartFocus
-                        FocusPhase.Running, FocusPhase.Paused -> onTogglePause
-                        FocusPhase.Review -> onResetFocus
-                    }.invoke()
+                    haptics.performHapticFeedback(HapticFeedbackType.Reject)
+                    onEndFocus()
                 },
                 modifier = Modifier
-                    .weight(1f)
-                    .height(60.dp),
-                shape = RoundedCornerShape(actionCorner),
-            ) {
-                when (phase) {
-                    FocusPhase.Setup, FocusPhase.Review -> PlayTriangleIcon(modifier = Modifier.padding(end = 8.dp))
-                    FocusPhase.Running -> PauseIcon(modifier = Modifier.padding(end = 7.dp))
-                    FocusPhase.Paused -> PlayTriangleIcon(modifier = Modifier.padding(end = 7.dp))
-                }
-                Text(
-                    text = when (phase) {
-                        FocusPhase.Setup -> stringResource(R.string.start_focus)
-                        FocusPhase.Running -> stringResource(R.string.pause_focus)
-                        FocusPhase.Paused -> stringResource(R.string.resume_focus)
-                        FocusPhase.Review -> stringResource(R.string.start_another)
+                    .weight(splitProgress.coerceAtLeast(0.001f))
+                    .height(60.dp)
+                    .graphicsLayer {
+                        alpha = splitProgress
+                        scaleX = 0.72f + splitProgress * 0.28f
                     },
+                shape = RoundedCornerShape(actionCorner),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp),
+            ) {
+                StopIcon(modifier = Modifier.padding(end = 7.dp))
+                Text(
+                    text = stringResource(R.string.stop_focus),
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                 )
             }
-            if (splitProgress > 0.001f) {
-                FilledTonalButton(
-                    onClick = {
-                        haptics.performHapticFeedback(HapticFeedbackType.Reject)
-                        onEndFocus()
-                    },
-                    modifier = Modifier
-                        .weight(splitProgress.coerceAtLeast(0.001f))
-                        .height(60.dp)
-                        .graphicsLayer {
-                            alpha = splitProgress
-                            scaleX = 0.72f + splitProgress * 0.28f
-                        },
-                    shape = RoundedCornerShape(actionCorner),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp),
-                ) {
-                    StopIcon(modifier = Modifier.padding(end = 7.dp))
-                    Text(
-                        text = stringResource(R.string.stop_focus),
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                    )
-                }
-            }
-        }
-        FilledTonalButton(
-            onClick = {
-                haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-                onSendScene()
-            },
-            modifier = Modifier
-                .size(width = 92.dp, height = 60.dp)
-                .semantics { contentDescription = sendDescription },
-            shape = MaterialTheme.shapes.extraLarge,
-        ) {
-            SendToX3Icon()
         }
     }
 }

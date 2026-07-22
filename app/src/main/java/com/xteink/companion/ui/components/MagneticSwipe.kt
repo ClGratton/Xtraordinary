@@ -16,19 +16,17 @@ internal data class MagneticSwipeConfig(
         require(resistedTravel > 0f)
     }
 
-    /**
-     * Tracks the finger at first, compresses travel while approaching the threshold, then
-     * releases the withheld distance and tracks the finger exactly after the bump is crossed.
-     */
-    fun displayedProgress(signedProgress: Float): Float {
+    /** Blends between the resisted curve (1) and exact finger tracking (0). */
+    fun displayedProgress(signedProgress: Float, resistance: Float): Float {
         val bounded = signedProgress.coerceIn(-1f, 1f)
         val progress = bounded.absoluteValue
-        if (progress <= freeTravel || progress >= threshold) return bounded
+        if (progress <= freeTravel) return bounded
 
         val constrainedProgress = (progress - freeTravel) / (1f - freeTravel)
         val resistedProgress = freeTravel +
             resistedTravel * sin(constrainedProgress * (PI.toFloat() / 2f))
-        return bounded.sign * resistedProgress.coerceAtMost(progress)
+        val resisted = bounded.sign * resistedProgress.coerceAtMost(progress)
+        return bounded + (resisted - bounded) * resistance.coerceIn(0f, 1f)
     }
 }
 

@@ -1,4 +1,11 @@
-# Xtraordinary
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/xtraordinary-logo-dark.svg">
+    <img src="firmware/src/images/logo.svg" width="90" alt="Xtraordinary logo">
+  </picture>
+</p>
+
+<h1 align="center">Xtraordinary</h1>
 
 Android companion prototype and an XTEINK X3-focused CrossPoint firmware research fork.
 

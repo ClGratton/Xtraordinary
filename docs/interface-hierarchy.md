@@ -62,7 +62,7 @@ The screen is the concept-B control deck:
 1. X3 status and Settings.
 2. A real monochrome image field representing the content to send to the rear display.
 3. One large duration control.
-4. Start focus and a compact send action.
+4. One full-width Start focus action; active sessions split it into Pause/Resume and Stop.
 
 The image field is not a duplicate timer. Starting Focus is always explicit; pairing or placing the phone face-down never starts it.
 
@@ -129,7 +129,7 @@ The screen also reserves honest planned surfaces for unified title/author search
 
 The complete pass card is the carousel page. There is no route chip or ticket selector above it. The viewport reveals an edge of the next card, and after the first page it also reveals the previous card edge. A horizontal swipe selects another pass; details below follow the settled page.
 
-While the finger drags, supported Pixel-class devices use Android's documented `PRIMITIVE_LOW_TICK` resistance pattern with intensity and cadence proportional to displacement. Release ends the repeating effect; the settled page produces one `PRIMITIVE_CLICK`. Semantic haptic fallbacks cover devices without those primitives.
+While the finger drags, supported Pixel-class devices use Android's documented `PRIMITIVE_LOW_TICK` pattern with intensity and cadence proportional to displacement before the magnetic threshold. Crossing the threshold in either direction emits the click again during the same touch. The withheld drag distance eases out rather than teleporting, direct finger tracking resumes beyond the bump, and the settled card receives the separate visual wobble. Semantic haptic fallbacks cover devices without those primitives.
 
 Each card contains:
 

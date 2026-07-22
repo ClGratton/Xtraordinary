@@ -71,7 +71,7 @@ import com.xteink.companion.R
 import com.xteink.companion.ui.BoardingPassUiState
 import com.xteink.companion.ui.TicketMode
 import com.xteink.companion.ui.TicketUiState
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlin.math.absoluteValue
 import kotlin.math.sign
@@ -98,8 +98,9 @@ fun PassesToolContent(
         pageCount = { ticket.passes.size },
     )
     val isPagerDragged by pagerState.interactionSource.collectIsDraggedAsState()
-    val resistanceRelease = remember { Animatable(0f) }
+    val resistanceBlend = remember { Animatable(0f) }
     val snapKick = remember { Animatable(0f) }
+    var beyondMagneticThreshold by remember { mutableStateOf(false) }
     val flingBehavior = PagerDefaults.flingBehavior(
         state = pagerState,
         snapPositionalThreshold = PassMagneticSwipe.threshold,
@@ -110,12 +111,25 @@ fun PassesToolContent(
     )
     LaunchedEffect(isPagerDragged) {
         if (isPagerDragged) {
-            resistanceRelease.snapTo(1f)
+            resistanceBlend.snapTo(1f)
         } else {
-            resistanceRelease.animateTo(0f, tween(durationMillis = 110))
+            beyondMagneticThreshold = false
+            resistanceBlend.animateTo(0f, tween(durationMillis = 110))
         }
     }
-    PagerResistanceFeedback(pagerState, isPagerDragged) { direction ->
+    LaunchedEffect(beyondMagneticThreshold) {
+        if (isPagerDragged) {
+            resistanceBlend.animateTo(
+                targetValue = if (beyondMagneticThreshold) 0f else 1f,
+                animationSpec = tween(durationMillis = 90),
+            )
+        }
+    }
+    PagerResistanceFeedback(
+        pagerState = pagerState,
+        isDragged = isPagerDragged,
+        onThresholdChanged = { beyondMagneticThreshold = it },
+    ) { direction ->
         snapKick.snapTo(direction * 0.018f)
         snapKick.animateTo(-direction * 0.006f, tween(durationMillis = 70))
         snapKick.animateTo(0f, tween(durationMillis = 100))
@@ -165,9 +179,12 @@ fun PassesToolContent(
                         .coerceIn(0f, 1f)
                     val signedDrag = ((pagerState.currentPage - pagerState.settledPage) +
                         pagerState.currentPageOffsetFraction).coerceIn(-1f, 1f)
-                    val displayedProgress = PassMagneticSwipe.displayedProgress(signedDrag)
+                    val displayedProgress = PassMagneticSwipe.displayedProgress(
+                        signedProgress = signedDrag,
+                        resistance = resistanceBlend.value,
+                    )
                     val resistedDistance = signedDrag - displayedProgress
-                    translationX = size.width * resistedDistance * resistanceRelease.value
+                    translationX = size.width * resistedDistance
                     if (page == pagerState.settledPage) translationX += snapKick.value * size.width
                     scaleX = 1f - pageOffset * 0.014f
                     scaleY = 1f - pageOffset * 0.010f
@@ -200,6 +217,7 @@ fun PassesToolContent(
 private fun PagerResistanceFeedback(
     pagerState: PagerState,
     isDragged: Boolean,
+    onThresholdChanged: (Boolean) -> Unit,
     onCenterSettled: suspend (Float) -> Unit,
 ) {
     val context = LocalContext.current
@@ -219,8 +237,7 @@ private fun PagerResistanceFeedback(
             if (!vibrator.playPrimitive(context, VibrationEffect.Composition.PRIMITIVE_LOW_TICK, 0.18f)) {
                 fallback.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
             }
-            while (isDragged) {
-                val position = pagerState.currentPage + pagerState.currentPageOffsetFraction
+            snapshotFlow { pagerState.currentPage + pagerState.currentPageOffsetFraction }.collect { position ->
                 val movement = position - lastPosition
                 val distance = movement.absoluteValue
                 val signedProgress = position - dragStartPosition
@@ -233,6 +250,7 @@ private fun PagerResistanceFeedback(
                     if (!vibrator.playSnapThreshold(context)) {
                         fallback.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
                     }
+                    onThresholdChanged(magneticState.isBeyondThreshold)
                     travelSinceTick = 0f
                     samplesUntilTick = 8
                 } else if (!magneticState.isBeyondThreshold && samplesUntilTick == 0) {
@@ -250,9 +268,9 @@ private fun PagerResistanceFeedback(
                     samplesUntilTick -= 1
                 }
                 lastPosition = position
-                delay(12)
             }
         } else if (dragSessionActive) {
+            onThresholdChanged(false)
             snapshotFlow { pagerState.isScrollInProgress }.first { scrolling -> !scrolling }
             dragSessionActive = false
             onCenterSettled(releaseDirection)
