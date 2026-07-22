@@ -9,6 +9,12 @@
 #include <string>
 #include <vector>
 
+#ifdef ENABLE_X3_COMPANION
+namespace companion {
+class SessionEngine;
+}
+#endif
+
 #include "GfxRenderer.h"
 #include "MappedInputManager.h"
 #include "util/ScreenshotInfo.h"
@@ -90,6 +96,9 @@ class ActivityManager {
   void goToBoot();
   void goToFullScreenMessage(std::string message, EpdFontFamily::Style style = EpdFontFamily::REGULAR);
   void goToCrashReport();
+#ifdef ENABLE_X3_COMPANION
+  void goToCompanionFocus(companion::SessionEngine& session);
+#endif
   void goHome(HomeMenuItem initialMenuItem = HomeMenuItem::NONE);
 
   // This will move current activity to stack instead of deleting it

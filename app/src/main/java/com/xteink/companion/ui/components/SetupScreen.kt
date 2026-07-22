@@ -46,6 +46,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.xteink.companion.R
+import com.xteink.companion.ui.DeviceUiState
 import kotlinx.coroutines.launch
 
 private enum class SetupPage {
@@ -63,6 +64,9 @@ fun SetupScreen(
     onFinish: () -> Unit,
     modifier: Modifier = Modifier,
     initialPage: Int = 0,
+    device: DeviceUiState = DeviceUiState(),
+    isDeviceConnected: Boolean = false,
+    onConnectDevice: (String) -> Unit = {},
 ) {
     val pagerState = rememberPagerState(
         initialPage = initialPage.coerceIn(SetupPages.indices),
@@ -142,7 +146,13 @@ fun SetupScreen(
     }
 
     if (devicesVisible) {
-        DeviceConnectionSheet(onDismiss = { devicesVisible = false })
+        DeviceConnectionSheet(
+            onDismiss = { devicesVisible = false },
+            device = device,
+            isConnected = isDeviceConnected,
+            onConnect = onConnectDevice,
+            showFirmwareUpdate = false,
+        )
     }
 }
 

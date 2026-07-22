@@ -1,0 +1,43 @@
+name: Release Xtraordinary firmware
+
+on:
+  push:
+    tags:
+      - "xtraordinary-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  x3-firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - uses: astral-sh/setup-uv@v7
+      - name: Install PlatformIO
+        run: uv pip install --system -U https://github.com/pioarduino/platformio-core/archive/refs/tags/v6.1.19.zip
+      - name: Build companion firmware
+        working-directory: firmware
+        env:
+          XTRAORDINARY_VERSION: ${{ github.ref_name }}
+        run: pio run -e x3_companion_release
+      - name: Build release manifest
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp firmware/.pio/build/x3_companion_release/firmware.bin dist/xtraordinary-x3.bin
+          python firmware/scripts/generate-companion-manifest.py \
+            --firmware dist/xtraordinary-x3.bin \
+            --model X3 \
+            --version "${GITHUB_REF_NAME}" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --output dist/firmware-manifest.json
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" dist/* --title "${GITHUB_REF_NAME}" --generate-notes

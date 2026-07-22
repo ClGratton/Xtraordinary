@@ -23,11 +23,16 @@ enum class MessageType(val wireValue: UByte) {
     GetLibrary(0x40u),
     LibraryPage(0x41u),
     DeleteLibraryEntries(0x42u),
+    BeginFirmware(0x50u),
+    FirmwareChunk(0x51u),
+    CommitFirmware(0x52u),
+    ApplyFirmware(0x53u),
     Ack(0x80u),
     Nack(0x81u),
     ButtonEvent(0x82u),
     StatusChanged(0x83u),
     LibraryChanged(0x84u),
+    FirmwareProgress(0x85u),
     Error(0xFFu),
     ;
 

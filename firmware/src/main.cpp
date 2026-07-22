@@ -33,6 +33,9 @@
 #include "images/LoadingIcon.h"
 #include "util/ButtonNavigator.h"
 #include "util/ScreenshotUtil.h"
+#ifdef ENABLE_X3_COMPANION
+#include "companion/CompanionService.h"
+#endif
 
 GfxRenderer renderer(display);
 MappedInputManager mappedInputManager(gpio, renderer);
@@ -478,6 +481,9 @@ void setup() {
   // Ensure we're not still holding the power button before leaving setup
   waitForPowerRelease();
   allowSleepAt = millis() + 2000;
+#ifdef ENABLE_X3_COMPANION
+  companion::companionService.begin();
+#endif
 }
 
 void loop() {
@@ -486,6 +492,9 @@ void loop() {
   static unsigned long lastMemPrint = 0;
 
   gpio.update();
+#ifdef ENABLE_X3_COMPANION
+  companion::companionService.loop();
+#endif
   halTiltSensor.update(SETTINGS.tiltPageTurn, SETTINGS.orientation, activityManager.isReaderActivity());
 
   renderer.setFadingFix(SETTINGS.fadingFix);

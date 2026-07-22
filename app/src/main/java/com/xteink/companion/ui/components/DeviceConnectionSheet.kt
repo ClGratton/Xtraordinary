@@ -17,8 +17,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -44,6 +46,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.xteink.companion.R
+import com.xteink.companion.ui.DeviceUiState
+import com.xteink.companion.ui.FirmwareCheckPhase
 
 enum class DeviceSetupStep {
     Devices,
@@ -62,13 +66,29 @@ private val XteinkModels = XteinkModel.entries
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DeviceConnectionSheet(onDismiss: () -> Unit) {
+fun DeviceConnectionSheet(
+    onDismiss: () -> Unit,
+    device: DeviceUiState = DeviceUiState(),
+    isConnected: Boolean = false,
+    onConnect: (String) -> Unit = {},
+    onCheckFirmware: (String) -> Unit = {},
+    onFlashFirmware: () -> Unit = {},
+    showFirmwareUpdate: Boolean = true,
+) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
     ) {
-        DeviceConnectionSheetContent(onDismiss = onDismiss)
+        DeviceConnectionSheetContent(
+            onDismiss = onDismiss,
+            device = device,
+            isConnected = isConnected,
+            onConnect = onConnect,
+            onCheckFirmware = onCheckFirmware,
+            onFlashFirmware = onFlashFirmware,
+            showFirmwareUpdate = showFirmwareUpdate,
+        )
     }
 }
 
@@ -77,6 +97,12 @@ fun DeviceConnectionSheetContent(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     initialStep: DeviceSetupStep = DeviceSetupStep.Devices,
+    device: DeviceUiState = DeviceUiState(),
+    isConnected: Boolean = false,
+    onConnect: (String) -> Unit = {},
+    onCheckFirmware: (String) -> Unit = {},
+    onFlashFirmware: () -> Unit = {},
+    showFirmwareUpdate: Boolean = true,
 ) {
     var stepName by rememberSaveable { mutableStateOf(initialStep.name) }
     var selectedModelName by rememberSaveable { mutableStateOf(XteinkModel.X3.name) }
@@ -116,7 +142,15 @@ fun DeviceConnectionSheetContent(
                 model = selectedModel,
                 onContinue = { stepName = DeviceSetupStep.Discover.name },
             )
-            DeviceSetupStep.Discover -> DiscoveryHandoff(model = selectedModel)
+            DeviceSetupStep.Discover -> DiscoveryHandoff(
+                model = selectedModel,
+                device = device,
+                isConnected = isConnected,
+                onConnect = { onConnect(selectedModel.label) },
+                onCheckFirmware = { onCheckFirmware(selectedModel.label) },
+                onFlashFirmware = onFlashFirmware,
+                showFirmwareUpdate = showFirmwareUpdate,
+            )
         }
     }
 }
@@ -307,7 +341,15 @@ private fun SetupStep(number: Int, text: String) {
 }
 
 @Composable
-private fun DiscoveryHandoff(model: XteinkModel) {
+private fun DiscoveryHandoff(
+    model: XteinkModel,
+    device: DeviceUiState,
+    isConnected: Boolean,
+    onConnect: () -> Unit,
+    onCheckFirmware: () -> Unit,
+    onFlashFirmware: () -> Unit,
+    showFirmwareUpdate: Boolean,
+) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -324,18 +366,104 @@ private fun DiscoveryHandoff(model: XteinkModel) {
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text = stringResource(R.string.discovery_not_available),
+            text = device.message ?: stringResource(R.string.discovery_ready_body),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(24.dp))
-        FilledTonalButton(
-            onClick = {},
-            enabled = false,
+        Button(
+            onClick = onConnect,
+            enabled = device.linkPhase !in setOf("Scanning", "Connecting") && !isConnected,
             modifier = Modifier.fillMaxWidth().height(58.dp),
         ) {
-            Text(stringResource(R.string.search_nearby))
+            if (device.linkPhase == "Scanning" || device.linkPhase == "Connecting") {
+                CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.size(10.dp))
+            }
+            Text(stringResource(if (isConnected) R.string.device_connected else R.string.search_nearby))
+        }
+        if (showFirmwareUpdate) {
+            Spacer(Modifier.height(18.dp))
+            FirmwareUpdatePanel(
+                device = device,
+                model = model.label,
+                isConnected = isConnected,
+                onCheckFirmware = onCheckFirmware,
+                onFlashFirmware = onFlashFirmware,
+            )
+        }
+    }
+}
+
+@Composable
+private fun FirmwareUpdatePanel(
+    device: DeviceUiState,
+    model: String,
+    isConnected: Boolean,
+    onCheckFirmware: () -> Unit,
+    onFlashFirmware: () -> Unit,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = MaterialTheme.shapes.large,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(18.dp)) {
+            Text(stringResource(R.string.firmware_update), style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = when {
+                    device.latestFirmwareVersion != null -> stringResource(
+                        R.string.latest_firmware_ready,
+                        device.latestFirmwareVersion,
+                        model,
+                    )
+                    else -> stringResource(R.string.firmware_polls_github)
+                },
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            device.firmwareProgress?.let { progress ->
+                Spacer(Modifier.height(12.dp))
+                LinearProgressIndicator(
+                    progress = { progress.coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            Spacer(Modifier.height(14.dp))
+            when (device.firmwareCheckPhase) {
+                FirmwareCheckPhase.Available -> Button(
+                    onClick = onFlashFirmware,
+                    enabled = isConnected,
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                ) { Text(stringResource(if (isConnected) R.string.flash_latest_firmware else R.string.connect_to_flash)) }
+                FirmwareCheckPhase.Downloading, FirmwareCheckPhase.Transferring -> FilledTonalButton(
+                    onClick = {},
+                    enabled = false,
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                ) { Text(stringResource(R.string.preparing_firmware)) }
+                FirmwareCheckPhase.Complete -> Text(
+                    stringResource(R.string.firmware_restart_message),
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                )
+                FirmwareCheckPhase.UpToDate -> Text(
+                    stringResource(R.string.firmware_up_to_date),
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                )
+                else -> FilledTonalButton(
+                    onClick = onCheckFirmware,
+                    enabled = device.firmwareCheckPhase != FirmwareCheckPhase.Checking,
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                ) {
+                    if (device.firmwareCheckPhase == FirmwareCheckPhase.Checking) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.size(10.dp))
+                    }
+                    Text(stringResource(R.string.check_github_firmware))
+                }
+            }
         }
     }
 }

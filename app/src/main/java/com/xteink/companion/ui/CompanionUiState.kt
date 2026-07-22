@@ -145,6 +145,18 @@ data class ReadUiState(
     val folderLinked: Boolean = false,
 )
 
+enum class FirmwareCheckPhase { Idle, Checking, Available, UpToDate, Downloading, Transferring, Complete, Error }
+
+data class DeviceUiState(
+    val linkPhase: String = "Disconnected",
+    val message: String? = null,
+    val firmwareVersion: String? = null,
+    val libraryRevision: UInt = 0u,
+    val firmwareCheckPhase: FirmwareCheckPhase = FirmwareCheckPhase.Idle,
+    val latestFirmwareVersion: String? = null,
+    val firmwareProgress: Float? = null,
+)
+
 data class CompanionUiState(
     val visualTheme: CompanionVisualTheme = CompanionVisualTheme.Expressive,
     val surface: CompanionSurface = CompanionSurface.Focus,
@@ -152,6 +164,7 @@ data class CompanionUiState(
     val focus: FocusUiState = FocusUiState(),
     val read: ReadUiState = ReadUiState(),
     val ticket: TicketUiState = TicketUiState(),
+    val device: DeviceUiState = DeviceUiState(),
     val isX3Connected: Boolean = false,
     val connectedDeviceModel: String? = null,
     val settingsVisible: Boolean = false,
@@ -170,4 +183,5 @@ sealed interface UiNotice {
         val failed: Int,
     ) : UiNotice
     data class FolderSynced(val found: Int, val added: Int) : UiNotice
+    data class DeviceMessage(val text: String) : UiNotice
 }

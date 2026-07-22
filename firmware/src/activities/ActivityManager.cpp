@@ -9,6 +9,9 @@
 #include "boot_sleep/BootActivity.h"
 #include "boot_sleep/SleepActivity.h"
 #include "browser/OpdsBookBrowserActivity.h"
+#ifdef ENABLE_X3_COMPANION
+#include "companion/CompanionFocusActivity.h"
+#endif
 #include "home/CrashActivity.h"
 #include "home/FileBrowserActivity.h"
 #include "home/HomeActivity.h"
@@ -226,6 +229,17 @@ void ActivityManager::goHome(HomeMenuItem initialMenuItem) {
   replaceActivity(std::make_unique<HomeActivity>(renderer, mappedInput, initialMenuItem));
 }
 void ActivityManager::goToCrashReport() { replaceActivity(std::make_unique<CrashActivity>(renderer, mappedInput)); }
+#ifdef ENABLE_X3_COMPANION
+void ActivityManager::goToCompanionFocus(companion::SessionEngine& session) {
+  replaceActivity(std::make_unique<CompanionFocusActivity>(renderer, mappedInput, session));
+}
+
+namespace companion {
+void showFocus(SessionEngine& session) { activityManager.goToCompanionFocus(session); }
+void showHome() { activityManager.goHome(); }
+void refreshFocus() { activityManager.requestUpdate(); }
+}  // namespace companion
+#endif
 
 void ActivityManager::pushActivity(std::unique_ptr<Activity>&& activity) {
   if (pendingActivity) {

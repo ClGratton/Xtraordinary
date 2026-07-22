@@ -18,6 +18,7 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.xteink.companion.data.BookLibraryRepository
+import com.xteink.companion.data.BluetoothCompanionClient
 import com.xteink.companion.data.EpubMetadataReader
 import com.xteink.companion.data.EpubFolderScanner
 import com.xteink.companion.data.OpenLibraryMetadataClient
@@ -48,6 +49,22 @@ class MainActivity : ComponentActivity() {
             val setupPreferences = remember { getSharedPreferences("xtraordinary_setup", MODE_PRIVATE) }
             var setupComplete by rememberSaveable {
                 mutableStateOf(setupPreferences.getBoolean("setup_complete", false))
+            }
+            var pendingDeviceModel by rememberSaveable { mutableStateOf<String?>(null) }
+            val nearbyPermissionLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestMultiplePermissions(),
+            ) { grants ->
+                val model = pendingDeviceModel
+                pendingDeviceModel = null
+                if (model != null && grants.values.all { it }) viewModel.connectDevice(model)
+            }
+            val connectDevice: (String) -> Unit = { model ->
+                if (viewModel.hasCompanionPermissions()) {
+                    viewModel.connectDevice(model)
+                } else {
+                    pendingDeviceModel = model
+                    nearbyPermissionLauncher.launch(BluetoothCompanionClient.requiredPermissions())
+                }
             }
             val epubPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
                 if (uris.isNotEmpty()) importEpubs(uris)
@@ -108,10 +125,16 @@ class MainActivity : ComponentActivity() {
                             setupComplete = false
                         },
                         onDismissNotice = viewModel::dismissNotice,
+                        onConnectDevice = connectDevice,
+                        onCheckFirmware = viewModel::checkLatestFirmware,
+                        onFlashFirmware = viewModel::flashLatestFirmware,
                     )
                 } else {
                     SetupScreen(
                         folderLinked = state.read.folderLinked,
+                        device = state.device,
+                        isDeviceConnected = state.isX3Connected,
+                        onConnectDevice = connectDevice,
                         onChooseBookFolder = { folderPicker.launch(null) },
                         onFinish = {
                             setupPreferences.edit().putBoolean("setup_complete", true).apply()

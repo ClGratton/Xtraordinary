@@ -60,6 +60,9 @@ fun X3CompanionApp(
     onShowSettings: (Boolean) -> Unit,
     onOpenSetup: () -> Unit,
     onDismissNotice: () -> Unit,
+    onConnectDevice: (String) -> Unit = {},
+    onCheckFirmware: (String) -> Unit = {},
+    onFlashFirmware: () -> Unit = {},
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     var devicesVisible by rememberSaveable { mutableStateOf(false) }
@@ -80,6 +83,7 @@ fun X3CompanionApp(
             notice.found,
             notice.added,
         )
+        is UiNotice.DeviceMessage -> notice.text
         null -> null
     }
 
@@ -179,6 +183,13 @@ fun X3CompanionApp(
         )
     }
     if (devicesVisible) {
-        DeviceConnectionSheet(onDismiss = { devicesVisible = false })
+        DeviceConnectionSheet(
+            onDismiss = { devicesVisible = false },
+            device = state.device,
+            isConnected = state.isX3Connected,
+            onConnect = onConnectDevice,
+            onCheckFirmware = onCheckFirmware,
+            onFlashFirmware = onFlashFirmware,
+        )
     }
 }

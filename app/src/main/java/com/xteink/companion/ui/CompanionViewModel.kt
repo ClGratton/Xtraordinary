@@ -1,7 +1,14 @@
 package com.xteink.companion.ui
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.xteink.companion.data.BluetoothCompanionClient
+import com.xteink.companion.data.BookLibraryRepository
+import com.xteink.companion.data.FirmwareRelease
+import com.xteink.companion.data.FirmwareReleaseRepository
+import com.xteink.companion.data.LinkPhase
+import com.xteink.companion.protocol.SessionStart
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -10,11 +17,38 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-class CompanionViewModel : ViewModel() {
+class CompanionViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(CompanionUiState())
     val uiState: StateFlow<CompanionUiState> = _uiState.asStateFlow()
+    private val companionClient = BluetoothCompanionClient(application)
+    private val firmwareReleases = FirmwareReleaseRepository(application)
+    private val bookLibrary = BookLibraryRepository(application)
+    private var latestRelease: FirmwareRelease? = null
 
     init {
+        viewModelScope.launch {
+            companionClient.state.collect { link ->
+                val capabilities = link.capabilities
+                _uiState.update { state ->
+                    state.copy(
+                        isX3Connected = link.phase == LinkPhase.Connected,
+                        connectedDeviceModel = capabilities?.model,
+                        device = state.device.copy(
+                            linkPhase = link.phase.name,
+                            message = link.message,
+                            firmwareVersion = capabilities?.firmwareVersion,
+                            libraryRevision = capabilities?.libraryRevision ?: state.device.libraryRevision,
+                            firmwareProgress = link.transferProgress ?: state.device.firmwareProgress,
+                        ),
+                    )
+                }
+            }
+        }
+        viewModelScope.launch {
+            companionClient.libraries.collect { snapshot ->
+                reconcileDeviceLibrary(snapshot.revision, snapshot.entries.map { it.path to it.sizeBytes })
+            }
+        }
         viewModelScope.launch {
             while (isActive) {
                 delay(1_000)
@@ -64,12 +98,25 @@ class CompanionViewModel : ViewModel() {
                     phase = FocusPhase.Running,
                     remainingSeconds = state.focus.selectedMinutes * 60,
                 ),
-                notice = UiNotice.FocusStartedWithoutX3,
+                notice = if (state.isX3Connected) null else UiNotice.FocusStartedWithoutX3,
             )
+        }
+        val state = _uiState.value
+        if (state.isX3Connected) viewModelScope.launch {
+            runDeviceCommand {
+                companionClient.startSession(
+                    SessionStart(
+                        deadlineEpochSeconds = System.currentTimeMillis() / 1_000 + state.focus.selectedMinutes * 60,
+                        durationSeconds = state.focus.selectedMinutes * 60,
+                        title = state.focus.task,
+                    ),
+                )
+            }
         }
     }
 
     fun togglePause() {
+        val wasRunning = _uiState.value.focus.phase == FocusPhase.Running
         _uiState.update { state ->
             val nextPhase = when (state.focus.phase) {
                 FocusPhase.Running -> FocusPhase.Paused
@@ -77,6 +124,11 @@ class CompanionViewModel : ViewModel() {
                 else -> state.focus.phase
             }
             state.copy(focus = state.focus.copy(phase = nextPhase))
+        }
+        if (_uiState.value.isX3Connected) viewModelScope.launch {
+            runDeviceCommand {
+                if (wasRunning) companionClient.pauseSession() else companionClient.resumeSession()
+            }
         }
     }
 
@@ -89,6 +141,7 @@ class CompanionViewModel : ViewModel() {
                 ),
             )
         }
+        if (_uiState.value.isX3Connected) viewModelScope.launch { runDeviceCommand { companionClient.stopSession() } }
     }
 
     fun resetFocus() {
@@ -101,6 +154,7 @@ class CompanionViewModel : ViewModel() {
                 ),
             )
         }
+        if (_uiState.value.isX3Connected) viewModelScope.launch { runDeviceCommand { companionClient.stopSession() } }
     }
 
     fun showTools() {
@@ -184,9 +238,65 @@ class CompanionViewModel : ViewModel() {
         _uiState.update { state ->
             if (!state.isX3Connected) {
                 state.copy(notice = UiNotice.ConnectX3ToDelete)
-            } else {
-                state.copy(notice = UiNotice.X3DeleteQueued(bookIds.size))
+            } else state
+        }
+        if (!_uiState.value.isX3Connected) return
+        val paths = _uiState.value.read.books.filter { it.id in bookIds }.mapNotNull { it.x3Path }
+        if (paths.isEmpty()) return
+        viewModelScope.launch {
+            runDeviceCommand {
+                companionClient.deleteLibraryEntries(_uiState.value.device.libraryRevision, paths)
+                _uiState.update { it.copy(notice = UiNotice.X3DeleteQueued(paths.size)) }
             }
+        }
+    }
+
+    fun hasCompanionPermissions(): Boolean = companionClient.hasPermissions()
+
+    fun connectDevice(model: String) {
+        companionClient.connect(model)
+    }
+
+    fun disconnectDevice() = companionClient.disconnect()
+
+    fun checkLatestFirmware(model: String) {
+        _uiState.update { it.copy(device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Checking, message = null)) }
+        viewModelScope.launch {
+            runCatching { firmwareReleases.latestFor(model) }
+                .onSuccess { release ->
+                    latestRelease = release
+                    val currentVersion = _uiState.value.device.firmwareVersion
+                    _uiState.update {
+                        it.copy(device = it.device.copy(
+                            firmwareCheckPhase = if (currentVersion == release.version) {
+                                FirmwareCheckPhase.UpToDate
+                            } else {
+                                FirmwareCheckPhase.Available
+                            },
+                            latestFirmwareVersion = release.version,
+                            message = "${release.version} is ready for ${release.model}",
+                        ))
+                    }
+                }
+                .onFailure { reportDeviceError(it) }
+        }
+    }
+
+    fun flashLatestFirmware() {
+        val release = latestRelease ?: return
+        if (!_uiState.value.isX3Connected) {
+            _uiState.update { it.copy(notice = UiNotice.DeviceMessage("Connect the device before flashing firmware")) }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Downloading)) }
+            runCatching {
+                val file = firmwareReleases.downloadVerified(release)
+                _uiState.update { it.copy(device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Transferring)) }
+                companionClient.flashFirmware(release, file)
+            }.onSuccess {
+                _uiState.update { it.copy(device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Complete)) }
+            }.onFailure(::reportDeviceError)
         }
     }
 
@@ -234,5 +344,48 @@ class CompanionViewModel : ViewModel() {
 
     fun dismissNotice() {
         _uiState.update { it.copy(notice = null) }
+    }
+
+    private fun reconcileDeviceLibrary(revision: UInt, entries: List<Pair<String, Long>>) {
+        _uiState.update { state ->
+            val byFileName = entries.associateBy { it.first.substringAfterLast('/').lowercase() }
+            val matchedPaths = mutableSetOf<String>()
+            val reconciled = state.read.books.map { book ->
+                val match = byFileName[book.fileName.lowercase()]
+                if (match != null) matchedPaths += match.first
+                book.copy(isOnX3 = match != null, x3Path = match?.first)
+            }.toMutableList()
+            entries.filterNot { it.first in matchedPaths }.forEach { (path, size) ->
+                val fileName = path.substringAfterLast('/')
+                reconciled += ImportedBookUiState(
+                    id = "xteink:${path.hashCode().toUInt().toString(16)}",
+                    title = fileName.substringBeforeLast('.'),
+                    author = "On XTEINK",
+                    fileName = fileName,
+                    fileSizeBytes = size,
+                    isOnPhone = false,
+                    isOnX3 = true,
+                    x3Path = path,
+                    metadataSource = "XTEINK",
+                )
+            }
+            val saved = reconciled.sortedByDescending { it.importedAtEpochMs }
+            bookLibrary.save(saved)
+            state.copy(read = state.read.copy(books = saved), device = state.device.copy(libraryRevision = revision))
+        }
+    }
+
+    private suspend fun runDeviceCommand(block: suspend () -> Unit) {
+        runCatching { block() }.onFailure(::reportDeviceError)
+    }
+
+    private fun reportDeviceError(error: Throwable) {
+        val message = error.message ?: "Device operation failed"
+        _uiState.update {
+            it.copy(
+                device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Error, message = message),
+                notice = UiNotice.DeviceMessage(message),
+            )
+        }
     }
 }

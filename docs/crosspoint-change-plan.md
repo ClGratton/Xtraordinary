@@ -1,7 +1,9 @@
 # Exact CrossPoint X3 change plan
 
-Status: implementation blueprint, 2026-07-22
+Status: first functional X3 vertical slice implemented, 2026-07-22
 Firmware baseline: CrossPoint `2754a5ff01644d36cf0a17db98f28408666ba518` (`1.4.1`)
+
+Implemented in the first vertical slice: the bounded v1 envelope and payload codecs, fixed FreeRTOS command queue, bonded/encrypted BLE control and data writes, generic local session engine and focus activity, bounded SD library scan/delete reconciliation, streamed firmware staging with manifest SHA-256 plus existing ESP image validation, inactive-slot flashing, Android GATT client, and GitHub Release manifest polling. Scene/card transport, physical passkey UI, reboot-persistent sessions, and X4-family builds remain later gates; they are not represented as complete.
 
 ## The firmware feature being added
 
