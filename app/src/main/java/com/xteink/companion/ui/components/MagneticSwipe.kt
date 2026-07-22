@@ -5,6 +5,17 @@ import kotlin.math.absoluteValue
 import kotlin.math.sign
 import kotlin.math.sin
 
+internal fun magneticSelectionStrength(
+    displayedPosition: Float,
+    page: Int,
+    settledPage: Int,
+    isScrollInProgress: Boolean,
+): Float {
+    val centeredStrength = (1f - (displayedPosition - page).absoluteValue).coerceIn(0f, 1f)
+    return if (isScrollInProgress && page != settledPage) centeredStrength * 0.65f
+    else centeredStrength
+}
+
 internal data class MagneticSwipeConfig(
     val threshold: Float,
     val freeTravel: Float,

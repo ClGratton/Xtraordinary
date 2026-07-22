@@ -38,6 +38,16 @@ class MagneticSwipeTest {
     }
 
     @Test
+    fun selectionColorReachesFullStrengthOnlyAfterSnapSettles() {
+        assertEquals(1f, magneticSelectionStrength(0f, page = 0, settledPage = 0, isScrollInProgress = false), 0.0001f)
+        assertEquals(1f, magneticSelectionStrength(0f, page = 0, settledPage = 0, isScrollInProgress = true), 0.0001f)
+        assertEquals(0.5f, magneticSelectionStrength(0.5f, page = 0, settledPage = 0, isScrollInProgress = true), 0.0001f)
+        assertEquals(0.325f, magneticSelectionStrength(0.5f, page = 1, settledPage = 0, isScrollInProgress = true), 0.0001f)
+        assertEquals(0f, magneticSelectionStrength(1f, page = 0, settledPage = 0, isScrollInProgress = false), 0.0001f)
+        assertEquals(1f, magneticSelectionStrength(1f, page = 1, settledPage = 1, isScrollInProgress = false), 0.0001f)
+    }
+
+    @Test
     fun emitsEveryCrossingWithoutRequiringFingerLift() {
         val state = MagneticSwipeState(config)
 

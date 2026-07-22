@@ -204,14 +204,17 @@ private fun ModelPicker(
             state = pagerState,
             contentPadding = PaddingValues(horizontal = 44.dp),
             pageSpacing = 12.dp,
-        ) { page ->
+            colors = MagneticPagerColors(
+                restingContainer = MaterialTheme.colorScheme.surfaceContainer,
+                selectedContainer = MaterialTheme.colorScheme.primaryContainer,
+                restingContent = MaterialTheme.colorScheme.onSurface,
+                selectedContent = MaterialTheme.colorScheme.onPrimaryContainer,
+            ),
+        ) { page, containerColor, contentColor ->
             val model = XteinkModels[page]
-            val selected = pagerState.settledPage == page
             Surface(
-                color = if (selected) MaterialTheme.colorScheme.primaryContainer
-                else MaterialTheme.colorScheme.surfaceContainer,
-                contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                else MaterialTheme.colorScheme.onSurface,
+                color = containerColor,
+                contentColor = contentColor,
                 shape = MaterialTheme.shapes.large,
                 modifier = Modifier.fillMaxWidth().height(218.dp),
             ) {
@@ -222,8 +225,7 @@ private fun ModelPicker(
                 ) {
                     DeviceModelIcon(
                         modifier = Modifier.size(76.dp),
-                        color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                        else MaterialTheme.colorScheme.onSurface,
+                        color = contentColor,
                     )
                     Spacer(Modifier.height(18.dp))
                     Text(model.label, style = MaterialTheme.typography.headlineMedium)

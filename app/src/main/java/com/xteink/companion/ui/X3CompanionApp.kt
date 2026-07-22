@@ -47,6 +47,7 @@ fun X3CompanionApp(
     onShowFocus: () -> Unit,
     onSetReadQuery: (String) -> Unit,
     onSetReadSort: (ReadSort) -> Unit,
+    onSetReadService: (ReadService) -> Unit,
     onSetOnX3Only: (Boolean) -> Unit,
     onChooseBookFolder: () -> Unit,
     onOpenEpub: () -> Unit,
@@ -116,6 +117,7 @@ fun X3CompanionApp(
         ) {
             CompanionTopBar(
                 isX3Connected = state.isX3Connected,
+                connectedDeviceModel = state.connectedDeviceModel,
                 onShowDevices = { devicesVisible = true },
                 onShowSettings = { onShowSettings(true) },
             )
@@ -138,11 +140,14 @@ fun X3CompanionApp(
                         CompanionSurface.Read -> ReadContent(
                             state = state.read,
                             isX3Connected = state.isX3Connected,
+                            connectedDeviceModel = state.connectedDeviceModel,
                             onSetQuery = onSetReadQuery,
                             onSetSort = onSetReadSort,
+                            onSetService = onSetReadService,
                             onSetOnX3Only = onSetOnX3Only,
                             onChooseBookFolder = onChooseBookFolder,
                             onOpenEpub = onOpenEpub,
+                            onOpenSettings = { onShowSettings(true) },
                             onDeleteBooksFromX3 = onDeleteBooksFromX3,
                         )
                         CompanionSurface.Tools -> when (toolDestination) {

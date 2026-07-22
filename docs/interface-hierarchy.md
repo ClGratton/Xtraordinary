@@ -18,7 +18,7 @@ App shell
 │  ├─ link one EPUB folder for automatic launch-time sync
 │  ├─ import one or more local EPUBs
 │  ├─ extract embedded metadata locally
-│  ├─ search, Date/Name/Size sort, and On X3 filter
+│  ├─ search, Date/Name/Size sort, service filter, and device-presence filter
 │  ├─ cached imported books
 │  ├─ cross-library search (planned)
 │  └─ supported library/catalog connectors (planned)
@@ -121,9 +121,11 @@ or: book-plus squircle -> OpenMultipleDocuments
 
 The app does not upload the EPUB, scrape another app's files, request all-files access, or bypass DRM. Android grants access only to the directory the user chooses. The picker can select several documents at once. Duplicate document URIs are skipped and counted; malformed EPUBs add nothing. Since DocumentsUI is owned by Android rather than this app, imported rows cannot be greyed inside the system picker. The in-app library remains the authoritative imported state.
 
-Search and Date/Name/Size sort operate on the merged phone and X3 catalog. On X3 filters only the authoritative device snapshot. EPUB fields always win. A missing field may be enriched through a low-volume Open Library Search API request; normalized results and downloaded cover art are cached, and failed lookups are throttled for seven days. Enrichment state is deliberately not a user-facing filter.
+Search and Date/Name/Size sort operate on the merged phone and device catalog. All sort and filter controls stay in one horizontally scrolling row. The device-presence chip uses the actual connected or last-known model name and filters only the authoritative device snapshot. The compact Service dropdown owns its choices directly: All services and Local EPUB are available now, while future providers are visibly unlinked. It never spawns a second filter chip. A separate dismissible reminder chip opens account settings, replacing the former large speculative card. EPUB fields always win. A missing field may be enriched through a low-volume Open Library Search API request; normalized results and downloaded cover art are cached, and failed lookups are throttled for seven days. Enrichment state is deliberately not a user-facing filter.
 
-The screen also reserves honest planned surfaces for unified title/author search and opt-in provider connections. Google Play Books, Kindle, Kobo, and Project Gutenberg are discovery targets, not implied working integrations. Purchased collections are shown only when a provider offers supported authorization and access.
+Long-press selection does not replace or reflow the library. The Read heading and subtitle remain present, the compact selection actions occupy the same fixed-height slot as the folder action, and circular marks overlay the fixed-size covers. Search, filters, card bounds, cover size, and metadata therefore remain at the same coordinates when selection starts.
+
+Google Play Books, Kindle, Kobo, and Project Gutenberg remain discovery targets, not implied working integrations. Purchased collections appear in the Service filter only after a provider offers supported authorization and access; account controls live in Settings.
 
 ## Passes & codes
 
@@ -131,7 +133,7 @@ The screen also reserves honest planned surfaces for unified title/author search
 
 The complete pass card is the carousel page. There is no route chip or ticket selector above it. The viewport reveals an edge of the next card, and after the first page it also reveals the previous card edge. A horizontal swipe selects another pass; details below follow the settled page.
 
-Passes and the XTEINK model picker render through one shared magnetic pager implementation. While the finger drags, supported Pixel-class devices use Android's documented `PRIMITIVE_LOW_TICK` pattern with intensity and cadence proportional to displacement before the magnetic threshold. Resistance depends only on displacement, so reversing direction at a given position does not change the displayed offset. Crossing the threshold in either direction emits the click again during the same touch. If a fast fling commits to another page before the dragged offset crosses that threshold, choosing the new pager target emits the same click immediately. The withheld drag distance eases out rather than teleporting, direct finger tracking resumes beyond the bump, and the settled card receives the separate visual wobble. Semantic haptic fallbacks cover devices without those primitives.
+Passes and the XTEINK model picker render through one shared magnetic pager implementation. While the finger drags, supported Pixel-class devices use Android's documented `PRIMITIVE_LOW_TICK` pattern with intensity and cadence proportional to displacement before the magnetic threshold. Resistance depends only on displacement, so reversing direction at a given position does not change the displayed offset. Crossing the threshold in either direction emits the click again during the same touch. If a fast fling commits to another page before the dragged offset crosses that threshold, choosing the new pager target emits the same click immediately. The withheld drag distance eases out rather than teleporting, direct finger tracking resumes beyond the bump, and the settled card receives the separate visual wobble. Each caller supplies its own resting and selected container/content colors; the outgoing color follows resisted displacement continuously with no touch-down jump, while the incoming color stays softened until it settles at full strength. Semantic haptic fallbacks cover devices without those primitives.
 
 Each card contains:
 
@@ -188,7 +190,7 @@ Expressive and Quiet render the same hierarchy and states. Theme switching prese
 
 On Android 12+, Expressive pulls its Material dynamic light seed from the phone. Quiet stays on the deterministic grayscale palette so it remains monochrome rather than inheriting a wallpaper tint.
 
-`On X3` is a device-inventory filter, not a synonym for Android storage. CrossPoint enumerates the live SD filesystem; the companion requests a paged inventory on connection, merges PC-added files into the phone catalog, and retains rows until device-confirmed deletion. Long-press activates circular multi-select, Select all, connection checking at the trash action, and a destructive confirmation dialog.
+`On <model>` is a device-inventory filter, not a synonym for Android storage. The label follows the connected or last-known XTEINK model. CrossPoint enumerates the live SD filesystem; the companion requests a paged inventory on connection, merges PC-added files into the phone catalog, and retains rows until device-confirmed deletion. Long-press activates circular multi-select, Select all, connection checking at the trash action, and a destructive confirmation dialog.
 
 ## Artwork and X3 crops
 

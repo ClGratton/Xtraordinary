@@ -99,10 +99,18 @@ fun PassesToolContent(
             state = pagerState,
             contentPadding = PaddingValues(horizontal = 48.dp),
             pageSpacing = 10.dp,
+            colors = MagneticPagerColors(
+                restingContainer = MaterialTheme.colorScheme.surfaceContainerLow,
+                selectedContainer = MaterialTheme.colorScheme.surfaceContainer,
+                restingContent = MaterialTheme.colorScheme.onSurfaceVariant,
+                selectedContent = MaterialTheme.colorScheme.onSurface,
+            ),
             modifier = Modifier.fillMaxWidth(),
-        ) { page ->
+        ) { page, containerColor, contentColor ->
             PassControlCard(
                 pass = ticket.passes[page],
+                containerColor = containerColor,
+                contentColor = contentColor,
             )
         }
         PassModeChooser(
@@ -128,10 +136,16 @@ fun PassesToolContent(
 }
 
 @Composable
-private fun PassControlCard(pass: BoardingPassUiState, modifier: Modifier = Modifier) {
+private fun PassControlCard(
+    pass: BoardingPassUiState,
+    containerColor: Color,
+    contentColor: Color,
+    modifier: Modifier = Modifier,
+) {
     Surface(
         modifier = modifier,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = containerColor,
+        contentColor = contentColor,
         shape = MaterialTheme.shapes.large,
         shadowElevation = 2.dp,
     ) {

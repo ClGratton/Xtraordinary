@@ -14,6 +14,7 @@ import com.android.tools.screenshot.PreviewTest
 import com.xteink.companion.ui.components.SettingsSheetContent
 import com.xteink.companion.ui.components.DeviceConnectionSheetContent
 import com.xteink.companion.ui.components.DeviceSetupStep
+import com.xteink.companion.ui.components.ReadContent
 import com.xteink.companion.ui.theme.X3CompanionTheme
 
 @PreviewTest
@@ -55,31 +56,58 @@ fun readLibraryPhoneScreenshot() {
         state = CompanionUiState(
             surface = CompanionSurface.Read,
             isX3Connected = true,
-            read = ReadUiState(
-                books = listOf(
-                    ImportedBookUiState(
-                        id = "sample-book",
-                        title = "The Left Hand of Darkness",
-                        author = "Ursula K. Le Guin",
-                        fileName = "left-hand-of-darkness.epub",
-                        language = "en",
-                        publisher = "Ace Books",
-                        isOnX3 = true,
-                        x3Path = "/Books/left-hand-of-darkness.epub",
-                    ),
-                    ImportedBookUiState(
-                        id = "phone-book",
-                        title = "The Dispossessed",
-                        author = "Ursula K. Le Guin",
-                        fileName = "the-dispossessed.epub",
-                        language = "en",
-                        publisher = "Harper & Row",
-                    ),
-                ),
-            ),
+            connectedDeviceModel = "X4 Pro",
+            read = screenshotReadState(),
         ),
     )
 }
+
+@PreviewTest
+@Preview(name = "Read content selected", widthDp = 412, heightDp = 760, showBackground = true)
+@Composable
+fun readContentSelectedScreenshot() {
+    X3CompanionTheme(visualTheme = CompanionVisualTheme.Expressive, useDynamicColor = false) {
+        Surface(color = MaterialTheme.colorScheme.background) {
+            ReadContent(
+                state = screenshotReadState(),
+                isX3Connected = true,
+                connectedDeviceModel = "X4 Pro",
+                onSetQuery = {},
+                onSetSort = {},
+                onSetService = {},
+                onSetOnX3Only = {},
+                onChooseBookFolder = {},
+                onOpenEpub = {},
+                onOpenSettings = {},
+                onDeleteBooksFromX3 = {},
+                initialSelectedBookIds = setOf("sample-book"),
+            )
+        }
+    }
+}
+
+private fun screenshotReadState() = ReadUiState(
+    books = listOf(
+        ImportedBookUiState(
+            id = "sample-book",
+            title = "The Left Hand of Darkness",
+            author = "Ursula K. Le Guin",
+            fileName = "left-hand-of-darkness.epub",
+            language = "en",
+            publisher = "Ace Books",
+            isOnX3 = true,
+            x3Path = "/Books/left-hand-of-darkness.epub",
+        ),
+        ImportedBookUiState(
+            id = "phone-book",
+            title = "The Dispossessed",
+            author = "Ursula K. Le Guin",
+            fileName = "the-dispossessed.epub",
+            language = "en",
+            publisher = "Harper & Row",
+        ),
+    ),
+)
 
 @PreviewTest
 @Preview(name = "Pass detail phone", widthDp = 412, heightDp = 915, showBackground = true)
@@ -196,6 +224,7 @@ private fun ScreenshotApp(state: CompanionUiState) {
             onShowFocus = {},
             onSetReadQuery = {},
             onSetReadSort = {},
+            onSetReadService = {},
             onSetOnX3Only = {},
             onChooseBookFolder = {},
             onOpenEpub = {},

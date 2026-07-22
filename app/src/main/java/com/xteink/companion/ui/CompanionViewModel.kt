@@ -171,6 +171,10 @@ class CompanionViewModel : ViewModel() {
         _uiState.update { it.copy(read = it.read.copy(sort = sort)) }
     }
 
+    fun setReadService(service: ReadService) {
+        _uiState.update { it.copy(read = it.read.copy(service = service)) }
+    }
+
     fun setOnX3Only(enabled: Boolean) {
         _uiState.update { it.copy(read = it.read.copy(onX3Only = enabled)) }
     }

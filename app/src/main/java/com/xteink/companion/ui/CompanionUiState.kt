@@ -129,10 +129,16 @@ enum class ReadSort {
     Size,
 }
 
+enum class ReadService {
+    All,
+    LocalEpub,
+}
+
 data class ReadUiState(
     val books: List<ImportedBookUiState> = emptyList(),
     val query: String = "",
     val sort: ReadSort = ReadSort.Recent,
+    val service: ReadService = ReadService.All,
     val onX3Only: Boolean = false,
     val importing: Boolean = false,
     val syncing: Boolean = false,
@@ -147,6 +153,7 @@ data class CompanionUiState(
     val read: ReadUiState = ReadUiState(),
     val ticket: TicketUiState = TicketUiState(),
     val isX3Connected: Boolean = false,
+    val connectedDeviceModel: String? = null,
     val settingsVisible: Boolean = false,
     val notice: UiNotice? = null,
 )

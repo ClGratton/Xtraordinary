@@ -73,6 +73,7 @@ class MainActivity : ComponentActivity() {
                     onShowFocus = viewModel::showFocus,
                     onSetReadQuery = viewModel::setReadQuery,
                     onSetReadSort = viewModel::setReadSort,
+                    onSetReadService = viewModel::setReadService,
                     onSetOnX3Only = viewModel::setOnX3Only,
                     onDeleteBooksFromX3 = viewModel::requestDeleteBooksFromX3,
                     onChooseBookFolder = { folderPicker.launch(null) },

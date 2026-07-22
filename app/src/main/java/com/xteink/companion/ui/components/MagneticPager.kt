@@ -26,7 +26,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -43,6 +45,13 @@ internal val DefaultMagneticSwipe = MagneticSwipeConfig(
     resistedTravel = 0.48f,
 )
 
+internal data class MagneticPagerColors(
+    val restingContainer: Color,
+    val selectedContainer: Color,
+    val restingContent: Color,
+    val selectedContent: Color,
+)
+
 /**
  * The shared direct-manipulation pager used by passes and device selection.
  * Resistance, haptics, fling commitment, and the settled kick intentionally live here together.
@@ -52,9 +61,10 @@ internal fun MagneticHorizontalPager(
     state: PagerState,
     contentPadding: PaddingValues,
     pageSpacing: Dp,
+    colors: MagneticPagerColors,
     modifier: Modifier = Modifier,
     config: MagneticSwipeConfig = DefaultMagneticSwipe,
-    content: @Composable (page: Int) -> Unit,
+    content: @Composable (page: Int, containerColor: Color, contentColor: Color) -> Unit,
 ) {
     val isDragged by state.interactionSource.collectIsDraggedAsState()
     val resistanceBlend = remember { Animatable(0f) }
@@ -103,24 +113,33 @@ internal fun MagneticHorizontalPager(
         flingBehavior = flingBehavior,
         modifier = modifier,
     ) { page ->
+        val pageOffset = ((state.currentPage - page) + state.currentPageOffsetFraction)
+            .absoluteValue
+            .coerceIn(0f, 1f)
+        val signedDrag = ((state.currentPage - state.settledPage) +
+            state.currentPageOffsetFraction).coerceIn(-1f, 1f)
+        val displayedProgress = config.displayedProgress(
+            signedProgress = signedDrag,
+            resistance = resistanceBlend.value,
+        )
+        val displayedPosition = state.settledPage + displayedProgress
+        val selectionProgress = magneticSelectionStrength(
+            displayedPosition = displayedPosition,
+            page = page,
+            settledPage = state.settledPage,
+            isScrollInProgress = state.isScrollInProgress,
+        )
+        val containerColor = lerp(colors.restingContainer, colors.selectedContainer, selectionProgress)
+        val contentColor = lerp(colors.restingContent, colors.selectedContent, selectionProgress)
         Box(
             modifier = Modifier.graphicsLayer {
-                val pageOffset = ((state.currentPage - page) + state.currentPageOffsetFraction)
-                    .absoluteValue
-                    .coerceIn(0f, 1f)
-                val signedDrag = ((state.currentPage - state.settledPage) +
-                    state.currentPageOffsetFraction).coerceIn(-1f, 1f)
-                val displayedProgress = config.displayedProgress(
-                    signedProgress = signedDrag,
-                    resistance = resistanceBlend.value,
-                )
                 translationX = size.width * (signedDrag - displayedProgress)
                 if (page == state.settledPage) translationX += snapKick.value * size.width
                 scaleX = 1f - pageOffset * 0.014f
                 scaleY = 1f - pageOffset * 0.010f
             },
         ) {
-            content(page)
+            content(page, containerColor, contentColor)
         }
     }
 }
