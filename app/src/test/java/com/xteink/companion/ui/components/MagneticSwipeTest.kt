@@ -29,6 +29,30 @@ class MagneticSwipeTest {
     }
 
     @Test
+    fun reversesResistanceWhileReturningToCenter() {
+        val outward = config.displayedProgress(0.30f, resistance = 1f)
+        val returning = config.displayedProgress(
+            signedProgress = 0.30f,
+            resistance = 1f,
+            returningToOrigin = true,
+        )
+
+        assertTrue(outward < 0.30f)
+        assertTrue(returning > 0.30f)
+        assertTrue(
+            config.displayedProgress(0.40f, resistance = 1f, returningToOrigin = true) <= config.threshold,
+        )
+        assertEquals(
+            0.05f,
+            config.displayedProgress(0.05f, resistance = 1f, returningToOrigin = true),
+            0.0001f,
+        )
+        assertTrue(
+            config.displayedProgress(-0.30f, resistance = 1f, returningToOrigin = true) < -0.30f,
+        )
+    }
+
+    @Test
     fun emitsEveryCrossingWithoutRequiringFingerLift() {
         val state = MagneticSwipeState(config)
 

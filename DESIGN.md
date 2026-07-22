@@ -116,7 +116,7 @@ Icons are drawn as consistent vector geometry. Pass transfer actions use an upwa
 ## Motion
 
 - Use short fades for destination changes and restrained spring motion for direct manipulation.
-- The pass carousel follows the finger, builds magnetic resistance before its commit threshold, and smoothly releases the withheld distance after the bump so direct tracking resumes. Every inward or outward threshold crossing emits a crisp click without requiring finger lift; a fast fling that commits before the dragged offset reaches that threshold emits the same click as soon as the pager chooses its new target. The small visual wobble occurs only after a card settles at center. Unsupported haptic primitives fall back to semantic Compose feedback.
+- Passes and device selection use the same reusable magnetic pager. It builds resistance before the commit threshold and smoothly releases the withheld distance after the bump so direct tracking resumes. When the finger reverses after crossing back through the threshold, the force reverses too: the card trails on the original side, progressively catches up, and matches the finger near center. Every inward or outward threshold crossing emits a crisp click without requiring finger lift; a fast fling that commits before the dragged offset reaches that threshold emits the same click as soon as the pager chooses its new target. The small visual wobble occurs only after a card settles at center. Unsupported haptic primitives fall back to semantic Compose feedback.
 - Do not animate continuously while a timer runs.
 - Never imply the X3 updated before a firmware acknowledgement.
 - Respect Android reduced-motion settings.

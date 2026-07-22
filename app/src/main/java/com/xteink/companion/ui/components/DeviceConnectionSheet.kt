@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -30,9 +28,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -41,8 +37,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -191,17 +185,11 @@ private fun ModelPicker(
     onSelectedModel: (XteinkModel) -> Unit,
     onContinue: () -> Unit,
 ) {
-    val haptics = LocalHapticFeedback.current
     val initialPage = XteinkModels.indexOf(selectedModel).coerceAtLeast(0)
     val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { XteinkModels.size })
-    var lastHapticPage by remember { mutableIntStateOf(initialPage) }
     LaunchedEffect(pagerState.settledPage) {
         val page = pagerState.settledPage
         onSelectedModel(XteinkModels[page])
-        if (page != lastHapticPage) {
-            haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
-            lastHapticPage = page
-        }
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -212,11 +200,10 @@ private fun ModelPicker(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(18.dp))
-        HorizontalPager(
+        MagneticHorizontalPager(
             state = pagerState,
             contentPadding = PaddingValues(horizontal = 44.dp),
             pageSpacing = 12.dp,
-            flingBehavior = PagerDefaults.flingBehavior(state = pagerState),
         ) { page ->
             val model = XteinkModels[page]
             val selected = pagerState.settledPage == page
