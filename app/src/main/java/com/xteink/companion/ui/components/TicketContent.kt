@@ -47,6 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
@@ -224,11 +225,15 @@ private fun PagerResistanceFeedback(
     val fallback = LocalHapticFeedback.current
     var dragSessionActive by remember { mutableStateOf(false) }
     var releaseDirection by remember { mutableFloatStateOf(1f) }
+    var dragStartPage by remember { mutableIntStateOf(pagerState.settledPage) }
+    var crossedThresholdAtRelease by remember { mutableStateOf(false) }
     val vibrator = remember(context) { context.touchVibrator() }
 
     LaunchedEffect(isDragged) {
         if (isDragged) {
             dragSessionActive = true
+            dragStartPage = pagerState.settledPage
+            crossedThresholdAtRelease = false
             val dragStartPosition = pagerState.currentPage + pagerState.currentPageOffsetFraction
             var lastPosition = pagerState.currentPage + pagerState.currentPageOffsetFraction
             var travelSinceTick = 0f
@@ -251,6 +256,7 @@ private fun PagerResistanceFeedback(
                         fallback.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
                     }
                     onThresholdChanged(magneticState.isBeyondThreshold)
+                    crossedThresholdAtRelease = magneticState.isBeyondThreshold
                     travelSinceTick = 0f
                     samplesUntilTick = 8
                 } else if (!magneticState.isBeyondThreshold && samplesUntilTick == 0) {
@@ -271,6 +277,16 @@ private fun PagerResistanceFeedback(
             }
         } else if (dragSessionActive) {
             onThresholdChanged(false)
+            val committedPage = snapshotFlow {
+                pagerState.targetPage to pagerState.isScrollInProgress
+            }.first { (targetPage, scrolling) ->
+                targetPage != dragStartPage || !scrolling
+            }.first
+            if (committedPage != dragStartPage && !crossedThresholdAtRelease) {
+                if (!vibrator.playSnapThreshold(context)) {
+                    fallback.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
+                }
+            }
             snapshotFlow { pagerState.isScrollInProgress }.first { scrolling -> !scrolling }
             dragSessionActive = false
             onCenterSettled(releaseDirection)

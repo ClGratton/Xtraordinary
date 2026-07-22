@@ -77,7 +77,7 @@ fun ControlDeckFocusContent(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
                 .padding(top = 4.dp, bottom = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             X3ImageField(visualTheme = visualTheme)
             DurationControlDeck(
@@ -100,15 +100,12 @@ fun ControlDeckFocusContent(
 private fun X3ImageField(visualTheme: CompanionVisualTheme) {
     val description = stringResource(R.string.x3_preview_description)
     val artwork = sceneArtworkFor(visualTheme).phonePreview
-    val quiet = visualTheme == CompanionVisualTheme.Quiet
-    val frameColor = if (quiet) Color.White else Color(0xFF111111)
-    val brandColor = if (quiet) Color.Black else Color.White
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(1.60f)
             .semantics { contentDescription = description },
-        color = frameColor,
+        color = Color.White,
         shape = MaterialTheme.shapes.medium,
     ) {
         Column(
@@ -132,7 +129,7 @@ private fun X3ImageField(visualTheme: CompanionVisualTheme) {
             }
             Text(
                 text = stringResource(R.string.x3_brand),
-                color = brandColor,
+                color = Color.Black,
                 fontSize = 9.sp,
                 letterSpacing = 1.sp,
                 fontWeight = FontWeight.Bold,
@@ -147,11 +144,11 @@ private val DurationDeckShape = GenericShape { size, _ ->
     cubicTo(size.width * 0.34f, size.height * 0.018f, size.width * 0.38f, size.height * 0.065f, size.width * 0.50f, size.height * 0.065f)
     cubicTo(size.width * 0.62f, size.height * 0.065f, size.width * 0.70f, size.height * 0.018f, size.width * 0.82f, size.height * 0.01f)
     cubicTo(size.width * 0.93f, size.height * 0.003f, size.width, size.height * 0.11f, size.width, size.height * 0.25f)
-    lineTo(size.width, size.height * 0.76f)
-    cubicTo(size.width, size.height * 0.92f, size.width * 0.93f, size.height, size.width * 0.79f, size.height)
+    lineTo(size.width, size.height * 0.82f)
+    cubicTo(size.width, size.height * 0.94f, size.width * 0.93f, size.height, size.width * 0.79f, size.height)
     cubicTo(size.width * 0.67f, size.height, size.width * 0.62f, size.height * 0.95f, size.width * 0.50f, size.height * 0.95f)
     cubicTo(size.width * 0.38f, size.height * 0.95f, size.width * 0.28f, size.height, size.width * 0.16f, size.height)
-    cubicTo(size.width * 0.07f, size.height, 0f, size.height * 0.91f, 0f, size.height * 0.77f)
+    cubicTo(size.width * 0.07f, size.height, 0f, size.height * 0.93f, 0f, size.height * 0.83f)
     close()
 }
 
@@ -176,7 +173,8 @@ private fun DurationControlDeck(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 18.dp, vertical = 18.dp),
+                    .padding(horizontal = 18.dp)
+                    .padding(top = 26.dp, bottom = 18.dp),
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 Row(

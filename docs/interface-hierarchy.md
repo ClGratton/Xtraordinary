@@ -129,7 +129,7 @@ The screen also reserves honest planned surfaces for unified title/author search
 
 The complete pass card is the carousel page. There is no route chip or ticket selector above it. The viewport reveals an edge of the next card, and after the first page it also reveals the previous card edge. A horizontal swipe selects another pass; details below follow the settled page.
 
-While the finger drags, supported Pixel-class devices use Android's documented `PRIMITIVE_LOW_TICK` pattern with intensity and cadence proportional to displacement before the magnetic threshold. Crossing the threshold in either direction emits the click again during the same touch. The withheld drag distance eases out rather than teleporting, direct finger tracking resumes beyond the bump, and the settled card receives the separate visual wobble. Semantic haptic fallbacks cover devices without those primitives.
+While the finger drags, supported Pixel-class devices use Android's documented `PRIMITIVE_LOW_TICK` pattern with intensity and cadence proportional to displacement before the magnetic threshold. Crossing the threshold in either direction emits the click again during the same touch. If a fast fling commits to another page before the dragged offset crosses that threshold, choosing the new pager target emits the same click immediately. The withheld drag distance eases out rather than teleporting, direct finger tracking resumes beyond the bump, and the settled card receives the separate visual wobble. Semantic haptic fallbacks cover devices without those primitives.
 
 Each card contains:
 
@@ -197,7 +197,7 @@ Phone artwork and X3 output are not the same bitmap. `SceneArtwork` maps a full 
 | Expressive | full landscape lighthouse | wide horizontal lighthouse crop |
 | Quiet | full landscape astronaut | X3-ready astronaut crop |
 
-Both phone previews use one fixed landscape frame, so switching themes cannot change the screen's geometry. The phone keeps the black physical XTEINK frame and label outside the artwork. The eventual renderer consumes `x3PayloadCrop`, converts it to one-bit physical framebuffer order, and never resizes the already-approved phone composition as a shortcut.
+Both phone previews use one fixed landscape frame, so switching themes cannot change the screen's geometry. The phone keeps a white physical XTEINK frame with black branding outside the artwork in both visual themes. The eventual renderer consumes `x3PayloadCrop`, converts it to one-bit physical framebuffer order, and never resizes the already-approved phone composition as a shortcut.
 
 The exact concept-board slices are retained as [lighthouse](assets/concept-lighthouse-reference.png) and [astronaut](assets/concept-astronaut-reference.png) references; production payload assets are normalized to the physical X3 dimensions.
 
