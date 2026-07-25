@@ -2,6 +2,9 @@
 
 #include "CompanionService.h"
 
+#include <Arduino.h>
+#include <Logging.h>
+#include <Memory.h>
 #include <NimBLEDevice.h>
 #include <esp_system.h>
 #include <mbedtls/sha256.h>
@@ -50,28 +53,66 @@ CompanionService companionService;
 void CompanionService::begin() {
   commandQueue_ = xQueueCreateStatic(COMMAND_QUEUE_DEPTH, sizeof(CommandPacket), commandQueueStorage_.data(),
                                      &commandQueueState_);
-  NimBLEDevice::init("XTEINK Companion");
+  if (!commandQueue_) {
+    LOG_ERR("CMP", "Failed to create command queue");
+    return;
+  }
+  LOG_INF("CMP", "Starting BLE companion, free heap: %u", ESP.getFreeHeap());
+  if (!NimBLEDevice::init("XTEINK Companion")) {
+    LOG_ERR("CMP", "NimBLE initialization failed");
+    return;
+  }
   NimBLEDevice::setSecurityAuth(true, false, true);
   NimBLEDevice::setSecurityIOCap(BLE_HS_IO_NO_INPUT_OUTPUT);
-  auto* server = NimBLEDevice::createServer();
-  auto* service = server->createService(SERVICE_UUID);
+  server_ = NimBLEDevice::createServer();
+  if (!server_) {
+    LOG_ERR("CMP", "Failed to create BLE server");
+    return;
+  }
+  auto* service = server_->createService(SERVICE_UUID);
+  if (!service) {
+    LOG_ERR("CMP", "Failed to create companion service");
+    return;
+  }
   auto properties = NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_ENC;
   auto* control = service->createCharacteristic(CONTROL_UUID, properties, MAX_PACKET_BYTES);
   auto* data = service->createCharacteristic(DATA_UUID, properties, MAX_PACKET_BYTES);
   events_ = service->createCharacteristic(EVENTS_UUID, NIMBLE_PROPERTY::NOTIFY, MAX_PACKET_BYTES);
-  service->createCharacteristic(STATUS_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY, MAX_PACKET_BYTES);
+  auto* status =
+      service->createCharacteristic(STATUS_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY, MAX_PACKET_BYTES);
+  if (!control || !data || !events_ || !status) {
+    LOG_ERR("CMP", "Failed to create companion characteristics");
+    return;
+  }
   control->setCallbacks(&writeCallbacks);
   data->setCallbacks(&writeCallbacks);
-  server->start();
-  auto* advertising = NimBLEDevice::getAdvertising();
-  advertising->addServiceUUID(SERVICE_UUID);
-  advertising->enableScanResponse(true);
-  advertising->start();
+  if (!server_->start()) {
+    LOG_ERR("CMP", "Failed to start BLE server");
+    return;
+  }
+  server_->advertiseOnDisconnect(true);
+  advertising_ = NimBLEDevice::getAdvertising();
+  if (!advertising_) {
+    LOG_ERR("CMP", "BLE advertising unavailable");
+    return;
+  }
+  const bool uuidAdded = advertising_->addServiceUUID(SERVICE_UUID);
+  advertising_->enableScanResponse(true);
+  const bool started = uuidAdded && advertising_->start();
+  lastAdvertisingAttemptMs_ = millis();
+  LOG_INF("CMP", "BLE advertising UUID=%d started=%d active=%d free heap=%u", uuidAdded, started,
+          advertising_->isAdvertising(), ESP.getFreeHeap());
 }
 
-bool CompanionService::connected() const { return NimBLEDevice::getServer()->getConnectedCount() > 0; }
+bool CompanionService::connected() const { return server_ && server_->getConnectedCount() > 0; }
 
 void CompanionService::loop() {
+  if (advertising_ && !connected() && !advertising_->isAdvertising() &&
+      static_cast<uint32_t>(millis() - lastAdvertisingAttemptMs_) >= 5000) {
+    lastAdvertisingAttemptMs_ = millis();
+    const bool started = advertising_->start();
+    LOG_INF("CMP", "Restarted BLE advertising: %d", started);
+  }
   CommandPacket command;
   if (commandQueue_ && xQueueReceive(commandQueue_, &command, 0) == pdTRUE) handlePacket(command.bytes, command.length);
   session_.update();
@@ -128,7 +169,7 @@ void CompanionService::handlePacket(const uint8_t* bytes, size_t length) {
       showHome();
       break;
     case MessageType::GET_LIBRARY:
-      scanLibrary();
+      ok = scanLibrary();
       break;
     case MessageType::DELETE_LIBRARY_ENTRIES:
       ok = deleteLibraryEntries(envelope);
@@ -193,7 +234,14 @@ void CompanionService::sendCapabilities(MessageType type) {
   notify(type, payload, cursor);
 }
 
-void CompanionService::scanLibrary() {
+bool CompanionService::scanLibrary() {
+  librarySendPending_ = false;
+  library_.reset();
+  library_ = makeUniqueNoThrow<LibraryItem[]>(MAX_LIBRARY_ITEMS);
+  if (!library_) {
+    LOG_ERR("CMP", "OOM allocating library snapshot: %u bytes", sizeof(LibraryItem) * MAX_LIBRARY_ITEMS);
+    return false;
+  }
   libraryCount_ = 0;
   scanDirectory("/", 0);
   uint32_t revision = 0xffffffffu;
@@ -204,10 +252,12 @@ void CompanionService::scanLibrary() {
   libraryRevision_ = revision;
   librarySendIndex_ = 0;
   librarySendPending_ = true;
+  LOG_INF("CMP", "Library snapshot: %u items, free heap: %u", libraryCount_, ESP.getFreeHeap());
+  return true;
 }
 
 void CompanionService::scanDirectory(const char* path, uint8_t depth) {
-  if (depth > 8 || libraryCount_ >= MAX_LIBRARY_ITEMS) return;
+  if (!library_ || depth > 8 || libraryCount_ >= MAX_LIBRARY_ITEMS) return;
   HalFile directory = Storage.open(path);
   if (!directory || !directory.isDirectory()) return;
   while (libraryCount_ < MAX_LIBRARY_ITEMS) {
@@ -232,6 +282,10 @@ void CompanionService::scanDirectory(const char* path, uint8_t depth) {
 }
 
 void CompanionService::sendNextLibraryItem() {
+  if (!library_) {
+    librarySendPending_ = false;
+    return;
+  }
   uint8_t payload[MAX_PAYLOAD_BYTES];
   size_t cursor = 0;
   writeU32(payload + cursor, libraryRevision_);
@@ -256,10 +310,13 @@ void CompanionService::sendNextLibraryItem() {
     cursor += 8;
   }
   notify(MessageType::LIBRARY_PAGE, payload, cursor);
-  if (last)
+  if (last) {
     librarySendPending_ = false;
-  else
+    library_.reset();
+    LOG_INF("CMP", "Library snapshot sent, free heap: %u", ESP.getFreeHeap());
+  } else {
     ++librarySendIndex_;
+  }
 }
 
 bool CompanionService::deleteLibraryEntries(const EnvelopeView& envelope) {
@@ -278,8 +335,7 @@ bool CompanionService::deleteLibraryEntries(const EnvelopeView& envelope) {
     cursor += pathLength;
     if (path[0] != '/' || std::strstr(path, "..") || !hasBookExtension(path) || !Storage.remove(path)) return false;
   }
-  scanLibrary();
-  return cursor == envelope.payloadLength;
+  return cursor == envelope.payloadLength && scanLibrary();
 }
 
 bool CompanionService::beginFirmware(const EnvelopeView& envelope) {

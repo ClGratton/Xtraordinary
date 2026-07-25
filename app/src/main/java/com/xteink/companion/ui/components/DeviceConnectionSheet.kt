@@ -1,14 +1,19 @@
 package com.xteink.companion.ui.components
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +22,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.rememberPagerState
@@ -53,14 +59,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.xteink.companion.R
+import com.xteink.companion.data.FirmwareSource
 import com.xteink.companion.ui.DeviceUiState
 import com.xteink.companion.ui.FirmwareCheckPhase
 
 enum class DeviceSetupStep {
     Devices,
     ChooseModel,
-    Prepare,
     Discover,
+    FirmwareDefault,
+    FirmwareSources,
+}
+
+enum class DeviceConnectionPath {
+    FirstTimeFlash,
+    AlreadyFlashed,
 }
 
 private enum class XteinkModel(val label: String) {
@@ -78,9 +91,11 @@ fun DeviceConnectionSheet(
     device: DeviceUiState = DeviceUiState(),
     isConnected: Boolean = false,
     onConnect: (String) -> Unit = {},
-    onCheckFirmware: (String) -> Unit = {},
+    onCheckFirmware: (String, FirmwareSource) -> Unit = { _, _ -> },
     onFlashFirmware: () -> Unit = {},
     showFirmwareUpdate: Boolean = true,
+    initialStep: DeviceSetupStep = DeviceSetupStep.Devices,
+    startWithFirstTimeFlash: Boolean = false,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
@@ -95,6 +110,8 @@ fun DeviceConnectionSheet(
             onCheckFirmware = onCheckFirmware,
             onFlashFirmware = onFlashFirmware,
             showFirmwareUpdate = showFirmwareUpdate,
+            initialStep = initialStep,
+            startWithFirstTimeFlash = startWithFirstTimeFlash,
         )
     }
 }
@@ -107,14 +124,24 @@ fun DeviceConnectionSheetContent(
     device: DeviceUiState = DeviceUiState(),
     isConnected: Boolean = false,
     onConnect: (String) -> Unit = {},
-    onCheckFirmware: (String) -> Unit = {},
+    onCheckFirmware: (String, FirmwareSource) -> Unit = { _, _ -> },
     onFlashFirmware: () -> Unit = {},
     showFirmwareUpdate: Boolean = true,
+    startWithFirstTimeFlash: Boolean = false,
 ) {
     var stepName by rememberSaveable { mutableStateOf(initialStep.name) }
     var selectedModelName by rememberSaveable { mutableStateOf(XteinkModel.X3.name) }
+    var connectionPathName by rememberSaveable {
+        mutableStateOf(
+            if (startWithFirstTimeFlash) DeviceConnectionPath.FirstTimeFlash.name
+            else DeviceConnectionPath.AlreadyFlashed.name,
+        )
+    }
+    var firmwareSourceName by rememberSaveable { mutableStateOf(FirmwareSource.Xtraordinary.name) }
     val step = DeviceSetupStep.valueOf(stepName)
     val selectedModel = XteinkModel.valueOf(selectedModelName)
+    val connectionPath = DeviceConnectionPath.valueOf(connectionPathName)
+    val firmwareSource = FirmwareSource.valueOf(firmwareSourceName)
 
     Column(
         modifier = modifier
@@ -129,8 +156,9 @@ fun DeviceConnectionSheetContent(
                 stepName = when (step) {
                     DeviceSetupStep.Devices -> DeviceSetupStep.Devices
                     DeviceSetupStep.ChooseModel -> DeviceSetupStep.Devices
-                    DeviceSetupStep.Prepare -> DeviceSetupStep.ChooseModel
-                    DeviceSetupStep.Discover -> DeviceSetupStep.Prepare
+                    DeviceSetupStep.Discover -> DeviceSetupStep.ChooseModel
+                    DeviceSetupStep.FirmwareDefault -> DeviceSetupStep.Discover
+                    DeviceSetupStep.FirmwareSources -> DeviceSetupStep.FirmwareDefault
                 }.name
             },
             onDismiss = onDismiss,
@@ -143,20 +171,38 @@ fun DeviceConnectionSheetContent(
             DeviceSetupStep.ChooseModel -> ModelPicker(
                 selectedModel = selectedModel,
                 onSelectedModel = { selectedModelName = it.name },
-                onContinue = { stepName = DeviceSetupStep.Prepare.name },
-            )
-            DeviceSetupStep.Prepare -> PrepareDevice(
-                model = selectedModel,
                 onContinue = { stepName = DeviceSetupStep.Discover.name },
             )
             DeviceSetupStep.Discover -> DiscoveryHandoff(
                 model = selectedModel,
                 device = device,
                 isConnected = isConnected,
+                connectionPath = connectionPath,
+                onConnectionPath = { connectionPathName = it.name },
                 onConnect = { onConnect(selectedModel.label) },
-                onCheckFirmware = { onCheckFirmware(selectedModel.label) },
-                onFlashFirmware = onFlashFirmware,
+                onInstallFirstTime = { stepName = DeviceSetupStep.FirmwareDefault.name },
                 showFirmwareUpdate = showFirmwareUpdate,
+            )
+            DeviceSetupStep.FirmwareDefault -> DefaultFirmwarePage(
+                model = selectedModel,
+                device = device,
+                onCheckFirmware = { onCheckFirmware(selectedModel.label, FirmwareSource.Xtraordinary) },
+                onFlashFirmware = onFlashFirmware,
+                onChooseAlternative = {
+                    firmwareSourceName = FirmwareSource.CrossPoint.name
+                    onCheckFirmware(selectedModel.label, FirmwareSource.CrossPoint)
+                    stepName = DeviceSetupStep.FirmwareSources.name
+                },
+            )
+            DeviceSetupStep.FirmwareSources -> FirmwareSourcePicker(
+                model = selectedModel,
+                device = device,
+                selectedSource = firmwareSource,
+                onSelectSource = { source ->
+                    firmwareSourceName = source.name
+                    onCheckFirmware(selectedModel.label, source)
+                },
+                onFlashFirmware = onFlashFirmware,
             )
         }
     }
@@ -306,55 +352,14 @@ private fun ModelPicker(
 }
 
 @Composable
-private fun PrepareDevice(model: XteinkModel, onContinue: () -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(R.string.prepare_device, model.label),
-            style = MaterialTheme.typography.headlineMedium,
-        )
-        Spacer(Modifier.height(16.dp))
-        SetupStep(1, stringResource(R.string.prepare_device_power))
-        SetupStep(2, stringResource(R.string.prepare_device_companion))
-        SetupStep(3, stringResource(R.string.prepare_device_nearby))
-        Spacer(Modifier.height(22.dp))
-        Button(
-            onClick = onContinue,
-            modifier = Modifier.fillMaxWidth().height(58.dp),
-        ) {
-            Text(stringResource(R.string.device_is_ready))
-        }
-    }
-}
-
-@Composable
-private fun SetupStep(number: Int, text: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 9.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Surface(
-            modifier = Modifier.size(34.dp),
-            color = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            shape = CircleShape,
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text(number.toString(), fontWeight = FontWeight.Bold)
-            }
-        }
-        Text(text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-    }
-}
-
-@Composable
 private fun DiscoveryHandoff(
     model: XteinkModel,
     device: DeviceUiState,
     isConnected: Boolean,
+    connectionPath: DeviceConnectionPath,
+    onConnectionPath: (DeviceConnectionPath) -> Unit,
     onConnect: () -> Unit,
-    onCheckFirmware: () -> Unit,
-    onFlashFirmware: () -> Unit,
+    onInstallFirstTime: () -> Unit,
     showFirmwareUpdate: Boolean,
 ) {
     Column(
@@ -362,148 +367,304 @@ private fun DiscoveryHandoff(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         DeviceModelIcon(
-            modifier = Modifier.size(74.dp),
+            modifier = Modifier.size(56.dp),
             color = MaterialTheme.colorScheme.primary,
         )
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(12.dp))
         Text(
-            text = stringResource(R.string.ready_to_find_device, model.label),
+            text = stringResource(R.string.connect_device_model, model.label),
             style = MaterialTheme.typography.headlineMedium,
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = device.message ?: device.usbMessage ?: stringResource(R.string.discovery_ready_body),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(24.dp))
-        Button(
-            onClick = onConnect,
-            enabled = device.linkPhase !in setOf("Scanning", "Connecting") && !isConnected,
-            modifier = Modifier.fillMaxWidth().height(58.dp),
-        ) {
-            if (device.linkPhase == "Scanning" || device.linkPhase == "Connecting") {
-                CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                Spacer(Modifier.size(10.dp))
+        Spacer(Modifier.height(18.dp))
+        ExpandingChoiceRow(
+            choices = listOf(
+                ExpandingChoice(
+                    key = DeviceConnectionPath.FirstTimeFlash.name,
+                    title = stringResource(R.string.first_time_flash),
+                    body = stringResource(R.string.first_time_flash_body),
+                ),
+                ExpandingChoice(
+                    key = DeviceConnectionPath.AlreadyFlashed.name,
+                    title = stringResource(R.string.already_flashed),
+                    body = stringResource(R.string.already_flashed_body),
+                ),
+            ),
+            selectedKey = connectionPath.name,
+            onSelect = { onConnectionPath(DeviceConnectionPath.valueOf(it)) },
+            optionHeight = 226.dp,
+            selectedContainer = MaterialTheme.colorScheme.secondaryContainer,
+            selectedContent = MaterialTheme.colorScheme.onSecondaryContainer,
+        ) { key ->
+            if (key == DeviceConnectionPath.FirstTimeFlash.name) {
+                Button(
+                    onClick = onInstallFirstTime,
+                    enabled = showFirmwareUpdate && model == XteinkModel.X3,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp),
+                ) {
+                    Text(
+                        stringResource(
+                            if (showFirmwareUpdate && model == XteinkModel.X3) {
+                                R.string.install_firmware
+                            } else {
+                                R.string.firmware_not_available
+                            },
+                        ),
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                    )
+                }
+            } else {
+                Button(
+                    onClick = onConnect,
+                    enabled = device.linkPhase !in setOf("Scanning", "Connecting") && !isConnected,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp),
+                ) {
+                    if (device.linkPhase == "Scanning" || device.linkPhase == "Connecting") {
+                        CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.size(10.dp))
+                    }
+                    Text(
+                        stringResource(if (isConnected) R.string.device_connected else R.string.search_nearby),
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                    )
+                }
             }
-            Text(stringResource(if (isConnected) R.string.device_connected else R.string.search_nearby))
         }
-        if (showFirmwareUpdate) {
-            Spacer(Modifier.height(18.dp))
-            FirmwareUpdatePanel(
-                device = device,
-                model = model.label,
-                isConnected = isConnected,
-                onCheckFirmware = onCheckFirmware,
-                onFlashFirmware = onFlashFirmware,
+        AnimatedVisibility(
+            visible = connectionPath == DeviceConnectionPath.AlreadyFlashed && !device.message.isNullOrBlank(),
+            enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+            exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top),
+        ) {
+            Text(
+                text = device.message.orEmpty(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 14.dp),
             )
         }
     }
 }
 
 @Composable
-private fun FirmwareUpdatePanel(
+private fun DefaultFirmwarePage(
+    model: XteinkModel,
     device: DeviceUiState,
-    model: String,
-    isConnected: Boolean,
     onCheckFirmware: () -> Unit,
     onFlashFirmware: () -> Unit,
+    onChooseAlternative: () -> Unit,
 ) {
-    val canFlash = device.usbConnected || isConnected
+    LaunchedEffect(model) {
+        if (model == XteinkModel.X3) onCheckFirmware()
+    }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.install_firmware_title), style = MaterialTheme.typography.headlineMedium)
+        Text(
+            text = stringResource(R.string.install_firmware_body, model.label),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(18.dp))
+        FirmwareSourceCard(
+            source = FirmwareSource.Xtraordinary,
+            device = device,
+            selected = true,
+            onSelect = null,
+            onFlashFirmware = onFlashFirmware,
+        )
+        Spacer(Modifier.height(8.dp))
+        TextButton(onClick = onChooseAlternative, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+            Text(stringResource(R.string.choose_another_firmware))
+        }
+    }
+}
+
+@Composable
+private fun FirmwareSourcePicker(
+    model: XteinkModel,
+    device: DeviceUiState,
+    selectedSource: FirmwareSource,
+    onSelectSource: (FirmwareSource) -> Unit,
+    onFlashFirmware: () -> Unit,
+) {
+    val alternatives = listOf(FirmwareSource.CrossPoint, FirmwareSource.CrossInk)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.choose_firmware), style = MaterialTheme.typography.headlineMedium)
+        Text(
+            text = stringResource(R.string.choose_firmware_body, model.label),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(18.dp))
+        alternatives.forEachIndexed { index, source ->
+            FirmwareSourceCard(
+                source = source,
+                device = device,
+                selected = source == selectedSource,
+                onSelect = { onSelectSource(source) },
+                onFlashFirmware = onFlashFirmware,
+            )
+            if (index != alternatives.lastIndex) Spacer(Modifier.height(12.dp))
+        }
+    }
+}
+
+@Composable
+private fun FirmwareSourceCard(
+    source: FirmwareSource,
+    device: DeviceUiState,
+    selected: Boolean,
+    onSelect: (() -> Unit)?,
+    onFlashFirmware: () -> Unit,
+) {
+    val sourcePhase = if (device.firmwareSource == source) device.firmwareCheckPhase else FirmwareCheckPhase.Idle
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = if (selected) MaterialTheme.colorScheme.secondaryContainer
+        else MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = if (selected) MaterialTheme.colorScheme.onSecondaryContainer
+        else MaterialTheme.colorScheme.onSurface,
         shape = MaterialTheme.shapes.large,
-        modifier = Modifier.fillMaxWidth().animateContentSize(),
+        border = if (selected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onSelect != null) Modifier.clickable(onClick = onSelect) else Modifier)
+            .animateContentSize(),
     ) {
         Column(Modifier.padding(18.dp)) {
-            Text(stringResource(R.string.firmware_update), style = MaterialTheme.typography.titleLarge)
+            Text(firmwareSourceTitle(source), style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(4.dp))
             Text(
-                text = when {
-                    device.latestFirmwareVersion != null -> stringResource(
-                        if (device.usbConnected) R.string.latest_firmware_ready_usb else R.string.latest_firmware_ready,
-                        device.latestFirmwareVersion,
-                        model,
-                    )
-                    else -> stringResource(R.string.firmware_polls_github)
-                },
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = firmwareSourceBody(source),
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer
+                else MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (device.usbConnected) {
-                Spacer(Modifier.height(12.dp))
-                Surface(
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    shape = CircleShape,
-                ) {
-                    Text(
-                        text = stringResource(R.string.x3_connected_usb),
-                        style = MaterialTheme.typography.labelLarge,
-                        modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp),
-                    )
-                }
-            }
-            device.firmwareProgress?.let { progress ->
-                Spacer(Modifier.height(12.dp))
-                LinearProgressIndicator(
-                    progress = { progress.coerceIn(0f, 1f) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            Spacer(Modifier.height(14.dp))
-            AnimatedContent(
-                targetState = device.firmwareCheckPhase,
-                transitionSpec = {
-                    (fadeIn() + scaleIn(initialScale = 0.96f)) togetherWith
-                        (fadeOut() + scaleOut(targetScale = 0.96f))
-                },
-                label = "firmware action",
-            ) { phase ->
-                when (phase) {
-                    FirmwareCheckPhase.Available -> Button(
-                        onClick = onFlashFirmware,
-                        enabled = canFlash,
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
-                    ) {
-                        Text(stringResource(if (canFlash) R.string.flash_latest_firmware else R.string.connect_to_flash))
-                    }
-                    FirmwareCheckPhase.Downloading, FirmwareCheckPhase.Transferring -> FilledTonalButton(
-                        onClick = {},
-                        enabled = false,
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
-                    ) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                        Spacer(Modifier.size(10.dp))
-                        Text(device.usbMessage ?: stringResource(R.string.preparing_firmware))
-                    }
-                    FirmwareCheckPhase.Complete -> Text(
-                        stringResource(R.string.firmware_restart_message),
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    FirmwareCheckPhase.UpToDate -> Text(
-                        stringResource(R.string.firmware_up_to_date),
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    else -> FilledTonalButton(
-                        onClick = onCheckFirmware,
-                        enabled = phase != FirmwareCheckPhase.Checking,
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
-                    ) {
-                        if (phase == FirmwareCheckPhase.Checking) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                            Spacer(Modifier.size(10.dp))
+            AnimatedVisibility(
+                visible = selected,
+                enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+                exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top),
+            ) {
+                Column {
+                    device.latestFirmwareVersion
+                        ?.takeIf { device.firmwareSource == source }
+                        ?.let { version ->
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                text = stringResource(R.string.firmware_version, version),
+                                style = MaterialTheme.typography.labelLarge,
+                            )
                         }
-                        Text(stringResource(R.string.check_github_firmware))
+                    device.firmwareProgress?.let { progress ->
+                        Spacer(Modifier.height(10.dp))
+                        LinearProgressIndicator(
+                            progress = { progress.coerceIn(0f, 1f) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
+                    Spacer(Modifier.height(12.dp))
+                    FirmwareInstallAction(
+                        phase = sourcePhase,
+                        device = device,
+                        onFlashFirmware = onFlashFirmware,
+                    )
                 }
             }
         }
     }
 }
+
+@Composable
+private fun FirmwareInstallAction(
+    phase: FirmwareCheckPhase,
+    device: DeviceUiState,
+    onFlashFirmware: () -> Unit,
+) {
+    val canFlash = device.usbConnected
+    AnimatedContent(
+        targetState = phase,
+        transitionSpec = {
+            (fadeIn() + scaleIn(initialScale = 0.96f)) togetherWith
+                (fadeOut() + scaleOut(targetScale = 0.96f))
+        },
+        label = "firmware install action",
+    ) { currentPhase ->
+        when (currentPhase) {
+            FirmwareCheckPhase.Available, FirmwareCheckPhase.UpToDate -> Button(
+                onClick = onFlashFirmware,
+                enabled = canFlash,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp),
+            ) {
+                Text(
+                    stringResource(if (canFlash) R.string.install_firmware else R.string.connect_to_flash),
+                    textAlign = TextAlign.Center,
+                )
+            }
+            FirmwareCheckPhase.Downloading, FirmwareCheckPhase.Transferring -> FilledTonalButton(
+                onClick = {},
+                enabled = false,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 68.dp),
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.size(10.dp))
+                Text(
+                    device.usbMessage ?: stringResource(R.string.preparing_firmware),
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                )
+            }
+            FirmwareCheckPhase.Complete -> Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                shape = MaterialTheme.shapes.extraLarge,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                    Text(
+                        stringResource(R.string.firmware_installed_short),
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+            FirmwareCheckPhase.Error -> FilledTonalButton(
+                onClick = {},
+                enabled = false,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp),
+            ) {
+                Text(device.message ?: stringResource(R.string.firmware_check_failed), textAlign = TextAlign.Center)
+            }
+            else -> FilledTonalButton(
+                onClick = {},
+                enabled = false,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp),
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.size(10.dp))
+                Text(stringResource(R.string.finding_latest_firmware))
+            }
+        }
+    }
+}
+
+@Composable
+private fun firmwareSourceTitle(source: FirmwareSource): String = stringResource(
+    when (source) {
+        FirmwareSource.Xtraordinary -> R.string.firmware_xtraordinary_title
+        FirmwareSource.CrossPoint -> R.string.firmware_crosspoint_title
+        FirmwareSource.CrossInk -> R.string.firmware_crossink_title
+    },
+)
+
+@Composable
+private fun firmwareSourceBody(source: FirmwareSource): String = stringResource(
+    when (source) {
+        FirmwareSource.Xtraordinary -> R.string.firmware_xtraordinary_body
+        FirmwareSource.CrossPoint -> R.string.firmware_crosspoint_body
+        FirmwareSource.CrossInk -> R.string.firmware_crossink_body
+    },
+)
 
 @Composable
 private fun DeviceModelIcon(

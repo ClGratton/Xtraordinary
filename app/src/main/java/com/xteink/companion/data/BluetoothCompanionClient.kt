@@ -99,8 +99,13 @@ class BluetoothCompanionClient(private val context: Context) {
             return
         }
         _state.value = CompanionLinkState(LinkPhase.Scanning, model, message = "Searching nearby")
+        val companionService = ParcelUuid.fromString(XTEINK_SERVICE_UUID)
         val callback = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
+                val scanRecord = result.scanRecord
+                val advertisesCompanion = scanRecord?.serviceUuids?.contains(companionService) == true
+                val hasCompanionName = scanRecord?.deviceName == CompanionDeviceName
+                if (!advertisesCompanion && !hasCompanionName) return
                 stopScan()
                 _state.value = _state.value.copy(phase = LinkPhase.Connecting, message = "Connecting")
                 gatt = result.device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
@@ -111,13 +116,12 @@ class BluetoothCompanionClient(private val context: Context) {
             }
         }
         scanCallback = callback
-        val filter = ScanFilter.Builder().setServiceUuid(ParcelUuid.fromString(XTEINK_SERVICE_UUID)).build()
         val scanner = adapter.bluetoothLeScanner ?: run {
             _state.value = CompanionLinkState(LinkPhase.Error, model, message = "Bluetooth LE is unavailable")
             return
         }
         scanner.startScan(
-            listOf(filter),
+            emptyList<ScanFilter>(),
             ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build(),
             callback,
         )
@@ -343,6 +347,7 @@ class BluetoothCompanionClient(private val context: Context) {
     private data class PendingWrite(val characteristicUuid: UUID, val value: ByteArray)
     companion object {
         private val CLIENT_CONFIG_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+        private const val CompanionDeviceName = "XTEINK Companion"
 
         fun requiredPermissions(): Array<String> = if (Build.VERSION.SDK_INT >= 31) {
             arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)

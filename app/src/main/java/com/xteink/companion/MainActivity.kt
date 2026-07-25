@@ -126,7 +126,7 @@ class MainActivity : ComponentActivity() {
                         },
                         onDismissNotice = viewModel::dismissNotice,
                         onConnectDevice = connectDevice,
-                        onCheckFirmware = viewModel::checkLatestFirmware,
+                        onCheckFirmware = viewModel::checkFirmware,
                         onFlashFirmware = viewModel::flashLatestFirmware,
                     )
                 } else {
@@ -135,6 +135,8 @@ class MainActivity : ComponentActivity() {
                         device = state.device,
                         isDeviceConnected = state.isX3Connected,
                         onConnectDevice = connectDevice,
+                        onCheckFirmware = viewModel::checkFirmware,
+                        onFlashFirmware = viewModel::flashLatestFirmware,
                         onChooseBookFolder = { folderPicker.launch(null) },
                         onFinish = {
                             setupPreferences.edit().putBoolean("setup_complete", true).apply()

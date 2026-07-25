@@ -12,8 +12,11 @@ internal object EspRomProtocol {
     const val Sync = 0x08
     const val FlashBegin = 0x02
     const val FlashData = 0x03
-    const val FlashEnd = 0x04
     const val FlashMd5 = 0x13
+    const val WriteRegister = 0x09
+    const val ReadRegister = 0x0A
+    const val SpiSetParameters = 0x0B
+    const val SpiAttach = 0x0D
 
     private const val DirectionRequest = 0x00
     private const val DirectionResponse = 0x01
@@ -38,9 +41,23 @@ internal object EspRomProtocol {
         return littleEndianInts(block.size, sequence, 0, 0) + block
     }
 
-    fun flashEndPayload(): ByteArray = littleEndianInts(1)
-
     fun flashMd5Payload(size: Int): ByteArray = littleEndianInts(FlashOffset, size, 0, 0)
+
+    fun readRegisterPayload(address: Int): ByteArray = littleEndianInts(address)
+
+    fun writeRegisterPayload(address: Int, value: Int): ByteArray =
+        littleEndianInts(address, value, -1, 0)
+
+    fun spiAttachPayload(): ByteArray = littleEndianInts(0, 0)
+
+    fun spiSetParametersPayload(): ByteArray = littleEndianInts(
+        0,
+        16 * 1024 * 1024,
+        64 * 1024,
+        4 * 1024,
+        256,
+        0xFFFF,
+    )
 
     fun request(operation: Int, data: ByteArray, checksum: Int = 0): ByteArray {
         require(data.size <= 0xFFFF)

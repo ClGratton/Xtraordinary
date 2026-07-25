@@ -1,7 +1,5 @@
 package com.xteink.companion.ui.components
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -295,99 +293,50 @@ private fun PassModeChooser(
     onSend: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val staticWeight by animateFloatAsState(
-        targetValue = if (mode == TicketMode.Static) 1.35f else 0.75f,
-        label = "static option width",
-    )
-    val liveWeight by animateFloatAsState(
-        targetValue = if (mode == TicketMode.Live) 1.35f else 0.75f,
-        label = "live option width",
-    )
-
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.Top,
-    ) {
-        PassModeOption(
-            title = stringResource(R.string.static_ticket),
-            body = stringResource(R.string.static_ticket_body_short),
-            sendLabel = stringResource(R.string.send_static_ticket),
-            selected = mode == TicketMode.Static,
-            onSelect = { onSetMode(TicketMode.Static) },
-            onSend = onSend,
-            modifier = Modifier.weight(staticWeight),
-        )
-        PassModeOption(
-            title = stringResource(R.string.live_ticket),
-            body = stringResource(R.string.live_ticket_body_short),
-            sendLabel = stringResource(R.string.start_live_and_send),
-            selected = mode == TicketMode.Live,
-            onSelect = { onSetMode(TicketMode.Live) },
-            onSend = onSend,
-            modifier = Modifier.weight(liveWeight),
-        )
-    }
-}
-
-@Composable
-private fun PassModeOption(
-    title: String,
-    body: String,
-    sendLabel: String,
-    selected: Boolean,
-    onSelect: () -> Unit,
-    onSend: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
     val haptics = LocalHapticFeedback.current
-    Surface(
-        onClick = {
-            if (!selected) haptics.performHapticFeedback(HapticFeedbackType.ToggleOn)
-            onSelect()
-        },
-        modifier = modifier.height(170.dp),
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
-        contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
-        shape = MaterialTheme.shapes.large,
-        border = if (selected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+    val staticKey = TicketMode.Static.name
+    val liveKey = TicketMode.Live.name
+    ExpandingChoiceRow(
+        choices = listOf(
+            ExpandingChoice(
+                key = staticKey,
+                title = stringResource(R.string.static_ticket),
+                body = stringResource(R.string.static_ticket_body_short),
+            ),
+            ExpandingChoice(
+                key = liveKey,
+                title = stringResource(R.string.live_ticket),
+                body = stringResource(R.string.live_ticket_body_short),
+            ),
+        ),
+        selectedKey = mode.name,
+        onSelect = { onSetMode(TicketMode.valueOf(it)) },
+        optionHeight = 170.dp,
+        modifier = modifier,
+    ) { key ->
+        Button(
+            onClick = {
+                haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                onSend()
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
+            shape = MaterialTheme.shapes.extraLarge,
+            contentPadding = PaddingValues(horizontal = 10.dp),
         ) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(
-                text = body,
-                style = MaterialTheme.typography.labelMedium,
-                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
+            SendToX3Icon(
+                modifier = Modifier.size(22.dp),
+                color = MaterialTheme.colorScheme.onPrimary,
             )
-            if (selected) {
-                Spacer(modifier = Modifier.weight(1f))
-                Button(
-                    onClick = {
-                        haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-                        onSend()
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                    shape = MaterialTheme.shapes.extraLarge,
-                    contentPadding = PaddingValues(horizontal = 10.dp),
-                ) {
-                    SendToX3Icon(
-                        modifier = Modifier.size(22.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                    Text(
-                        text = sendLabel,
-                        style = MaterialTheme.typography.labelLarge,
-                        modifier = Modifier.padding(start = 7.dp),
-                        maxLines = 1,
-                    )
-                }
-            }
+            Text(
+                text = stringResource(
+                    if (key == staticKey) R.string.send_static_ticket else R.string.start_live_and_send,
+                ),
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.padding(start = 7.dp),
+                maxLines = 1,
+            )
         }
     }
 }

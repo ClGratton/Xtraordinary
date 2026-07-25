@@ -50,4 +50,16 @@ class EspRomProtocolTest {
         assertEquals(0x1234, response.value)
         assertArrayEquals(byteArrayOf(0, 0, 0, 0), response.data)
     }
+
+    @Test
+    fun spiParametersDescribeTheX3SixteenMegabyteFlash() {
+        val payload = ByteBuffer.wrap(EspRomProtocol.spiSetParametersPayload()).order(ByteOrder.LITTLE_ENDIAN)
+
+        assertEquals(0, payload.int)
+        assertEquals(16 * 1024 * 1024, payload.int)
+        assertEquals(64 * 1024, payload.int)
+        assertEquals(4 * 1024, payload.int)
+        assertEquals(256, payload.int)
+        assertEquals(0xFFFF, payload.int)
+    }
 }

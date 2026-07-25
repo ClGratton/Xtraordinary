@@ -106,7 +106,7 @@ class UsbEspFlasher(context: Context) : Closeable {
         require(image.size <= EspRomProtocol.MaxAppSize) {
             "Firmware image does not fit the X3 app partition"
         }
-        val device = awaitPermission()
+        val device = awaitPermission(findDevice() ?: error("Connect the X3 to this phone with a USB data cable"))
         _state.value = UsbFlashState(
             phase = UsbFlashPhase.EnteringBootloader,
             deviceDetected = true,
@@ -115,7 +115,14 @@ class UsbEspFlasher(context: Context) : Closeable {
         )
         runCatching {
             RomConnection.open(usbManager, device).use { connection ->
-                connection.enterBootloaderAndSync()
+                connection.resetToBootloader()
+                _state.value = _state.value.copy(
+                    phase = UsbFlashPhase.EnteringBootloader,
+                    message = "Synchronizing with the X3 bootloader…",
+                )
+                connection.syncAndPrepare()
+                connection.disableUsbWatchdogs()
+                connection.attachAndConfigureFlash()
                 _state.value = _state.value.copy(
                     phase = UsbFlashPhase.Erasing,
                     message = "Preparing the X3 flash…",
@@ -128,7 +135,6 @@ class UsbEspFlasher(context: Context) : Closeable {
                 connection.writeImage(image) { progress ->
                     _state.value = _state.value.copy(progress = progress)
                 }
-                connection.flashEnd()
                 _state.value = _state.value.copy(
                     phase = UsbFlashPhase.Verifying,
                     progress = 1f,
@@ -158,8 +164,23 @@ class UsbEspFlasher(context: Context) : Closeable {
         }.getOrThrow()
     }
 
-    private suspend fun awaitPermission(): UsbDevice {
-        val device = findDevice() ?: error("Connect the X3 to this phone with a USB data cable")
+    suspend fun captureBootLog(durationMs: Long = 10_000): String = withContext(Dispatchers.IO) {
+        val device = awaitPermission(findDevice() ?: error("X3 is not connected by USB"))
+        RomConnection.open(usbManager, device).use { connection ->
+            connection.hardReset()
+            connection.readSerialText(durationMs)
+        }
+    }
+
+    suspend fun readCrashReport(timeoutMs: Long = 8_000): String = withContext(Dispatchers.IO) {
+        val device = awaitPermission(findDevice() ?: error("X3 is not connected by USB"))
+        RomConnection.open(usbManager, device).use { connection ->
+            connection.prepareSerial()
+            connection.requestCrashReport(timeoutMs)
+        }
+    }
+
+    private suspend fun awaitPermission(device: UsbDevice): UsbDevice {
         if (usbManager.hasPermission(device)) return device
         _state.value = UsbFlashState(
             phase = UsbFlashPhase.PermissionRequired,
@@ -202,19 +223,50 @@ class UsbEspFlasher(context: Context) : Closeable {
         private var rts = false
         private val receivedBytes = ArrayDeque<Int>()
 
-        fun enterBootloaderAndSync() {
+        fun resetToBootloader() {
             setLineCoding()
+            usbJtagSerialReset()
+        }
+
+        fun prepareSerial() {
+            setLineCoding()
+            drainInput()
+        }
+
+        fun syncAndPrepare() {
             var lastError: Throwable? = null
-            repeat(7) {
+            repeat(5) {
                 runCatching {
-                    usbJtagSerialReset()
                     drainInput()
                     command(EspRomProtocol.Sync, EspRomProtocol.syncPayload(), timeoutMs = 1_000)
                 }.onSuccess { return }.onFailure { lastError = it }
             }
             throw IllegalStateException(
-                "Could not enter the X3 bootloader. Keep the cable connected and try again.",
+                "Could not synchronize with the X3 bootloader: ${lastError?.message ?: "no response"}",
                 lastError,
+            )
+        }
+
+        fun disableUsbWatchdogs() {
+            writeRegister(RtcWdtWriteProtect, RtcWdtKey)
+            writeRegister(RtcWdtConfig0, 0)
+            writeRegister(RtcWdtWriteProtect, 0)
+            writeRegister(SwdWriteProtect, SwdWriteProtectKey)
+            val swdConfig = readRegister(SwdConfig)
+            writeRegister(SwdConfig, swdConfig or SwdAutoFeedEnable)
+            writeRegister(SwdWriteProtect, 0)
+        }
+
+        fun attachAndConfigureFlash() {
+            command(
+                EspRomProtocol.SpiAttach,
+                EspRomProtocol.spiAttachPayload(),
+                timeoutMs = 3_000,
+            )
+            command(
+                EspRomProtocol.SpiSetParameters,
+                EspRomProtocol.spiSetParametersPayload(),
+                timeoutMs = 3_000,
             )
         }
 
@@ -222,7 +274,21 @@ class UsbEspFlasher(context: Context) : Closeable {
             command(
                 EspRomProtocol.FlashBegin,
                 EspRomProtocol.flashBeginPayload(size),
-                timeoutMs = 180_000,
+                timeoutMs = EraseTimeoutMs,
+            )
+        }
+
+        private fun readRegister(address: Int): Int = command(
+            EspRomProtocol.ReadRegister,
+            EspRomProtocol.readRegisterPayload(address),
+            timeoutMs = 3_000,
+        ).value.toInt()
+
+        private fun writeRegister(address: Int, value: Int) {
+            command(
+                EspRomProtocol.WriteRegister,
+                EspRomProtocol.writeRegisterPayload(address, value),
+                timeoutMs = 3_000,
             )
         }
 
@@ -257,10 +323,6 @@ class UsbEspFlasher(context: Context) : Closeable {
             }
         }
 
-        fun flashEnd() {
-            command(EspRomProtocol.FlashEnd, EspRomProtocol.flashEndPayload(), timeoutMs = 5_000)
-        }
-
         fun verifyMd5(image: ByteArray) {
             val expected = MessageDigest.getInstance("MD5").digest(image).toHex()
             val response = command(
@@ -278,6 +340,36 @@ class UsbEspFlasher(context: Context) : Closeable {
             Thread.sleep(200)
             setControlLines(dtr = false, rts = false)
             Thread.sleep(200)
+        }
+
+        fun readSerialText(durationMs: Long): String {
+            val deadline = System.currentTimeMillis() + durationMs
+            val bytes = ByteArrayOutputStream()
+            val buffer = ByteArray(input.maxPacketSize.coerceAtLeast(64))
+            while (System.currentTimeMillis() < deadline) {
+                val count = connection.bulkTransfer(input, buffer, buffer.size, 250)
+                if (count > 0) bytes.write(buffer, 0, count)
+            }
+            return bytes.toByteArray().toString(Charsets.UTF_8)
+        }
+
+        fun requestCrashReport(timeoutMs: Long): String {
+            writeAll("CMD:CRASH_REPORT\n".toByteArray(Charsets.US_ASCII))
+            val deadline = System.currentTimeMillis() + timeoutMs
+            val bytes = ByteArrayOutputStream()
+            val buffer = ByteArray(input.maxPacketSize.coerceAtLeast(64))
+            while (System.currentTimeMillis() < deadline) {
+                val count = connection.bulkTransfer(input, buffer, buffer.size, 250)
+                if (count > 0) {
+                    bytes.write(buffer, 0, count)
+                    require(bytes.size() <= MaxCrashReportBytes) { "X3 crash report is unexpectedly large" }
+                    val text = bytes.toByteArray().toString(Charsets.UTF_8)
+                    if (text.contains(CrashReportEnd)) {
+                        return text.substringAfter(CrashReportStart).substringBefore(CrashReportEnd).trim()
+                    }
+                }
+            }
+            error("Timed out reading crash_report.txt from the X3")
         }
 
         private fun command(
@@ -327,7 +419,7 @@ class UsbEspFlasher(context: Context) : Closeable {
                 0x08, // eight data bits
             )
             val result = connection.controlTransfer(
-                UsbConstants.USB_TYPE_CLASS or UsbConstants.USB_DIR_OUT,
+                UsbConstants.USB_TYPE_CLASS or UsbRecipientInterface or UsbConstants.USB_DIR_OUT,
                 CdcSetLineCoding,
                 0,
                 controlInterface.id,
@@ -343,7 +435,7 @@ class UsbEspFlasher(context: Context) : Closeable {
             this.rts = rts
             val value = (if (dtr) 1 else 0) or (if (rts) 2 else 0)
             val result = connection.controlTransfer(
-                UsbConstants.USB_TYPE_CLASS or UsbConstants.USB_DIR_OUT,
+                UsbConstants.USB_TYPE_CLASS or UsbRecipientInterface or UsbConstants.USB_DIR_OUT,
                 CdcSetControlLineState,
                 value,
                 controlInterface.id,
@@ -411,6 +503,19 @@ class UsbEspFlasher(context: Context) : Closeable {
         }
 
         companion object {
+            private const val RtcControlBase = 0x60008000
+            private const val RtcWdtConfig0 = RtcControlBase + 0x0090
+            private const val RtcWdtWriteProtect = RtcControlBase + 0x00A8
+            private const val RtcWdtKey = 0x50D83AA1
+            private const val SwdConfig = RtcControlBase + 0x00AC
+            private const val SwdWriteProtect = RtcControlBase + 0x00B0
+            private const val SwdWriteProtectKey = 0x8F1D312A.toInt()
+            private const val SwdAutoFeedEnable = 1 shl 31
+            private const val EraseTimeoutMs = 360_000
+            private const val MaxCrashReportBytes = 64 * 1024
+            private const val CrashReportStart = "CRASH_REPORT_START"
+            private const val CrashReportEnd = "CRASH_REPORT_END"
+
             fun open(manager: UsbManager, device: UsbDevice): RomConnection {
                 val control = (0 until device.interfaceCount)
                     .map(device::getInterface)
@@ -446,6 +551,7 @@ class UsbEspFlasher(context: Context) : Closeable {
         private const val UsbTimeoutMs = 5_000
         private const val CdcSetLineCoding = 0x20
         private const val CdcSetControlLineState = 0x22
+        private const val UsbRecipientInterface = 0x01
         private const val SlipEnd = 0xC0
         private val ActivePhases = setOf(
             UsbFlashPhase.EnteringBootloader,

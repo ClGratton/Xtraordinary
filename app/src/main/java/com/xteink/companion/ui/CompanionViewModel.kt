@@ -1,12 +1,14 @@
 package com.xteink.companion.ui
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.xteink.companion.data.BluetoothCompanionClient
 import com.xteink.companion.data.BookLibraryRepository
 import com.xteink.companion.data.FirmwareRelease
 import com.xteink.companion.data.FirmwareReleaseRepository
+import com.xteink.companion.data.FirmwareSource
 import com.xteink.companion.data.LinkPhase
 import com.xteink.companion.data.UsbEspFlasher
 import com.xteink.companion.data.UsbFlashPhase
@@ -290,10 +292,19 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun disconnectDevice() = companionClient.disconnect()
 
-    fun checkLatestFirmware(model: String) {
-        _uiState.update { it.copy(device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Checking, message = null)) }
+    fun checkLatestFirmware(model: String) = checkFirmware(model, FirmwareSource.Xtraordinary)
+
+    fun checkFirmware(model: String, source: FirmwareSource) {
+        _uiState.update {
+            it.copy(device = it.device.copy(
+                firmwareCheckPhase = FirmwareCheckPhase.Checking,
+                firmwareSource = source,
+                latestFirmwareVersion = null,
+                message = null,
+            ))
+        }
         viewModelScope.launch {
-            runCatching { firmwareReleases.latestFor(model) }
+            runCatching { firmwareReleases.latestFor(model, source) }
                 .onSuccess { release ->
                     latestRelease = release
                     val currentVersion = _uiState.value.device.firmwareVersion
@@ -304,6 +315,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                             } else {
                                 FirmwareCheckPhase.Available
                             },
+                            firmwareSource = release.source,
                             latestFirmwareVersion = release.version,
                         ))
                     }
@@ -315,6 +327,12 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     fun flashLatestFirmware() {
         val release = latestRelease ?: return
         val useUsb = _uiState.value.device.usbConnected
+        if (release.source != FirmwareSource.Xtraordinary && !useUsb) {
+            _uiState.update {
+                it.copy(notice = UiNotice.DeviceMessage("Connect the X3 to this phone by USB before flashing"))
+            }
+            return
+        }
         if (!useUsb && !_uiState.value.isX3Connected) {
             _uiState.update { it.copy(notice = UiNotice.DeviceMessage("Connect the X3 to this phone by USB before flashing")) }
             return
@@ -327,13 +345,25 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                     message = null,
                 ))
             }
-            runCatching {
+            val flashResult = runCatching {
                 val file = firmwareReleases.downloadVerified(release)
                 _uiState.update { it.copy(device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Transferring)) }
                 if (useUsb) usbFlasher.flash(file) else companionClient.flashFirmware(release, file)
-            }.onSuccess {
+            }
+            if (flashResult.isSuccess) {
                 _uiState.update { it.copy(device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Complete)) }
-            }.onFailure(::reportDeviceError)
+                if (useUsb) {
+                    delay(7_000)
+                    runCatching { usbFlasher.readCrashReport() }
+                        .onSuccess { report ->
+                            getApplication<Application>().filesDir.resolve("x3_crash_report.txt").writeText(report)
+                            Log.i("XtraordinaryCrash", report)
+                        }
+                        .onFailure { Log.e("XtraordinaryCrash", "Could not retrieve X3 crash report", it) }
+                }
+            } else {
+                flashResult.exceptionOrNull()?.let(::reportDeviceError)
+            }
         }
     }
 

@@ -9,8 +9,15 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 
+enum class FirmwareSource {
+    Xtraordinary,
+    CrossPoint,
+    CrossInk,
+}
+
 data class FirmwareRelease(
     val model: String,
+    val source: FirmwareSource,
     val version: String,
     val assetName: String,
     val downloadUrl: String,
@@ -19,8 +26,27 @@ data class FirmwareRelease(
 )
 
 class FirmwareReleaseRepository(private val context: Context) {
-    suspend fun latestFor(model: String): FirmwareRelease = withContext(Dispatchers.IO) {
-        val release = JSONObject(getText(LATEST_RELEASE_URL))
+    suspend fun latestFor(
+        model: String,
+        source: FirmwareSource = FirmwareSource.Xtraordinary,
+    ): FirmwareRelease = withContext(Dispatchers.IO) {
+        when (source) {
+            FirmwareSource.Xtraordinary -> latestXtraordinary(model)
+            FirmwareSource.CrossPoint -> latestGitHubAsset(
+                model = model,
+                source = source,
+                releaseUrl = CROSSPOINT_RELEASE_URL,
+            ) { name -> name == "firmware.bin" }
+            FirmwareSource.CrossInk -> latestGitHubAsset(
+                model = model,
+                source = source,
+                releaseUrl = CROSSINK_RELEASE_URL,
+            ) { name -> name.startsWith("firmware-tiny-") && name.endsWith(".bin") }
+        }
+    }
+
+    private fun latestXtraordinary(model: String): FirmwareRelease {
+        val release = JSONObject(getText(XTRAORDINARY_RELEASE_URL))
         val version = release.getString("tag_name")
         val assets = release.getJSONArray("assets")
         val manifestAsset = (0 until assets.length())
@@ -33,8 +59,9 @@ class FirmwareReleaseRepository(private val context: Context) {
             .map { firmwareAssets.getJSONObject(it) }
             .firstOrNull { it.getString("model").equals(model, ignoreCase = true) }
             ?: error("Latest release has no firmware for $model")
-        FirmwareRelease(
+        return FirmwareRelease(
             model = match.getString("model"),
+            source = FirmwareSource.Xtraordinary,
             version = manifest.optString("version", version),
             assetName = match.getString("name"),
             downloadUrl = match.optString("url").ifBlank {
@@ -44,6 +71,35 @@ class FirmwareReleaseRepository(private val context: Context) {
             },
             sizeBytes = match.getLong("size"),
             sha256 = match.getString("sha256").lowercase(),
+        )
+    }
+
+    private fun latestGitHubAsset(
+        model: String,
+        source: FirmwareSource,
+        releaseUrl: String,
+        matchesAsset: (String) -> Boolean,
+    ): FirmwareRelease {
+        require(model.equals("X3", ignoreCase = true)) { "$source firmware is currently available for X3 only" }
+        val release = JSONObject(getText(releaseUrl))
+        val version = release.getString("tag_name")
+        val assets = release.getJSONArray("assets")
+        val asset = (0 until assets.length())
+            .map { assets.getJSONObject(it) }
+            .firstOrNull { matchesAsset(it.getString("name")) }
+            ?: error("Latest $source release has no compatible X3 firmware")
+        val digest = asset.optString("digest").removePrefix("sha256:").lowercase()
+        require(digest.matches(Regex("[0-9a-f]{64}"))) {
+            "GitHub did not provide a SHA-256 digest for the latest $source firmware"
+        }
+        return FirmwareRelease(
+            model = "X3",
+            source = source,
+            version = version,
+            assetName = asset.getString("name"),
+            downloadUrl = asset.getString("browser_download_url"),
+            sizeBytes = asset.getLong("size"),
+            sha256 = digest,
         )
     }
 
@@ -81,8 +137,12 @@ class FirmwareReleaseRepository(private val context: Context) {
     private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
 
     companion object {
-        private const val LATEST_RELEASE_URL =
+        private const val XTRAORDINARY_RELEASE_URL =
             "https://api.github.com/repos/ClGratton/Xtraordinary/releases/latest"
+        private const val CROSSPOINT_RELEASE_URL =
+            "https://api.github.com/repos/crosspoint-reader/crosspoint-reader/releases/latest"
+        private const val CROSSINK_RELEASE_URL =
+            "https://api.github.com/repos/uxjulia/CrossInk/releases/latest"
         private const val MANIFEST_NAME = "firmware-manifest.json"
     }
 }

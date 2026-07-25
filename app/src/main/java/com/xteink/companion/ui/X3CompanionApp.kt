@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.xteink.companion.R
+import com.xteink.companion.data.FirmwareSource
 import com.xteink.companion.ui.components.CompanionNavigation
 import com.xteink.companion.ui.components.CompanionTopBar
 import com.xteink.companion.ui.components.ControlDeckFocusContent
@@ -61,7 +62,7 @@ fun X3CompanionApp(
     onOpenSetup: () -> Unit,
     onDismissNotice: () -> Unit,
     onConnectDevice: (String) -> Unit = {},
-    onCheckFirmware: (String) -> Unit = {},
+    onCheckFirmware: (String, FirmwareSource) -> Unit = { _, _ -> },
     onFlashFirmware: () -> Unit = {},
 ) {
     val snackbarHostState = remember { SnackbarHostState() }

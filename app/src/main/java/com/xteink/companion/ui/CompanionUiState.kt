@@ -1,5 +1,7 @@
 package com.xteink.companion.ui
 
+import com.xteink.companion.data.FirmwareSource
+
 enum class CompanionVisualTheme {
     Expressive,
     Quiet,
@@ -156,6 +158,7 @@ data class DeviceUiState(
     val firmwareVersion: String? = null,
     val libraryRevision: UInt = 0u,
     val firmwareCheckPhase: FirmwareCheckPhase = FirmwareCheckPhase.Idle,
+    val firmwareSource: FirmwareSource = FirmwareSource.Xtraordinary,
     val latestFirmwareVersion: String? = null,
     val firmwareProgress: Float? = null,
 )

@@ -9,11 +9,14 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 
 #include "CompanionProtocol.h"
 #include "SessionEngine.h"
 
+class NimBLEAdvertising;
 class NimBLECharacteristic;
+class NimBLEServer;
 
 namespace companion {
 
@@ -29,12 +32,15 @@ class CompanionService {
   };
   static constexpr size_t MAX_LIBRARY_ITEMS = 128;
 
+  NimBLEServer* server_ = nullptr;
+  NimBLEAdvertising* advertising_ = nullptr;
   NimBLECharacteristic* events_ = nullptr;
-  std::array<LibraryItem, MAX_LIBRARY_ITEMS> library_{};
+  std::unique_ptr<LibraryItem[]> library_;
   size_t libraryCount_ = 0;
   size_t librarySendIndex_ = 0;
   uint32_t libraryRevision_ = 0;
   bool librarySendPending_ = false;
+  uint32_t lastAdvertisingAttemptMs_ = 0;
   SessionEngine session_;
   HalFile firmwareFile_;
   uint64_t firmwareExpectedSize_ = 0;
@@ -53,7 +59,7 @@ class CompanionService {
   void sendAck(uint32_t messageId);
   void sendNack(uint32_t messageId, const char* reason);
   void sendCapabilities(MessageType type = MessageType::CAPABILITIES);
-  void scanLibrary();
+  bool scanLibrary();
   void scanDirectory(const char* path, uint8_t depth);
   void sendNextLibraryItem();
   bool beginFirmware(const EnvelopeView& envelope);
