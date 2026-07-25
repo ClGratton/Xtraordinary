@@ -612,11 +612,21 @@ void loop() {
     powerManager.setPowerSaving(false);  // Make sure we're at full performance when skipLoopDelay is requested
     yield();                             // Give FreeRTOS a chance to run tasks, but return immediately
   } else {
-    if (millis() - lastActivityTime >= HalPowerManager::IDLE_POWER_SAVING_MS) {
+    bool companionConnected = false;
+#ifdef ENABLE_X3_COMPANION
+    companionConnected = companion::companionService.connected();
+#endif
+    if (millis() - lastActivityTime >= HalPowerManager::IDLE_POWER_SAVING_MS && !companionConnected) {
       // If we've been inactive for a while, increase the delay to save power
       powerManager.setPowerSaving(true);  // Lower CPU frequency after extended inactivity
       delay(50);
     } else {
+      if (companionConnected) {
+        // Secure Connections performs ECDH immediately after the BLE link is
+        // established. At the 10 MHz idle clock Android times out before the
+        // X3 can finish pairing, so keep normal speed for the link lifetime.
+        powerManager.setPowerSaving(false);
+      }
       // Short delay to prevent tight loop while still being responsive
       delay(10);
     }
