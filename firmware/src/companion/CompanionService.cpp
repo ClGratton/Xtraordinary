@@ -96,11 +96,12 @@ void CompanionService::begin() {
     LOG_ERR("CMP", "BLE advertising unavailable");
     return;
   }
-  const bool uuidAdded = advertising_->addServiceUUID(SERVICE_UUID);
   advertising_->enableScanResponse(true);
-  const bool started = uuidAdded && advertising_->start();
+  const bool nameAdded = advertising_->setName("XTEINK Companion");
+  const bool uuidAdded = advertising_->addServiceUUID(SERVICE_UUID);
+  const bool started = nameAdded && uuidAdded && advertising_->start();
   lastAdvertisingAttemptMs_ = millis();
-  LOG_INF("CMP", "BLE advertising UUID=%d started=%d active=%d free heap=%u", uuidAdded, started,
+  LOG_INF("CMP", "BLE advertising name=%d UUID=%d started=%d active=%d free heap=%u", nameAdded, uuidAdded, started,
           advertising_->isAdvertising(), ESP.getFreeHeap());
 }
 
