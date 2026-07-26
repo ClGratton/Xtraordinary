@@ -33,26 +33,55 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         application.getSharedPreferences("xtraordinary_connection", Application.MODE_PRIVATE)
     private var latestRelease: FirmwareRelease? = null
     private var backgroundDisconnectJob: Job? = null
+    private var reconnectJob: Job? = null
+    private var focusSyncJob: Job? = null
+    private var deleteSyncJob: Job? = null
+    private var appForeground = false
+    private var intentionalTransportIdle = true
+    private var reconnectAttempt = 0
+    private var pendingFocusSync = false
+    private val pendingDeletePaths = linkedSetOf<String>()
 
     init {
+        managedDeviceModel()?.let { model ->
+            _uiState.update { it.copy(isX3Connected = true, connectedDeviceModel = model) }
+        }
         viewModelScope.launch {
             companionClient.state.collect { link ->
                 val capabilities = link.capabilities
                 if (link.phase == LinkPhase.Connected && link.requestedModel != null) {
                     connectionPreferences.edit().putString(LastConnectedModelKey, link.requestedModel).apply()
                 }
+                val managedModel = managedDeviceModel()
+                val transportConnected = link.phase == LinkPhase.Connected
+                val unexpectedDisconnect = link.phase == LinkPhase.Error && !intentionalTransportIdle
                 _uiState.update { state ->
                     state.copy(
-                        isX3Connected = link.phase == LinkPhase.Connected,
-                        connectedDeviceModel = capabilities?.model,
+                        isX3Connected = managedModel != null || transportConnected,
+                        isX3TransportConnected = transportConnected,
+                        connectedDeviceModel = capabilities?.model ?: managedModel ?: state.connectedDeviceModel,
                         device = state.device.copy(
                             linkPhase = link.phase.name,
+                            reconnecting = shouldShowReconnecting(
+                                previous = state.device.reconnecting,
+                                phase = link.phase,
+                                intentionalTransportIdle = intentionalTransportIdle,
+                            ),
                             message = link.message,
-                            firmwareVersion = capabilities?.firmwareVersion,
+                            firmwareVersion = capabilities?.firmwareVersion ?: state.device.firmwareVersion,
                             libraryRevision = capabilities?.libraryRevision ?: state.device.libraryRevision,
                             firmwareProgress = link.transferProgress ?: state.device.firmwareProgress,
                         ),
                     )
+                }
+                if (transportConnected) {
+                    reconnectAttempt = 0
+                    reconnectJob?.cancel()
+                    reconnectJob = null
+                    drainPendingFocusSync()
+                    drainPendingDeletes()
+                } else if (unexpectedDisconnect) {
+                    scheduleReconnect()
                 }
             }
         }
@@ -141,22 +170,10 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 notice = if (state.isX3Connected) null else UiNotice.FocusStartedWithoutX3,
             )
         }
-        val state = _uiState.value
-        if (state.isX3Connected) viewModelScope.launch {
-            runDeviceCommand {
-                companionClient.startSession(
-                    SessionStart(
-                        deadlineEpochSeconds = System.currentTimeMillis() / 1_000 + state.focus.selectedMinutes * 60,
-                        durationSeconds = state.focus.selectedMinutes * 60,
-                        title = state.focus.task,
-                    ),
-                )
-            }
-        }
+        requestFocusSync()
     }
 
     fun togglePause() {
-        val wasRunning = _uiState.value.focus.phase == FocusPhase.Running
         _uiState.update { state ->
             val nextPhase = when (state.focus.phase) {
                 FocusPhase.Running -> FocusPhase.Paused
@@ -165,11 +182,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             }
             state.copy(focus = state.focus.copy(phase = nextPhase))
         }
-        if (_uiState.value.isX3Connected) viewModelScope.launch {
-            runDeviceCommand {
-                if (wasRunning) companionClient.pauseSession() else companionClient.resumeSession()
-            }
-        }
+        requestFocusSync()
     }
 
     fun endFocus() {
@@ -181,7 +194,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 ),
             )
         }
-        if (_uiState.value.isX3Connected) viewModelScope.launch { runDeviceCommand { companionClient.stopSession() } }
+        requestFocusSync()
     }
 
     fun resetFocus() {
@@ -194,7 +207,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 ),
             )
         }
-        if (_uiState.value.isX3Connected) viewModelScope.launch { runDeviceCommand { companionClient.stopSession() } }
+        requestFocusSync()
     }
 
     fun showTools() {
@@ -283,46 +296,65 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         if (!_uiState.value.isX3Connected) return
         val paths = _uiState.value.read.books.filter { it.id in bookIds }.mapNotNull { it.x3Path }
         if (paths.isEmpty()) return
-        viewModelScope.launch {
-            runDeviceCommand {
-                companionClient.deleteLibraryEntries(_uiState.value.device.libraryRevision, paths)
-                _uiState.update { it.copy(notice = UiNotice.X3DeleteQueued(paths.size)) }
-            }
-        }
+        pendingDeletePaths += paths
+        if (_uiState.value.isX3TransportConnected) drainPendingDeletes() else ensureTransportConnected()
     }
 
     fun hasCompanionPermissions(): Boolean = companionClient.hasPermissions()
 
     fun connectDevice(model: String) {
+        intentionalTransportIdle = false
+        reconnectJob?.cancel()
+        reconnectJob = null
         companionClient.connect(model)
     }
 
     fun disconnectDevice() {
+        intentionalTransportIdle = true
+        reconnectJob?.cancel()
+        reconnectJob = null
+        pendingFocusSync = false
+        pendingDeletePaths.clear()
         connectionPreferences.edit().remove(LastConnectedModelKey).apply()
         companionClient.disconnect()
+        _uiState.update {
+            it.copy(
+                isX3Connected = false,
+                isX3TransportConnected = false,
+                connectedDeviceModel = null,
+                device = it.device.copy(reconnecting = false),
+            )
+        }
     }
 
     fun onAppForegrounded() {
+        appForeground = true
+        intentionalTransportIdle = false
         backgroundDisconnectJob?.cancel()
         backgroundDisconnectJob = null
-        if (!companionClient.hasPermissions()) return
-        val phase = _uiState.value.device.linkPhase
-        if (phase == LinkPhase.Connected.name || phase == LinkPhase.Connecting.name || phase == LinkPhase.Scanning.name) {
-            return
-        }
-        connectionPreferences.getString(LastConnectedModelKey, null)?.let(companionClient::connect)
+        ensureTransportConnected()
     }
 
     fun onAppBackgrounded() {
+        appForeground = false
         backgroundDisconnectJob?.cancel()
         backgroundDisconnectJob = viewModelScope.launch {
             delay(BackgroundDisconnectGraceMs)
             val state = _uiState.value
-            val connectionInProgress =
-                state.device.linkPhase == LinkPhase.Connecting.name || state.device.linkPhase == LinkPhase.Scanning.name
             val firmwareInProgress = state.device.firmwareCheckPhase == FirmwareCheckPhase.Downloading ||
                 state.device.firmwareCheckPhase == FirmwareCheckPhase.Transferring
-            if (!connectionInProgress && !firmwareInProgress) companionClient.disconnect()
+            if (!firmwareInProgress) {
+                intentionalTransportIdle = true
+                reconnectJob?.cancel()
+                reconnectJob = null
+                companionClient.disconnect()
+                _uiState.update {
+                    it.copy(
+                        isX3TransportConnected = false,
+                        device = it.device.copy(reconnecting = false),
+                    )
+                }
+            }
             backgroundDisconnectJob = null
         }
     }
@@ -372,6 +404,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             _uiState.update { it.copy(notice = UiNotice.DeviceMessage("Connect the X3 to this phone by USB before flashing")) }
             return
         }
+        if (!useUsb) ensureTransportConnected()
         viewModelScope.launch {
             _uiState.update {
                 it.copy(device = it.device.copy(
@@ -383,7 +416,12 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             val flashResult = runCatching {
                 val file = firmwareReleases.downloadVerified(release)
                 _uiState.update { it.copy(device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Transferring)) }
-                if (useUsb) usbFlasher.flash(file) else companionClient.flashFirmware(release, file)
+                if (useUsb) {
+                    usbFlasher.flash(file)
+                } else {
+                    companionClient.awaitConnected()
+                    companionClient.flashFirmware(release, file)
+                }
             }
             if (flashResult.isSuccess) {
                 _uiState.update { it.copy(device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Complete)) }
@@ -458,10 +496,16 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         _uiState.update { state ->
             val byFileName = entries.associateBy { it.first.substringAfterLast('/').lowercase() }
             val matchedPaths = mutableSetOf<String>()
-            val reconciled = state.read.books.map { book ->
+            val reconciled = state.read.books.mapNotNull { book ->
                 val match = byFileName[book.fileName.lowercase()]
-                if (match != null) matchedPaths += match.first
-                book.copy(isOnX3 = match != null, x3Path = match?.first)
+                if (match != null) {
+                    matchedPaths += match.first
+                    book.copy(isOnX3 = true, x3Path = match.first)
+                } else if (!book.isOnPhone && book.metadataSource == "XTEINK") {
+                    null
+                } else {
+                    book.copy(isOnX3 = false, x3Path = null)
+                }
             }.toMutableList()
             entries.filterNot { it.first in matchedPaths }.forEach { (path, size) ->
                 val fileName = path.substringAfterLast('/')
@@ -483,6 +527,105 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    private fun managedDeviceModel(): String? =
+        connectionPreferences.getString(LastConnectedModelKey, null)
+
+    private fun ensureTransportConnected() {
+        if (!appForeground || intentionalTransportIdle || !companionClient.hasPermissions()) return
+        val model = managedDeviceModel() ?: return
+        val phase = _uiState.value.device.linkPhase
+        if (phase == LinkPhase.Connected.name || phase == LinkPhase.Connecting.name || phase == LinkPhase.Scanning.name) {
+            return
+        }
+        companionClient.connect(model)
+    }
+
+    private fun scheduleReconnect() {
+        val model = managedDeviceModel() ?: return
+        if (!appForeground || intentionalTransportIdle || reconnectJob?.isActive == true) return
+        _uiState.update { it.copy(device = it.device.copy(reconnecting = true)) }
+        val delayMs = ReconnectBackoffMs[reconnectAttempt.coerceAtMost(ReconnectBackoffMs.lastIndex)]
+        reconnectAttempt++
+        reconnectJob = viewModelScope.launch {
+            delay(delayMs)
+            reconnectJob = null
+            if (appForeground && !intentionalTransportIdle && !_uiState.value.isX3TransportConnected) {
+                companionClient.connect(model)
+            }
+        }
+    }
+
+    private fun requestFocusSync() {
+        if (!_uiState.value.isX3Connected) return
+        pendingFocusSync = true
+        if (_uiState.value.isX3TransportConnected) drainPendingFocusSync() else ensureTransportConnected()
+    }
+
+    private fun drainPendingFocusSync() {
+        if (!pendingFocusSync || !_uiState.value.isX3TransportConnected || focusSyncJob?.isActive == true) return
+        focusSyncJob = viewModelScope.launch {
+            while (pendingFocusSync && _uiState.value.isX3TransportConnected) {
+                pendingFocusSync = false
+                val focus = _uiState.value.focus
+                val result = runCatching {
+                    when (focus.phase) {
+                        FocusPhase.Running, FocusPhase.Paused -> {
+                            val remaining = focus.remainingSeconds.coerceAtLeast(1)
+                            companionClient.startSession(
+                                SessionStart(
+                                    deadlineEpochSeconds = System.currentTimeMillis() / 1_000 + remaining,
+                                    durationSeconds = remaining,
+                                    title = focus.task,
+                                ),
+                            )
+                            if (focus.phase == FocusPhase.Paused) companionClient.pauseSession()
+                        }
+                        FocusPhase.Setup, FocusPhase.Review -> companionClient.stopSession()
+                    }
+                }
+                if (result.isFailure) {
+                    pendingFocusSync = true
+                    handleDeferredTransportFailure(result.exceptionOrNull())
+                    break
+                }
+            }
+            focusSyncJob = null
+        }
+    }
+
+    private fun drainPendingDeletes() {
+        if (pendingDeletePaths.isEmpty() || !_uiState.value.isX3TransportConnected || deleteSyncJob?.isActive == true) {
+            return
+        }
+        deleteSyncJob = viewModelScope.launch {
+            val paths = pendingDeletePaths.toList()
+            val result = runCatching {
+                companionClient.deleteLibraryEntries(_uiState.value.device.libraryRevision, paths)
+            }
+            if (result.isSuccess) {
+                pendingDeletePaths.removeAll(paths.toSet())
+                _uiState.update { it.copy(notice = UiNotice.X3DeleteQueued(paths.size)) }
+            } else {
+                handleDeferredTransportFailure(result.exceptionOrNull())
+            }
+            deleteSyncJob = null
+        }
+    }
+
+    private fun handleDeferredTransportFailure(error: Throwable?) {
+        companionClient.disconnect()
+        _uiState.update {
+            it.copy(
+                isX3TransportConnected = false,
+                device = it.device.copy(
+                    reconnecting = true,
+                    message = error?.message ?: "XTEINK connection interrupted",
+                ),
+            )
+        }
+        scheduleReconnect()
+    }
+
     private suspend fun runDeviceCommand(block: suspend () -> Unit) {
         runCatching { block() }.onFailure(::reportDeviceError)
     }
@@ -500,5 +643,6 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     private companion object {
         const val BackgroundDisconnectGraceMs = 1_500L
         const val LastConnectedModelKey = "last_connected_model"
+        val ReconnectBackoffMs = longArrayOf(1_000L, 3_000L, 8_000L, 15_000L)
     }
 }

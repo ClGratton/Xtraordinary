@@ -151,6 +151,7 @@ enum class FirmwareCheckPhase { Idle, Checking, Available, UpToDate, Downloading
 
 data class DeviceUiState(
     val linkPhase: String = "Disconnected",
+    val reconnecting: Boolean = false,
     val message: String? = null,
     val usbConnected: Boolean = false,
     val usbPhase: String = "Disconnected",
@@ -171,7 +172,10 @@ data class CompanionUiState(
     val read: ReadUiState = ReadUiState(),
     val ticket: TicketUiState = TicketUiState(),
     val device: DeviceUiState = DeviceUiState(),
+    // This is the logical, user-visible relationship: a managed device remains
+    // connected while its short-lived BLE transport is intentionally idle.
     val isX3Connected: Boolean = false,
+    val isX3TransportConnected: Boolean = false,
     val connectedDeviceModel: String? = null,
     val settingsVisible: Boolean = false,
     val notice: UiNotice? = null,

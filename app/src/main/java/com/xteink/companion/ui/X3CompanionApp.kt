@@ -123,6 +123,7 @@ fun X3CompanionApp(
         ) {
             CompanionTopBar(
                 isX3Connected = state.isX3Connected,
+                isX3Reconnecting = state.device.reconnecting,
                 connectedDeviceModel = state.connectedDeviceModel,
                 onShowDevices = { devicesVisible = true },
                 onShowSettings = { onShowSettings(true) },

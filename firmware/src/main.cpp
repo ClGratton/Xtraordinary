@@ -493,6 +493,9 @@ void loop() {
 
   gpio.update();
 #ifdef ENABLE_X3_COMPANION
+  // BLE callbacks only stamp activity and enqueue work. Restore full speed on
+  // the main loop before decoding a command or rendering its resulting UI.
+  if (companion::companionService.requiresFullClock()) powerManager.setPowerSaving(false);
   companion::companionService.loop();
 #endif
   halTiltSensor.update(SETTINGS.tiltPageTurn, SETTINGS.orientation, activityManager.isReaderActivity());
@@ -612,11 +615,11 @@ void loop() {
     powerManager.setPowerSaving(false);  // Make sure we're at full performance when skipLoopDelay is requested
     yield();                             // Give FreeRTOS a chance to run tasks, but return immediately
   } else {
-    bool companionConnected = false;
+    bool companionNeedsFullClock = false;
 #ifdef ENABLE_X3_COMPANION
-    companionConnected = companion::companionService.connected();
+    companionNeedsFullClock = companion::companionService.requiresFullClock();
 #endif
-    if (millis() - lastActivityTime >= HalPowerManager::IDLE_POWER_SAVING_MS && !companionConnected) {
+    if (millis() - lastActivityTime >= HalPowerManager::IDLE_POWER_SAVING_MS && !companionNeedsFullClock) {
       // If we've been inactive for a while, increase the delay to save power
       int minimumFrequency = HalPowerManager::LOW_POWER_FREQ;
 #ifdef ENABLE_X3_COMPANION
@@ -625,10 +628,10 @@ void loop() {
       powerManager.setPowerSaving(true, minimumFrequency);
       delay(50);
     } else {
-      if (companionConnected) {
-        // Secure Connections performs ECDH immediately after the BLE link is
-        // established. At the 10 MHz idle clock Android times out before the
-        // X3 can finish pairing, so keep normal speed for the link lifetime.
+      if (companionNeedsFullClock) {
+        // Pairing and bursts run at normal speed. Once BLE traffic has been
+        // idle for a measured grace period, the companion-safe 80 MHz floor
+        // is sufficient and avoids holding 160 MHz for the entire link.
         powerManager.setPowerSaving(false);
       }
       // Short delay to prevent tight loop while still being responsive

@@ -46,6 +46,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.io.File
@@ -230,6 +231,9 @@ class BluetoothCompanionClient(private val context: Context) {
     suspend fun resumeSession() = sendAwaitingAck(MessageType.ResumeSession)
     suspend fun stopSession() = sendAwaitingAck(MessageType.StopSession)
     suspend fun refreshLibrary() = sendAwaitingAck(MessageType.GetLibrary)
+    suspend fun awaitConnected(timeoutMillis: Long = 20_000) {
+        withTimeout(timeoutMillis) { state.first { it.phase == LinkPhase.Connected } }
+    }
 
     suspend fun deleteLibraryEntries(revision: UInt, paths: List<String>) {
         paths.forEach { path ->

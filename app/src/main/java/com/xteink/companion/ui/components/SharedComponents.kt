@@ -48,6 +48,7 @@ import com.xteink.companion.ui.CompanionVisualTheme
 @Composable
 fun CompanionTopBar(
     isX3Connected: Boolean,
+    isX3Reconnecting: Boolean,
     connectedDeviceModel: String?,
     onShowDevices: () -> Unit,
     onShowSettings: () -> Unit,
@@ -90,7 +91,11 @@ fun CompanionTopBar(
                     )
                     Text(
                         text = stringResource(
-                            if (isX3Connected) R.string.settings_device_connected else R.string.settings_device_value,
+                            when {
+                                isX3Reconnecting -> R.string.settings_device_reconnecting
+                                isX3Connected -> R.string.settings_device_connected
+                                else -> R.string.settings_device_value
+                            },
                         ),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

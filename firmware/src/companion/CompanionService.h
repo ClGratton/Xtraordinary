@@ -41,6 +41,10 @@ class CompanionService {
   uint32_t libraryRevision_ = 0;
   bool librarySendPending_ = false;
   bool initialized_ = false;
+  volatile uint16_t connectionHandle_ = 0xffff;
+  volatile uint32_t connectedAtMs_ = 0;
+  volatile uint32_t lastBleActivityMs_ = 0;
+  volatile bool connectionParamsPending_ = false;
   SessionEngine session_;
   HalFile firmwareFile_;
   uint64_t firmwareExpectedSize_ = 0;
@@ -51,11 +55,15 @@ class CompanionService {
   bool applyPending_ = false;
   uint32_t applyAtMs_ = 0;
   uint32_t outgoingMessageId_ = 1;
+  uint32_t pendingResponseMessageId_ = 0;
+  bool pendingResponse_ = false;
+  bool pendingResponseIsNack_ = false;
   StaticQueue_t commandQueueState_{};
   std::array<uint8_t, sizeof(CommandPacket) * COMMAND_QUEUE_DEPTH> commandQueueStorage_{};
   QueueHandle_t commandQueue_ = nullptr;
 
   void handlePacket(const uint8_t* bytes, size_t length);
+  bool sendResponse(uint32_t messageId, bool nack);
   void sendAck(uint32_t messageId);
   void sendNack(uint32_t messageId, const char* reason);
   void sendCapabilities(MessageType type = MessageType::CAPABILITIES);
@@ -66,15 +74,18 @@ class CompanionService {
   bool writeFirmwareChunk(const EnvelopeView& envelope);
   bool commitFirmware();
   bool deleteLibraryEntries(const EnvelopeView& envelope);
-  void notify(MessageType type, const uint8_t* payload, size_t payloadLength);
+  bool notify(MessageType type, const uint8_t* payload, size_t payloadLength);
 
  public:
   void begin();
   void loop();
   bool connected() const;
-  bool requiresBleSafeClock() const { return initialized_ && !connected(); }
+  bool requiresBleSafeClock() const { return initialized_; }
+  bool requiresFullClock() const;
   SessionEngine& session() { return session_; }
   void onWrite(const uint8_t* bytes, size_t length);
+  void onClientConnected(uint16_t connectionHandle);
+  void onClientDisconnected();
 };
 
 extern CompanionService companionService;

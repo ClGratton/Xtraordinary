@@ -255,6 +255,8 @@ The 2026-07-26 follow-up also rejected dynamic advertiser mutation at the interi
 
 That interim build was discovered 82 seconds after disconnect and reached GATT Connected in 1.36 seconds from scan start, past the previous failure boundary. Android was separately verified to transition Connected -> Disconnected when backgrounded and Scanning -> Connected when foregrounded, without periodic polling. Physical controls remain a mandatory hardware check before release.
 
+The next bounded battery step does not pretend that the precompiled framework has modem sleep. It keeps the proven 80 MHz BLE floor, requests a 60-100 ms connection interval with one interval of peripheral latency, and holds 160 MHz only for the first five seconds after a connection or BLE traffic. BLE callbacks merely stamp activity and enqueue data; the main loop restores full speed before it handles a command or renders. Android separately treats a paired XTEINK as a logical managed device while the transport is intentionally idle, queues focus/deletion intent, and only labels the device `Reconnecting` after an unexpected link failure. Library pages advance only when NimBLE accepts the notification, so transmit congestion cannot silently turn a non-empty SD library into a zero-book snapshot. SD inventory scans also rewind every directory, close skipped entries, filter generated diagnostics, and construct root paths with the filename argument rather than accidentally reducing every root file to `//`.
+
 The target behavior is:
 
 1. A physical wake or first-time setup opens a bounded fast-advertising window.

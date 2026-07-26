@@ -13,6 +13,7 @@
 #include <cctype>
 #include <cstdio>
 #include <cstring>
+#include <iterator>
 
 #include "MappedInputManager.h"
 #include "CompanionUiBridge.h"
@@ -29,6 +30,12 @@ constexpr char EVENTS_UUID[] = "7e400004-b5a3-f393-e0a9-e50e24dcca9e";
 constexpr char STATUS_UUID[] = "7e400005-b5a3-f393-e0a9-e50e24dcca9e";
 constexpr char FIRMWARE_PATH[] = "/.crosspoint/companion/firmware.bin";
 constexpr uint16_t ADVERTISING_INTERVAL = 800;  // 500 ms in 0.625 ms units
+constexpr uint32_t FULL_CLOCK_AFTER_BLE_ACTIVITY_MS = 5000;
+constexpr uint32_t CONNECTION_PARAMETER_DELAY_MS = 3000;
+constexpr uint16_t IDLE_CONNECTION_INTERVAL_MIN = 48;  // 60 ms in 1.25 ms units
+constexpr uint16_t IDLE_CONNECTION_INTERVAL_MAX = 80;  // 100 ms in 1.25 ms units
+constexpr uint16_t IDLE_CONNECTION_LATENCY = 1;  // At most ~200 ms idle response at the negotiated maximum.
+constexpr uint16_t CONNECTION_SUPERVISION_TIMEOUT = 600;  // 6 s in 10 ms units
 
 bool hasBookExtension(const char* path) {
   const char* dot = std::strrchr(path, '.');
@@ -52,6 +59,22 @@ bool equalsIgnoreCase(const char* left, const char* right) {
   return *left == '\0' && *right == '\0';
 }
 
+bool isGeneratedDeviceTextFile(const char* name) {
+  if (!name) return false;
+  char normalized[96] = {};
+  size_t cursor = 0;
+  for (const char* value = name; *value && *value != '.' && cursor + 1 < sizeof(normalized); ++value) {
+    if (std::isalnum(static_cast<unsigned char>(*value))) {
+      normalized[cursor++] = static_cast<char>(std::tolower(static_cast<unsigned char>(*value)));
+    }
+  }
+  static constexpr const char* GENERATED_NAMES[] = {
+      "crashreport", "readtime", "readingtime", "readingtimestats", "readingstats", "readstats",
+  };
+  return std::any_of(std::begin(GENERATED_NAMES), std::end(GENERATED_NAMES),
+                     [normalized](const char* generated) { return std::strcmp(normalized, generated) == 0; });
+}
+
 class WriteCallbacks final : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic* characteristic, NimBLEConnInfo&) override {
     const NimBLEAttValue value = characteristic->getValue();
@@ -59,6 +82,15 @@ class WriteCallbacks final : public NimBLECharacteristicCallbacks {
   }
 };
 WriteCallbacks writeCallbacks;
+
+class ServerCallbacks final : public NimBLEServerCallbacks {
+  void onConnect(NimBLEServer*, NimBLEConnInfo& info) override {
+    companionService.onClientConnected(info.getConnHandle());
+  }
+
+  void onDisconnect(NimBLEServer*, NimBLEConnInfo&, int) override { companionService.onClientDisconnected(); }
+};
+ServerCallbacks serverCallbacks;
 }  // namespace
 
 CompanionService companionService;
@@ -82,6 +114,7 @@ void CompanionService::begin() {
     LOG_ERR("CMP", "Failed to create BLE server");
     return;
   }
+  server_->setCallbacks(&serverCallbacks);
   auto* service = server_->createService(SERVICE_UUID);
   if (!service) {
     LOG_ERR("CMP", "Failed to create companion service");
@@ -121,11 +154,32 @@ void CompanionService::begin() {
 
 bool CompanionService::connected() const { return server_ && server_->getConnectedCount() > 0; }
 
+bool CompanionService::requiresFullClock() const {
+  return connected() && static_cast<uint32_t>(millis() - lastBleActivityMs_) < FULL_CLOCK_AFTER_BLE_ACTIVITY_MS;
+}
+
 void CompanionService::loop() {
+  if (connectionParamsPending_ && connected() &&
+      static_cast<uint32_t>(millis() - connectedAtMs_) >= CONNECTION_PARAMETER_DELAY_MS) {
+    connectionParamsPending_ = false;
+    server_->updateConnParams(connectionHandle_, IDLE_CONNECTION_INTERVAL_MIN, IDLE_CONNECTION_INTERVAL_MAX,
+                              IDLE_CONNECTION_LATENCY, CONNECTION_SUPERVISION_TIMEOUT);
+    LOG_INF("CMP", "Requested idle BLE connection parameters for handle %u", connectionHandle_);
+  }
+  bool transportQueueAvailable = true;
+  if (pendingResponse_) {
+    if (sendResponse(pendingResponseMessageId_, pendingResponseIsNack_)) {
+      pendingResponse_ = false;
+    } else {
+      transportQueueAvailable = false;
+    }
+  }
   CommandPacket command;
-  if (commandQueue_ && xQueueReceive(commandQueue_, &command, 0) == pdTRUE) handlePacket(command.bytes, command.length);
+  if (transportQueueAvailable && commandQueue_ && xQueueReceive(commandQueue_, &command, 0) == pdTRUE) {
+    handlePacket(command.bytes, command.length);
+  }
   session_.update();
-  if (librarySendPending_ && connected()) sendNextLibraryItem();
+  if (transportQueueAvailable && !pendingResponse_ && librarySendPending_ && connected()) sendNextLibraryItem();
   if (applyPending_ && static_cast<int32_t>(millis() - applyAtMs_) >= 0) {
     applyPending_ = false;
     const auto result = firmware_flash::flashFromSdPath(FIRMWARE_PATH, nullptr, nullptr, true);
@@ -137,11 +191,24 @@ void CompanionService::loop() {
 }
 
 void CompanionService::onWrite(const uint8_t* bytes, size_t length) {
+  lastBleActivityMs_ = millis();
   if (!commandQueue_ || !bytes || length == 0 || length > MAX_PACKET_BYTES) return;
   CommandPacket command;
   command.length = static_cast<uint16_t>(length);
   std::memcpy(command.bytes, bytes, length);
   xQueueSend(commandQueue_, &command, 0);
+}
+
+void CompanionService::onClientConnected(uint16_t connectionHandle) {
+  connectionHandle_ = connectionHandle;
+  connectedAtMs_ = millis();
+  lastBleActivityMs_ = connectedAtMs_;
+  connectionParamsPending_ = true;
+}
+
+void CompanionService::onClientDisconnected() {
+  connectionHandle_ = 0xffff;
+  connectionParamsPending_ = false;
 }
 
 void CompanionService::handlePacket(const uint8_t* bytes, size_t length) {
@@ -209,17 +276,31 @@ void CompanionService::handlePacket(const uint8_t* bytes, size_t length) {
     sendNack(envelope.messageId, "Command rejected");
 }
 
-void CompanionService::sendAck(uint32_t messageId) {
-  uint8_t payload[4];
-  writeU32(payload, messageId);
-  notify(MessageType::ACK, payload, sizeof(payload));
-}
-void CompanionService::sendNack(uint32_t messageId, const char* reason) {
+bool CompanionService::sendResponse(uint32_t messageId, bool nack) {
   uint8_t payload[96];
   writeU32(payload, messageId);
-  const size_t length = std::min<size_t>(std::strlen(reason), sizeof(payload) - 4);
-  std::memcpy(payload + 4, reason, length);
-  notify(MessageType::NACK, payload, length + 4);
+  size_t length = 4;
+  if (nack) {
+    constexpr char reason[] = "Command rejected";
+    std::memcpy(payload + length, reason, sizeof(reason) - 1);
+    length += sizeof(reason) - 1;
+  }
+  return notify(nack ? MessageType::NACK : MessageType::ACK, payload, length);
+}
+
+void CompanionService::sendAck(uint32_t messageId) {
+  if (sendResponse(messageId, false)) return;
+  pendingResponseMessageId_ = messageId;
+  pendingResponseIsNack_ = false;
+  pendingResponse_ = true;
+}
+
+void CompanionService::sendNack(uint32_t messageId, const char* reason) {
+  (void)reason;
+  if (sendResponse(messageId, true)) return;
+  pendingResponseMessageId_ = messageId;
+  pendingResponseIsNack_ = true;
+  pendingResponse_ = true;
 }
 
 void CompanionService::sendCapabilities(MessageType type) {
@@ -269,28 +350,43 @@ void CompanionService::scanDirectory(const char* path, uint8_t depth) {
   if (!library_ || depth > 8 || libraryCount_ >= MAX_LIBRARY_ITEMS) return;
   HalFile directory = Storage.open(path);
   if (!directory || !directory.isDirectory()) return;
+  directory.rewindDirectory();
   while (libraryCount_ < MAX_LIBRARY_ITEMS) {
     HalFile entry = directory.openNextFile();
     if (!entry) break;
-    char rawName[128] = {};
-    entry.getName(rawName, sizeof(rawName));
+    char rawName[181] = {};
+    if (entry.getName(rawName, sizeof(rawName)) == 0) {
+      entry.close();
+      continue;
+    }
     const char* name = rawName;
     while (*name == '/') ++name;
     if (const char* slash = std::strrchr(name, '/')) name = slash + 1;
-    if (name[0] == '\0' || name[0] == '.') continue;
+    if (name[0] == '\0' || name[0] == '.') {
+      entry.close();
+      continue;
+    }
     if (entry.isDirectory() &&
         (equalsIgnoreCase(name, "XTCache") || equalsIgnoreCase(name, "System Volume Information") ||
          equalsIgnoreCase(name, "LOST.DIR"))) {
+      entry.close();
       continue;
     }
     char fullPath[181];
-    const int written = std::snprintf(fullPath, sizeof(fullPath), std::strcmp(path, "/") == 0 ? "/%s" : "%s/%s", path,
-                                      name);
-    if (written <= 0 || static_cast<size_t>(written) >= sizeof(fullPath)) continue;
-    if (entry.isDirectory()) {
+    const int written = std::strcmp(path, "/") == 0
+                            ? std::snprintf(fullPath, sizeof(fullPath), "/%s", name)
+                            : std::snprintf(fullPath, sizeof(fullPath), "%s/%s", path, name);
+    if (written <= 0 || static_cast<size_t>(written) >= sizeof(fullPath)) {
+      entry.close();
+      continue;
+    }
+    const bool directoryEntry = entry.isDirectory();
+    const bool bookExtension = hasBookExtension(fullPath);
+    const bool generatedText = isGeneratedDeviceTextFile(name);
+    if (directoryEntry) {
       entry.close();
       scanDirectory(fullPath, depth + 1);
-    } else if (hasBookExtension(fullPath)) {
+    } else if (bookExtension && !generatedText) {
       auto& item = library_[libraryCount_++];
       std::strncpy(item.path, fullPath, sizeof(item.path) - 1);
       item.size = entry.fileSize64();
@@ -326,7 +422,10 @@ void CompanionService::sendNextLibraryItem() {
     writeU64(payload + cursor, 0);
     cursor += 8;
   }
-  notify(MessageType::LIBRARY_PAGE, payload, cursor);
+  // NimBLE can reject a notification while its transmit queue is busy. Keep
+  // the same page alive and retry on the next main-loop pass instead of
+  // silently advancing to an incomplete (or entirely missing) snapshot.
+  if (!notify(MessageType::LIBRARY_PAGE, payload, cursor)) return;
   if (last) {
     librarySendPending_ = false;
     library_.reset();
@@ -420,11 +519,11 @@ bool CompanionService::commitFirmware() {
   return firmwareValidated_;
 }
 
-void CompanionService::notify(MessageType type, const uint8_t* payload, size_t payloadLength) {
-  if (!events_ || !connected()) return;
+bool CompanionService::notify(MessageType type, const uint8_t* payload, size_t payloadLength) {
+  if (!events_ || !connected()) return false;
   uint8_t packet[MAX_PACKET_BYTES];
   const size_t length = encodeEnvelope(type, outgoingMessageId_++, payload, payloadLength, packet, sizeof(packet));
-  if (length) events_->notify(packet, length);
+  return length && events_->notify(packet, length);
 }
 }  // namespace companion
 

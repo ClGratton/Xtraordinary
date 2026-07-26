@@ -102,6 +102,7 @@
     <string name="settings_device">Devices</string>
     <string name="settings_device_value">None connected</string>
     <string name="settings_device_connected">Connected</string>
+    <string name="settings_device_reconnecting">Reconnecting…</string>
     <string name="settings_notifications">Notification rules</string>
     <string name="settings_notifications_value">Rules not configured</string>
     <string name="settings_gemini">Gemini &amp; privacy</string>
