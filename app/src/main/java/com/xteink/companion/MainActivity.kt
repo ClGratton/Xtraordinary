@@ -148,6 +148,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        viewModel.onAppForegrounded()
+    }
+
+    override fun onStop() {
+        viewModel.onAppBackgrounded()
+        super.onStop()
+    }
+
     private fun syncLinkedFolder(showNotice: Boolean) {
         val folder = bookLibrary.linkedFolderUri()?.let(android.net.Uri::parse) ?: return
         lifecycleScope.launch {

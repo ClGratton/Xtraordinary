@@ -618,7 +618,11 @@ void loop() {
 #endif
     if (millis() - lastActivityTime >= HalPowerManager::IDLE_POWER_SAVING_MS && !companionConnected) {
       // If we've been inactive for a while, increase the delay to save power
-      powerManager.setPowerSaving(true);  // Lower CPU frequency after extended inactivity
+      int minimumFrequency = HalPowerManager::LOW_POWER_FREQ;
+#ifdef ENABLE_X3_COMPANION
+      if (companion::companionService.requiresBleSafeClock()) minimumFrequency = HalPowerManager::BLE_SAFE_FREQ;
+#endif
+      powerManager.setPowerSaving(true, minimumFrequency);
       delay(50);
     } else {
       if (companionConnected) {

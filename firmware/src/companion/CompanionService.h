@@ -40,7 +40,7 @@ class CompanionService {
   size_t librarySendIndex_ = 0;
   uint32_t libraryRevision_ = 0;
   bool librarySendPending_ = false;
-  uint32_t lastAdvertisingAttemptMs_ = 0;
+  bool initialized_ = false;
   SessionEngine session_;
   HalFile firmwareFile_;
   uint64_t firmwareExpectedSize_ = 0;
@@ -72,6 +72,7 @@ class CompanionService {
   void begin();
   void loop();
   bool connected() const;
+  bool requiresBleSafeClock() const { return initialized_ && !connected(); }
   SessionEngine& session() { return session_; }
   void onWrite(const uint8_t* bytes, size_t length);
 };

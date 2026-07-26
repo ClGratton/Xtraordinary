@@ -13,6 +13,7 @@ import com.xteink.companion.data.LinkPhase
 import com.xteink.companion.data.UsbEspFlasher
 import com.xteink.companion.data.UsbFlashPhase
 import com.xteink.companion.protocol.SessionStart
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,12 +29,18 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     private val usbFlasher = UsbEspFlasher(application)
     private val firmwareReleases = FirmwareReleaseRepository(application)
     private val bookLibrary = BookLibraryRepository(application)
+    private val connectionPreferences =
+        application.getSharedPreferences("xtraordinary_connection", Application.MODE_PRIVATE)
     private var latestRelease: FirmwareRelease? = null
+    private var backgroundDisconnectJob: Job? = null
 
     init {
         viewModelScope.launch {
             companionClient.state.collect { link ->
                 val capabilities = link.capabilities
+                if (link.phase == LinkPhase.Connected && link.requestedModel != null) {
+                    connectionPreferences.edit().putString(LastConnectedModelKey, link.requestedModel).apply()
+                }
                 _uiState.update { state ->
                     state.copy(
                         isX3Connected = link.phase == LinkPhase.Connected,
@@ -290,7 +297,35 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         companionClient.connect(model)
     }
 
-    fun disconnectDevice() = companionClient.disconnect()
+    fun disconnectDevice() {
+        connectionPreferences.edit().remove(LastConnectedModelKey).apply()
+        companionClient.disconnect()
+    }
+
+    fun onAppForegrounded() {
+        backgroundDisconnectJob?.cancel()
+        backgroundDisconnectJob = null
+        if (!companionClient.hasPermissions()) return
+        val phase = _uiState.value.device.linkPhase
+        if (phase == LinkPhase.Connected.name || phase == LinkPhase.Connecting.name || phase == LinkPhase.Scanning.name) {
+            return
+        }
+        connectionPreferences.getString(LastConnectedModelKey, null)?.let(companionClient::connect)
+    }
+
+    fun onAppBackgrounded() {
+        backgroundDisconnectJob?.cancel()
+        backgroundDisconnectJob = viewModelScope.launch {
+            delay(BackgroundDisconnectGraceMs)
+            val state = _uiState.value
+            val connectionInProgress =
+                state.device.linkPhase == LinkPhase.Connecting.name || state.device.linkPhase == LinkPhase.Scanning.name
+            val firmwareInProgress = state.device.firmwareCheckPhase == FirmwareCheckPhase.Downloading ||
+                state.device.firmwareCheckPhase == FirmwareCheckPhase.Transferring
+            if (!connectionInProgress && !firmwareInProgress) companionClient.disconnect()
+            backgroundDisconnectJob = null
+        }
+    }
 
     fun checkLatestFirmware(model: String) = checkFirmware(model, FirmwareSource.Xtraordinary)
 
@@ -460,5 +495,10 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 notice = UiNotice.DeviceMessage(message),
             )
         }
+    }
+
+    private companion object {
+        const val BackgroundDisconnectGraceMs = 1_500L
+        const val LastConnectedModelKey = "last_connected_model"
     }
 }

@@ -15,7 +15,10 @@ import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
@@ -76,6 +79,7 @@ class BluetoothCompanionClient(private val context: Context) {
     private var gatt: BluetoothGatt? = null
     private var service: BluetoothGattService? = null
     private var scanCallback: ScanCallback? = null
+    private var bondReceiver: BroadcastReceiver? = null
 
     private val _state = MutableStateFlow(CompanionLinkState())
     val state: StateFlow<CompanionLinkState> = _state.asStateFlow()
@@ -102,13 +106,22 @@ class BluetoothCompanionClient(private val context: Context) {
         val companionService = ParcelUuid.fromString(XTEINK_SERVICE_UUID)
         val callback = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
+                handleScanResult(result, companionService)
+            }
+
+            override fun onBatchScanResults(results: MutableList<ScanResult>) {
+                results.forEach { handleScanResult(it, companionService) }
+            }
+
+            private fun handleScanResult(result: ScanResult, companionService: ParcelUuid) {
                 val scanRecord = result.scanRecord
                 val advertisesCompanion = scanRecord?.serviceUuids?.contains(companionService) == true
-                val hasCompanionName = scanRecord?.deviceName == CompanionDeviceName
+                val deviceName = scanRecord?.deviceName
+                    ?: runCatching { result.device.name }.getOrNull()
+                val hasCompanionName = deviceName.equals(CompanionDeviceName, ignoreCase = true)
                 if (!advertisesCompanion && !hasCompanionName) return
                 stopScan()
-                _state.value = _state.value.copy(phase = LinkPhase.Connecting, message = "Connecting")
-                gatt = result.device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
+                pairThenConnect(result.device)
             }
 
             override fun onScanFailed(errorCode: Int) {
@@ -136,6 +149,7 @@ class BluetoothCompanionClient(private val context: Context) {
     @SuppressLint("MissingPermission")
     fun disconnect() {
         stopScan()
+        unregisterBondReceiver()
         gatt?.disconnect()
         gatt?.close()
         gatt = null
@@ -145,6 +159,66 @@ class BluetoothCompanionClient(private val context: Context) {
         pendingAcks.values.forEach { it.cancel() }
         pendingAcks.clear()
         _state.value = CompanionLinkState()
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun pairThenConnect(device: BluetoothDevice) {
+        if (device.bondState == BluetoothDevice.BOND_BONDED) {
+            connectGatt(device)
+            return
+        }
+        unregisterBondReceiver()
+        _state.value = _state.value.copy(phase = LinkPhase.Connecting, message = "Pairing")
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(receiverContext: Context, intent: Intent) {
+                val changedDevice = if (Build.VERSION.SDK_INT >= 33) {
+                    intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                }
+                if (changedDevice?.address != device.address) return
+                when (intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.ERROR)) {
+                    BluetoothDevice.BOND_BONDED -> {
+                        unregisterBondReceiver()
+                        connectGatt(device)
+                    }
+                    BluetoothDevice.BOND_NONE -> {
+                        val previous =
+                            intent.getIntExtra(BluetoothDevice.EXTRA_PREVIOUS_BOND_STATE, BluetoothDevice.ERROR)
+                        if (previous == BluetoothDevice.BOND_BONDING) {
+                            unregisterBondReceiver()
+                            _state.value = _state.value.copy(
+                                phase = LinkPhase.Error,
+                                message = "Pairing was not completed",
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        bondReceiver = receiver
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED),
+            ContextCompat.RECEIVER_EXPORTED,
+        )
+        if (!device.createBond(BluetoothDevice.TRANSPORT_LE)) {
+            unregisterBondReceiver()
+            _state.value = _state.value.copy(phase = LinkPhase.Error, message = "Could not start pairing")
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun connectGatt(device: BluetoothDevice) {
+        _state.value = _state.value.copy(phase = LinkPhase.Connecting, message = "Connecting")
+        gatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
+    }
+
+    private fun unregisterBondReceiver() {
+        bondReceiver?.let { receiver -> runCatching { context.unregisterReceiver(receiver) } }
+        bondReceiver = null
     }
 
     suspend fun startSession(start: SessionStart) = sendAwaitingAck(

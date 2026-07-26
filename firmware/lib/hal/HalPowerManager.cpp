@@ -4,6 +4,7 @@
 #include <WiFi.h>
 #include <esp_sleep.h>
 
+#include <algorithm>
 #include <cassert>
 
 #include "HalGPIO.h"
@@ -25,7 +26,7 @@ void HalPowerManager::begin() {
   assert(modeMutex != nullptr);
 }
 
-void HalPowerManager::setPowerSaving(bool enabled) {
+void HalPowerManager::setPowerSaving(bool enabled, int minimumFrequencyMhz) {
   if (normalFreq <= 0) {
     return;  // invalid state
   }
@@ -40,21 +41,17 @@ void HalPowerManager::setPowerSaving(bool enabled) {
   // it's not very important if we read a slightly stale value for currentLockMode
   const LockMode mode = currentLockMode;
 
-  if (mode == None && enabled && !isLowPower) {
-    LOG_DBG("PWR", "Going to low-power mode");
-    if (!setCpuFrequencyMhz(LOW_POWER_FREQ)) {
-      LOG_DBG("PWR", "Failed to set CPU frequency = %d MHz", LOW_POWER_FREQ);
-      return;
-    }
-    isLowPower = true;
+  const int requestedLowPowerFreq = std::max(LOW_POWER_FREQ, minimumFrequencyMhz);
+  const int targetFrequency = mode == None && enabled ? requestedLowPowerFreq : normalFreq;
+  const int currentFrequency = getCpuFrequencyMhz();
 
-  } else if ((!enabled || mode != None) && isLowPower) {
-    LOG_DBG("PWR", "Restoring normal CPU frequency");
-    if (!setCpuFrequencyMhz(normalFreq)) {
-      LOG_DBG("PWR", "Failed to set CPU frequency = %d MHz", normalFreq);
+  if (currentFrequency != targetFrequency) {
+    LOG_DBG("PWR", "Changing CPU frequency from %d to %d MHz", currentFrequency, targetFrequency);
+    if (!setCpuFrequencyMhz(targetFrequency)) {
+      LOG_DBG("PWR", "Failed to set CPU frequency = %d MHz", targetFrequency);
       return;
     }
-    isLowPower = false;
+    isLowPower = targetFrequency != normalFreq;
   }
 
   // Otherwise, no change needed

@@ -3,14 +3,16 @@
 #ifdef ENABLE_X3_COMPANION
 
 #include <HalDisplay.h>
+#include <I18n.h>
 
 #include <cstdio>
 
+#include "components/UITheme.h"
 #include "fontIds.h"
 
 void CompanionFocusActivity::onEnter() {
   Activity::onEnter();
-  renderer.setOrientation(GfxRenderer::LandscapeCounterClockwise);
+  renderer.setOrientation(GfxRenderer::Portrait);
   requestUpdate();
 }
 
@@ -45,7 +47,8 @@ void CompanionFocusActivity::render(RenderLock&&) {
                           ? "Paused"
                           : (session_.phase() == companion::SessionPhase::COMPLETE ? "Complete" : "Focus");
   renderer.drawCenteredText(UI_10_FONT_ID, height / 2 + 74, state);
-  renderer.drawCenteredText(SMALL_FONT_ID, height - 66, "Back stops this session");
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
+  GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer(HalDisplay::FAST_REFRESH);
 }
 #endif

@@ -28,6 +28,7 @@ constexpr char DATA_UUID[] = "7e400003-b5a3-f393-e0a9-e50e24dcca9e";
 constexpr char EVENTS_UUID[] = "7e400004-b5a3-f393-e0a9-e50e24dcca9e";
 constexpr char STATUS_UUID[] = "7e400005-b5a3-f393-e0a9-e50e24dcca9e";
 constexpr char FIRMWARE_PATH[] = "/.crosspoint/companion/firmware.bin";
+constexpr uint16_t ADVERTISING_INTERVAL = 800;  // 500 ms in 0.625 ms units
 
 bool hasBookExtension(const char* path) {
   const char* dot = std::strrchr(path, '.');
@@ -37,6 +38,18 @@ bool hasBookExtension(const char* path) {
   for (size_t i = 0; i < length; ++i) ext[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(dot[i])));
   return std::strcmp(ext, ".epub") == 0 || std::strcmp(ext, ".txt") == 0 || std::strcmp(ext, ".xtc") == 0 ||
          std::strcmp(ext, ".pdf") == 0;
+}
+
+bool equalsIgnoreCase(const char* left, const char* right) {
+  while (*left && *right) {
+    if (std::tolower(static_cast<unsigned char>(*left)) !=
+        std::tolower(static_cast<unsigned char>(*right))) {
+      return false;
+    }
+    ++left;
+    ++right;
+  }
+  return *left == '\0' && *right == '\0';
 }
 
 class WriteCallbacks final : public NimBLECharacteristicCallbacks {
@@ -97,10 +110,11 @@ void CompanionService::begin() {
     return;
   }
   advertising_->enableScanResponse(true);
+  advertising_->setAdvertisingInterval(ADVERTISING_INTERVAL);
   const bool nameAdded = advertising_->setName("XTEINK Companion");
   const bool uuidAdded = advertising_->addServiceUUID(SERVICE_UUID);
-  const bool started = nameAdded && uuidAdded && advertising_->start();
-  lastAdvertisingAttemptMs_ = millis();
+  initialized_ = nameAdded && uuidAdded;
+  const bool started = initialized_ && advertising_->start();
   LOG_INF("CMP", "BLE advertising name=%d UUID=%d started=%d active=%d free heap=%u", nameAdded, uuidAdded, started,
           advertising_->isAdvertising(), ESP.getFreeHeap());
 }
@@ -108,12 +122,6 @@ void CompanionService::begin() {
 bool CompanionService::connected() const { return server_ && server_->getConnectedCount() > 0; }
 
 void CompanionService::loop() {
-  if (advertising_ && !connected() && !advertising_->isAdvertising() &&
-      static_cast<uint32_t>(millis() - lastAdvertisingAttemptMs_) >= 5000) {
-    lastAdvertisingAttemptMs_ = millis();
-    const bool started = advertising_->start();
-    LOG_INF("CMP", "Restarted BLE advertising: %d", started);
-  }
   CommandPacket command;
   if (commandQueue_ && xQueueReceive(commandQueue_, &command, 0) == pdTRUE) handlePacket(command.bytes, command.length);
   session_.update();
@@ -264,9 +272,17 @@ void CompanionService::scanDirectory(const char* path, uint8_t depth) {
   while (libraryCount_ < MAX_LIBRARY_ITEMS) {
     HalFile entry = directory.openNextFile();
     if (!entry) break;
-    char name[128] = {};
-    entry.getName(name, sizeof(name));
-    if (name[0] == '.' || std::strcmp(name, "System Volume Information") == 0) continue;
+    char rawName[128] = {};
+    entry.getName(rawName, sizeof(rawName));
+    const char* name = rawName;
+    while (*name == '/') ++name;
+    if (const char* slash = std::strrchr(name, '/')) name = slash + 1;
+    if (name[0] == '\0' || name[0] == '.') continue;
+    if (entry.isDirectory() &&
+        (equalsIgnoreCase(name, "XTCache") || equalsIgnoreCase(name, "System Volume Information") ||
+         equalsIgnoreCase(name, "LOST.DIR"))) {
+      continue;
+    }
     char fullPath[181];
     const int written = std::snprintf(fullPath, sizeof(fullPath), std::strcmp(path, "/") == 0 ? "/%s" : "%s/%s", path,
                                       name);

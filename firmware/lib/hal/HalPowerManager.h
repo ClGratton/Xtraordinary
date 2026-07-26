@@ -29,13 +29,14 @@ class HalPowerManager {
 
  public:
   static constexpr int LOW_POWER_FREQ = 10;                    // MHz
+  static constexpr int BLE_SAFE_FREQ = 80;                     // MHz; keeps the ESP32-C3 APB at 80 MHz
   static constexpr unsigned long IDLE_POWER_SAVING_MS = 3000;  // ms
   static constexpr unsigned long BATTERY_POLL_MS = 1500;       // ms
 
   void begin();
 
   // Control CPU frequency for power saving
-  void setPowerSaving(bool enabled);
+  void setPowerSaving(bool enabled, int minimumFrequencyMhz = LOW_POWER_FREQ);
 
   // Setup wake up GPIO and enter deep sleep
   // Should be called inside main loop() to handle the currentLockMode

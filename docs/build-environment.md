@@ -58,6 +58,16 @@ gradle :protocol:test :app:lintDebug :app:validateDebugScreenshotTest :app:assem
 
 The resulting APK is `app/build/outputs/apk/debug/app-debug.apk`. Compose reference images are updated only after visual review with `gradle :app:updateDebugScreenshotTest`.
 
+## Long-running command discipline
+
+Builds, tests, installs, flashing, and device-log captures must never be left running blindly.
+
+- Start every long-running command with a bounded wait appropriate to the expected operation.
+- If it has not completed, inspect its new output, process state, CPU activity, and output-artifact timestamp before waiting again.
+- A timeout or an existing artifact is not success. Record success only from the command's zero exit code and expected final output, then inspect the produced artifact.
+- If the process is silent, stalled, or no longer consuming work, stop diagnosing it as “still building”; capture the evidence and fix or restart the exact failed step.
+- Keep each follow-up wait bounded and report progress during hardware or build work rather than allowing an unobserved multi-minute command.
+
 ## Verified baseline
 
 Verified on 2026-07-22:

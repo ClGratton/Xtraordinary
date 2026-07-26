@@ -242,6 +242,36 @@ Add the build profile, `BleTransport`, a minimal `CompanionService`, settings/pa
 
 Gate: X3 only, one bonded phone reconnects reliably, reader behavior is unchanged, and minimum free heap stays above the project's 50 KiB human-review threshold during stress.
 
+#### BLE power and reconnect safety gate
+
+The 2026-07-25 hardware test established two constraints that must be treated as implementation gates:
+
+- NimBLE reporting its advertiser as active is not proof that a phone can discover the X3 over the air. Verify discovery from a disconnected phone at 3, 30, and 120 seconds, and again after every disconnect.
+- Calling the NimBLE advertiser stop/start path after manually lowering the ESP32-C3 CPU to 10 MHz caused an interrupt-watchdog reset loop. A connection happened to cancel the pending restart and therefore stopped that loop; it did not make the restart safe.
+
+Do not add an advertising restart watchdog at the manually lowered clock, and do not replace it with an Android timer that scans/connects every few seconds. The peripheral must first be discoverable, and periodic phone wakeups would spend phone and X3 battery without repairing a silent advertiser.
+
+The 2026-07-26 follow-up also rejected dynamic advertiser mutation at the interim 80 MHz floor. Stopping the active advertiser at the 60-second fast-to-slow boundary blocked the firmware main loop: physical buttons stopped responding and the phone could not discover the X3. The phone then restored the SHA-256-verified v0.2.3 image and recovered both BLE and controls. Until the project owns a power-management-enabled framework build, the safe interim policy is one fixed 500 ms advertising interval, one start during BLE initialization, NimBLE's normal advertise-on-disconnect behavior, an 80 MHz disconnected BLE floor, and normal speed while connected. There is no runtime advertiser stop, restart watchdog, or interval mutation.
+
+That interim build was discovered 82 seconds after disconnect and reached GATT Connected in 1.36 seconds from scan start, past the previous failure boundary. Android was separately verified to transition Connected -> Disconnected when backgrounded and Scanning -> Connected when foregrounded, without periodic polling. Physical controls remain a mandatory hardware check before release.
+
+The target behavior is:
+
+1. A physical wake or first-time setup opens a bounded fast-advertising window.
+2. A bonded, awake, disconnected X3 uses a measured slow connectable-advertising interval.
+3. The Android app connects when foregrounded or when the user starts a device operation; it keeps the link only for a transaction or an active live feature.
+4. Focus timing remains local on the X3, so the phone may disconnect without interrupting the session.
+5. CrossPoint's configured inactivity timeout remains the authority for powering the device off. Physical wake reopens the appropriate advertising state.
+
+Before changing the policy, replace the raw companion-idle frequency switch with ESP-IDF-coordinated power management/modem sleep, or prove a safe minimum clock on hardware. BLE callbacks may only record state; any advertising transition runs on the main loop at a proven-safe clock. Measure fast advertising, slow advertising, connected idle, transaction, focus, and reader-idle current before choosing intervals. Keep the last known-good released image as the rollback baseline until the complete reconnect matrix passes without watchdog resets.
+
+The current pioarduino framework is precompiled with both `CONFIG_PM_ENABLE` and Bluetooth controller modem sleep disabled. Defining those names only in application build flags does not rebuild the linked controller and power-management libraries and must not be presented as enabling the feature. Track a separate framework milestone that either:
+
+- rebuilds the Arduino framework libraries from an owned `sdkconfig`, or
+- moves the X3 companion target to Arduino as an ESP-IDF component so the project owns those settings.
+
+That milestone is a measured replacement for the interim 80 MHz BLE-safe floor, not a speculative cleanup. Compare it against the known-good firmware and the 80 MHz implementation for reader boot, EPUB open, page turn, rendering, pairing, encrypted service discovery, library transfer, focus updates, input latency, reconnect reliability, watchdog resets, heap, and current draw. Coordinated dynamic frequency scaling should be allowed to return to 160 MHz for active work and lower the clock only when idle; keep it only if the hardware results preserve or improve interactive performance while reducing energy use.
+
 ### Phase 1 - scene/action vertical slice
 
 Add protocol fixtures, streaming scene storage, scene activity/rendering, activity push/pop, and one action event.
