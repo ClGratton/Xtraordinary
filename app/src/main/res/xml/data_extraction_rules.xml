@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="sharedpref" path="xtraordinary_access.xml" />
+        <include domain="sharedpref" path="xtraordinary_setup.xml" />
+        <include domain="sharedpref" path="xtraordinary_connection.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="sharedpref" path="." />
+    </device-transfer>
+</data-extraction-rules>

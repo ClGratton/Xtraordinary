@@ -9,6 +9,10 @@
 
 Android companion prototype and an XTEINK X3-focused CrossPoint firmware research fork.
 
+Xtraordinary is an independent project. It is not affiliated with or endorsed
+by XTEINK or CrossPoint; those names identify compatible hardware and the
+upstream firmware project.
+
 The product model is simple: the phone owns integrations and intelligence; XTEINK is the persistent, low-power display and physical control surface on the back of the phone. The app contains Focus, Read, and Tools surfaces, persistent folder-based EPUB sync, a reconciled phone/device library, cached metadata enrichment, and the shared magnetic interaction system. The X3 companion build adds encrypted BLE commands, a device-owned focus countdown, authoritative SD-card inventory/delete operations, USB bootstrap flashing from Android, and streaming inactive-slot firmware updates.
 
 - [Architecture and implementation plan](docs/architecture-plan.md)
@@ -16,6 +20,7 @@ The product model is simple: the phone owns integrations and intelligence; XTEIN
 - [Phone and X3 interface hierarchy](docs/interface-hierarchy.md)
 - [Confirmed Material 3 Expressive design system](DESIGN.md)
 - [Project-local build environment](docs/build-environment.md)
+- [X3 firmware build and hardware-test runbook](docs/firmware-build-runbook.md)
 - `firmware/` is a CrossPoint Reader `1.4.1` research fork plus an isolated `x3_companion` build. Normal CrossPoint build targets remain unchanged.
 - [Third-party firmware notices](THIRD_PARTY_NOTICES.md)
 
@@ -44,3 +49,11 @@ pio run -e x3_companion
 ```
 
 Tagged `xtraordinary-v*` builds publish `xtraordinary-x3.bin` and a model-explicit, SHA-256 manifest. The Android app polls the latest GitHub Release, never guesses an asset by filename, and verifies its size and SHA-256 before writing. For first-time setup, connect the X3 directly to the phone with a USB data cable: Android requests USB-host permission and the app performs the ESP32-C3 bootloader reset, block write, on-device MD5 verification, and restart. Once companion firmware is running, normal app/device communication uses BLE.
+
+## Distribution
+
+GitHub Releases publish firmware, not Android APKs. The Android source remains
+buildable, while the official signed and automatically updated Android build
+is distributed through Google Play. See
+[ADR-0001](docs/adr/0001-open-source-play-distribution.md) for the community
+and Play flavor model, billing/advertising boundaries, and licensing decision.

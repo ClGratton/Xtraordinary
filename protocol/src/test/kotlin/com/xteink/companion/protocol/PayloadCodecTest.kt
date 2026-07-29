@@ -31,4 +31,23 @@ class PayloadCodecTest {
         assertEquals(expected.sizeBytes, actual.sizeBytes)
         assertTrue(expected.sha256.contentEquals(actual.sha256))
     }
+
+    @Test
+    fun powerAndStatusPayloadsRoundTrip() {
+        val config = PowerSyncConfig(
+            normalPollSeconds = 30,
+            slowPollSeconds = 10 * 60,
+            sleepTimeoutMinutes = 3,
+        )
+        assertEquals(config, PayloadCodec.decodePowerSyncConfig(PayloadCodec.encodePowerSyncConfig(config)))
+
+        val status = DeviceStatus(
+            revision = 42u,
+            activity = DeviceActivity.Reading,
+            syncMode = DeviceSyncMode.Slow,
+            powerConfig = config,
+        )
+        assertEquals(status, PayloadCodec.decodeDeviceStatus(PayloadCodec.encodeDeviceStatus(status)))
+        assertEquals(42u, PayloadCodec.decodeStatusConfirmation(PayloadCodec.encodeStatusConfirmation(42u)))
+    }
 }

@@ -42,18 +42,33 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.xteink.companion.R
+import com.xteink.companion.monetization.AccessState
 import com.xteink.companion.ui.CompanionSurface
 import com.xteink.companion.ui.CompanionVisualTheme
+import com.xteink.companion.ui.DeviceConnectionPresentation
+import com.xteink.companion.ui.deviceConnectionPresentation
+import com.xteink.companion.protocol.DeviceActivity
+import com.xteink.companion.protocol.PowerSyncConfig
 
 @Composable
 fun CompanionTopBar(
     isX3Connected: Boolean,
+    hasManagedX3: Boolean,
     isX3Reconnecting: Boolean,
+    deviceActivity: DeviceActivity?,
+    lowPowerGraceExpired: Boolean,
     connectedDeviceModel: String?,
     onShowDevices: () -> Unit,
     onShowSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val connectionPresentation = deviceConnectionPresentation(
+        hasManagedDevice = hasManagedX3,
+        transportConnected = isX3Connected,
+        reconnecting = isX3Reconnecting,
+        activity = deviceActivity,
+        lowPowerGraceExpired = lowPowerGraceExpired,
+    )
     val settingsDescription = stringResource(R.string.open_settings)
     val devicesDescription = stringResource(
         if (isX3Connected) R.string.open_connected_device else R.string.open_devices,
@@ -82,7 +97,7 @@ fun CompanionTopBar(
                 DeviceOutlineIcon()
                 Column {
                     Text(
-                        text = if (isX3Connected) {
+                        text = if (isX3Connected || hasManagedX3) {
                             connectedDeviceModel ?: stringResource(R.string.xteink_device_short)
                         } else {
                             stringResource(R.string.devices_title)
@@ -91,10 +106,13 @@ fun CompanionTopBar(
                     )
                     Text(
                         text = stringResource(
-                            when {
-                                isX3Reconnecting -> R.string.settings_device_reconnecting
-                                isX3Connected -> R.string.settings_device_connected
-                                else -> R.string.settings_device_value
+                            when (connectionPresentation) {
+                                DeviceConnectionPresentation.Connected -> R.string.settings_device_connected
+                                DeviceConnectionPresentation.Reading -> R.string.settings_device_reading
+                                DeviceConnectionPresentation.Sleeping -> R.string.settings_device_sleeping
+                                DeviceConnectionPresentation.Reconnecting -> R.string.settings_device_reconnecting
+                                DeviceConnectionPresentation.Offline -> R.string.settings_device_disconnected
+                                DeviceConnectionPresentation.None -> R.string.settings_device_value
                             },
                         ),
                         style = MaterialTheme.typography.labelMedium,
@@ -301,14 +319,28 @@ fun SendToX3Icon(
 @Composable
 fun SettingsSheet(
     visualTheme: CompanionVisualTheme,
+    powerSyncConfig: PowerSyncConfig,
+    access: AccessState,
     onSetVisualTheme: (CompanionVisualTheme) -> Unit,
+    onSetNormalPollSeconds: (Int) -> Unit,
+    onSetSlowPollSeconds: (Int) -> Unit,
+    onSetSleepTimeoutMinutes: (Int) -> Unit,
+    onGetPro: () -> Unit,
+    onShowPrivacyOptions: () -> Unit,
     onOpenSetup: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         SettingsSheetContent(
             visualTheme = visualTheme,
+            powerSyncConfig = powerSyncConfig,
+            access = access,
             onSetVisualTheme = onSetVisualTheme,
+            onSetNormalPollSeconds = onSetNormalPollSeconds,
+            onSetSlowPollSeconds = onSetSlowPollSeconds,
+            onSetSleepTimeoutMinutes = onSetSleepTimeoutMinutes,
+            onGetPro = onGetPro,
+            onShowPrivacyOptions = onShowPrivacyOptions,
             onOpenSetup = onOpenSetup,
             onDismiss = onDismiss,
         )
@@ -318,7 +350,14 @@ fun SettingsSheet(
 @Composable
 fun SettingsSheetContent(
     visualTheme: CompanionVisualTheme,
+    powerSyncConfig: PowerSyncConfig,
+    access: AccessState,
     onSetVisualTheme: (CompanionVisualTheme) -> Unit,
+    onSetNormalPollSeconds: (Int) -> Unit,
+    onSetSlowPollSeconds: (Int) -> Unit,
+    onSetSleepTimeoutMinutes: (Int) -> Unit,
+    onGetPro: () -> Unit,
+    onShowPrivacyOptions: () -> Unit,
     onOpenSetup: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
@@ -339,6 +378,27 @@ fun SettingsSheetContent(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.close_settings)) }
         }
         Spacer(Modifier.height(12.dp))
+        ProUpgradeSurface(
+            access = access,
+            onGetPro = onGetPro,
+        )
+        if (access.isPlayDistribution) {
+            val welcomeDays = access.welcomeDaysRemaining()
+            if (!access.isPro && welcomeDays != null && welcomeDays > 0) {
+                Text(
+                    text = stringResource(R.string.welcome_access, welcomeDays),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 4.dp, top = 6.dp),
+                )
+            }
+            if (access.privacyOptionsRequired) {
+                TextButton(onClick = onShowPrivacyOptions) {
+                    Text(stringResource(R.string.privacy_and_ads))
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
         Text(
             text = stringResource(R.string.settings_appearance),
             style = MaterialTheme.typography.titleMedium,
@@ -360,6 +420,35 @@ fun SettingsSheetContent(
                 modifier = Modifier.weight(1f),
             )
         }
+        Spacer(Modifier.height(22.dp))
+        Text(
+            text = stringResource(R.string.settings_power_sync),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            text = stringResource(R.string.settings_power_sync_body),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(12.dp))
+        SettingsChoiceRow(
+            label = stringResource(R.string.settings_normal_sync),
+            choices = listOf(15 to "15s", 30 to "30s", 60 to "1m"),
+            selected = powerSyncConfig.normalPollSeconds,
+            onSelect = onSetNormalPollSeconds,
+        )
+        SettingsChoiceRow(
+            label = stringResource(R.string.settings_reading_sync),
+            choices = listOf(5 * 60 to "5m", 10 * 60 to "10m", 15 * 60 to "15m"),
+            selected = powerSyncConfig.slowPollSeconds,
+            onSelect = onSetSlowPollSeconds,
+        )
+        SettingsChoiceRow(
+            label = stringResource(R.string.settings_sleep_after),
+            choices = listOf(1 to "1m", 2 to "2m", 3 to "3m", 5 to "5m"),
+            selected = powerSyncConfig.sleepTimeoutMinutes,
+            onSelect = onSetSleepTimeoutMinutes,
+        )
         Spacer(Modifier.height(12.dp))
         Surface(
             onClick = onOpenSetup,
@@ -395,6 +484,42 @@ fun SettingsSheetContent(
         )
         SettingsValue(stringResource(R.string.settings_gemini), stringResource(R.string.settings_gemini_value))
         SettingsValue(stringResource(R.string.settings_flights), stringResource(R.string.settings_flights_value))
+        Spacer(Modifier.height(18.dp))
+        Text(
+            text = stringResource(R.string.compatibility_disclaimer),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun SettingsChoiceRow(
+    label: String,
+    choices: List<Pair<Int, String>>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(6.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            choices.forEach { (value, text) ->
+                ThemeChip(
+                    label = text,
+                    selected = value == selected,
+                    onClick = { onSelect(value) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
     }
 }
 

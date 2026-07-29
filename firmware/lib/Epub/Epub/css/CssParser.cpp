@@ -8,6 +8,7 @@
 #include <cctype>
 #include <charconv>
 #include <cstring>
+#include <limits>
 #include <string_view>
 
 namespace {
@@ -44,6 +45,13 @@ constexpr size_t MAX_RULES = 1500;
 // Minimum free heap required to apply CSS during rendering
 // If below this threshold, we skip CSS to avoid display artifacts.
 constexpr size_t MIN_FREE_HEAP_FOR_CSS = 48 * 1024;
+
+// Loading a cache expands its compact on-disk representation into strings,
+// hash nodes, and buckets. Keep enough headroom for the reader and for one
+// cache insertion; CSS is optional, so opening the book takes priority.
+constexpr size_t MIN_FREE_HEAP_TO_LOAD_CSS_CACHE = 96 * 1024;
+constexpr size_t CSS_CACHE_HEAP_EXPANSION_FACTOR = 4;
+constexpr size_t CSS_CACHE_INSERT_HEADROOM = 4 * 1024;
 
 // Maximum length for a single selector string
 // Prevents parsing of extremely long or malformed selectors
@@ -801,6 +809,23 @@ bool CssParser::loadFromCache() {
     return false;
   }
 
+  const size_t serializedBytes = static_cast<size_t>(file.available());
+  const size_t maxSize = std::numeric_limits<size_t>::max();
+  const size_t estimatedCacheHeap =
+      serializedBytes > maxSize / CSS_CACHE_HEAP_EXPANSION_FACTOR
+          ? maxSize
+          : serializedBytes * CSS_CACHE_HEAP_EXPANSION_FACTOR;
+  const size_t fixedHeadroom = MIN_FREE_HEAP_FOR_CSS + CSS_CACHE_INSERT_HEADROOM;
+  const size_t requiredFreeHeap =
+      estimatedCacheHeap > maxSize - fixedHeadroom ? maxSize : fixedHeadroom + estimatedCacheHeap;
+  const size_t availableHeap = ESP.getFreeHeap();
+  const size_t minimumStartHeap = std::max(requiredFreeHeap, MIN_FREE_HEAP_TO_LOAD_CSS_CACHE);
+  if (availableHeap < minimumStartHeap) {
+    LOG_INF("CSS", "Skipping optional CSS cache: %u bytes free, estimated %zu required", ESP.getFreeHeap(),
+            minimumStartHeap);
+    return true;
+  }
+
   auto hasRemainingBytes = [&file](const size_t neededBytes) -> bool {
     return static_cast<size_t>(file.available()) >= neededBytes;
   };
@@ -808,7 +833,7 @@ bool CssParser::loadFromCache() {
   constexpr size_t CSS_LENGTH_FIELD_COUNT = 11;
   constexpr size_t CSS_LENGTH_BYTES = sizeof(float) + sizeof(uint8_t);
   constexpr size_t CSS_FIXED_STYLE_BYTES =
-      5 * sizeof(uint8_t) + (CSS_LENGTH_FIELD_COUNT * CSS_LENGTH_BYTES) + sizeof(uint8_t) + sizeof(uint32_t);
+      7 * sizeof(uint8_t) + (CSS_LENGTH_FIELD_COUNT * CSS_LENGTH_BYTES) + sizeof(uint32_t);
 
   // Read each rule
   for (uint16_t i = 0; i < ruleCount; ++i) {
@@ -938,7 +963,12 @@ bool CssParser::loadFromCache() {
     style.defined.direction = (definedBits & 1 << 16) != 0;
     style.defined.verticalAlign = (definedBits & 1 << 17) != 0;
 
-    rulesBySelector_[selector] = style;
+    if (ESP.getFreeHeap() < fixedHeadroom) {
+      LOG_INF("CSS", "Stopping optional CSS cache load at rule %u: %u bytes free", i, ESP.getFreeHeap());
+      rulesBySelector_.clear();
+      return true;
+    }
+    rulesBySelector_.emplace(std::move(selector), style);
   }
 
   LOG_DBG("CSS", "Loaded %u rules from cache", ruleCount);

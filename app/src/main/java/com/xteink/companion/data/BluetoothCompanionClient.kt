@@ -24,8 +24,10 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelUuid
+import android.util.Log
 import androidx.core.content.ContextCompat
 import com.xteink.companion.protocol.DeviceCapabilities
+import com.xteink.companion.protocol.DeviceStatus
 import com.xteink.companion.protocol.Envelope
 import com.xteink.companion.protocol.EnvelopeCodec
 import com.xteink.companion.protocol.FIRMWARE_CHUNK_BYTES
@@ -33,6 +35,7 @@ import com.xteink.companion.protocol.FirmwareBegin
 import com.xteink.companion.protocol.LibraryEntry
 import com.xteink.companion.protocol.MessageType
 import com.xteink.companion.protocol.PayloadCodec
+import com.xteink.companion.protocol.PowerSyncConfig
 import com.xteink.companion.protocol.SessionStart
 import com.xteink.companion.protocol.XTEINK_CONTROL_UUID
 import com.xteink.companion.protocol.XTEINK_DATA_UUID
@@ -86,6 +89,8 @@ class BluetoothCompanionClient(private val context: Context) {
     val state: StateFlow<CompanionLinkState> = _state.asStateFlow()
     private val _libraries = MutableSharedFlow<DeviceLibrarySnapshot>(extraBufferCapacity = 2)
     val libraries: SharedFlow<DeviceLibrarySnapshot> = _libraries.asSharedFlow()
+    private val _statuses = MutableSharedFlow<DeviceStatus>(replay = 1, extraBufferCapacity = 2)
+    val statuses: SharedFlow<DeviceStatus> = _statuses.asSharedFlow()
 
     fun hasPermissions(): Boolean = requiredPermissions().all {
         ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
@@ -103,7 +108,13 @@ class BluetoothCompanionClient(private val context: Context) {
             _state.value = CompanionLinkState(LinkPhase.Error, model, message = "Bluetooth is turned off")
             return
         }
+        val rememberedCompanionAddresses = adapter.bondedDevices
+            .filter { device ->
+                runCatching { device.name }.getOrNull().equals(CompanionDeviceName, ignoreCase = true)
+            }
+            .mapTo(mutableSetOf()) { it.address }
         _state.value = CompanionLinkState(LinkPhase.Scanning, model, message = "Searching nearby")
+        Log.i(LogTag, "Scanning for an advertising XTEINK companion")
         val companionService = ParcelUuid.fromString(XTEINK_SERVICE_UUID)
         val callback = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
@@ -120,12 +131,20 @@ class BluetoothCompanionClient(private val context: Context) {
                 val deviceName = scanRecord?.deviceName
                     ?: runCatching { result.device.name }.getOrNull()
                 val hasCompanionName = deviceName.equals(CompanionDeviceName, ignoreCase = true)
-                if (!advertisesCompanion && !hasCompanionName) return
+                val isRememberedCompanion = result.device.address in rememberedCompanionAddresses
+                if (!advertisesCompanion && !hasCompanionName && !isRememberedCompanion) return
                 stopScan()
+                Log.i(
+                    LogTag,
+                    "Found advertising XTEINK companion ${result.device.address} " +
+                        "rssi=${result.rssi} service=$advertisesCompanion name=$hasCompanionName " +
+                        "remembered=$isRememberedCompanion bonded=${result.device.bondState == BluetoothDevice.BOND_BONDED}",
+                )
                 pairThenConnect(result.device)
             }
 
             override fun onScanFailed(errorCode: Int) {
+                Log.e(LogTag, "Bluetooth scan failed ($errorCode)")
                 _state.value = _state.value.copy(phase = LinkPhase.Error, message = "Bluetooth scan failed ($errorCode)")
             }
         }
@@ -142,6 +161,7 @@ class BluetoothCompanionClient(private val context: Context) {
         handler.postDelayed({
             if (_state.value.phase == LinkPhase.Scanning) {
                 stopScan()
+                Log.w(LogTag, "No advertising XTEINK companion found within 15 seconds")
                 _state.value = _state.value.copy(phase = LinkPhase.Error, message = "No companion device found")
             }
         }, 15_000)
@@ -231,6 +251,12 @@ class BluetoothCompanionClient(private val context: Context) {
     suspend fun resumeSession() = sendAwaitingAck(MessageType.ResumeSession)
     suspend fun stopSession() = sendAwaitingAck(MessageType.StopSession)
     suspend fun refreshLibrary() = sendAwaitingAck(MessageType.GetLibrary)
+    suspend fun setPowerConfig(config: PowerSyncConfig) =
+        sendAwaitingAck(MessageType.SetPowerConfig, PayloadCodec.encodePowerSyncConfig(config))
+    suspend fun confirmStatus(revision: UInt) =
+        sendAwaitingAck(MessageType.ConfirmStatus, PayloadCodec.encodeStatusConfirmation(revision))
+    suspend fun startLibraryTransfer() = sendAwaitingAck(MessageType.StartLibraryTransfer, timeoutMillis = 20_000)
+    suspend fun stopLibraryTransfer() = sendAwaitingAck(MessageType.StopLibraryTransfer, timeoutMillis = 20_000)
     suspend fun awaitConnected(timeoutMillis: Long = 20_000) {
         withTimeout(timeoutMillis) { state.first { it.phase == LinkPhase.Connected } }
     }
@@ -325,39 +351,62 @@ class BluetoothCompanionClient(private val context: Context) {
     private val gattCallback = object : BluetoothGattCallback() {
         @SuppressLint("MissingPermission")
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
+            Log.i(LogTag, "GATT state status=$status newState=$newState address=${gatt.device.address}")
             if (status != BluetoothGatt.GATT_SUCCESS || newState == BluetoothProfile.STATE_DISCONNECTED) {
-                failLink("XTEINK disconnected")
+                failLink("XTEINK disconnected (Bluetooth status $status)")
                 return
             }
-            if (newState == BluetoothProfile.STATE_CONNECTED) gatt.discoverServices()
+            if (newState == BluetoothProfile.STATE_CONNECTED && !gatt.discoverServices()) {
+                failLink("Could not discover XTEINK services")
+            }
         }
 
         @SuppressLint("MissingPermission")
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
             service = gatt.getService(UUID.fromString(XTEINK_SERVICE_UUID))
+            Log.i(LogTag, "GATT services status=$status companionService=${service != null}")
             if (status != BluetoothGatt.GATT_SUCCESS || service == null) {
                 failLink("This firmware has no companion service")
                 return
             }
-            gatt.requestMtu(247)
+            if (!gatt.requestMtu(247)) enableEventNotifications(gatt)
         }
 
         @SuppressLint("MissingPermission")
         override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
-            val events = service?.getCharacteristic(UUID.fromString(XTEINK_EVENTS_UUID)) ?: return
+            Log.i(LogTag, "GATT MTU status=$status mtu=$mtu")
+            enableEventNotifications(gatt)
+        }
+
+        @SuppressLint("MissingPermission")
+        private fun enableEventNotifications(gatt: BluetoothGatt) {
+            val events = service?.getCharacteristic(UUID.fromString(XTEINK_EVENTS_UUID)) ?: run {
+                failLink("Companion event characteristic is missing")
+                return
+            }
             gatt.setCharacteristicNotification(events, true)
-            val descriptor = events.getDescriptor(CLIENT_CONFIG_UUID) ?: return
+            val descriptor = events.getDescriptor(CLIENT_CONFIG_UUID) ?: run {
+                failLink("Companion notification descriptor is missing")
+                return
+            }
             if (Build.VERSION.SDK_INT >= 33) {
-                gatt.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
+                if (gatt.writeDescriptor(
+                        descriptor,
+                        BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE,
+                    ) != BluetoothStatusCodes.SUCCESS
+                ) {
+                    failLink("Could not subscribe to XTEINK")
+                }
             } else {
                 @Suppress("DEPRECATION")
                 descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
                 @Suppress("DEPRECATION")
-                gatt.writeDescriptor(descriptor)
+                if (!gatt.writeDescriptor(descriptor)) failLink("Could not subscribe to XTEINK")
             }
         }
 
         override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
+            Log.i(LogTag, "GATT notifications status=$status")
             if (status != BluetoothGatt.GATT_SUCCESS) {
                 failLink("Could not subscribe to XTEINK")
                 return
@@ -395,9 +444,12 @@ class BluetoothCompanionClient(private val context: Context) {
                     pendingAcks.remove(id)?.completeExceptionally(IllegalStateException(message))
                     _state.value = _state.value.copy(message = message)
                 }
-                MessageType.Capabilities, MessageType.StatusChanged -> {
+                MessageType.Capabilities -> {
                     val capabilities = PayloadCodec.decodeCapabilities(envelope.payload)
                     _state.value = _state.value.copy(capabilities = capabilities)
+                }
+                MessageType.StatusChanged -> {
+                    _statuses.tryEmit(PayloadCodec.decodeDeviceStatus(envelope.payload))
                 }
                 MessageType.LibraryPage -> {
                     val page = PayloadCodec.decodeLibraryPage(envelope.payload)
@@ -419,6 +471,7 @@ class BluetoothCompanionClient(private val context: Context) {
     }
 
     private fun failLink(message: String) {
+        Log.e(LogTag, message)
         _state.value = _state.value.copy(phase = LinkPhase.Error, message = message, transferProgress = null)
     }
 
@@ -426,6 +479,7 @@ class BluetoothCompanionClient(private val context: Context) {
     companion object {
         private val CLIENT_CONFIG_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
         private const val CompanionDeviceName = "XTEINK Companion"
+        private const val LogTag = "XtraordinaryBLE"
 
         fun requiredPermissions(): Array<String> = if (Build.VERSION.SDK_INT >= 31) {
             arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)

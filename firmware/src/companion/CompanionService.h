@@ -45,6 +45,16 @@ class CompanionService {
   volatile uint32_t connectedAtMs_ = 0;
   volatile uint32_t lastBleActivityMs_ = 0;
   volatile bool connectionParamsPending_ = false;
+  volatile bool connectedOnceSinceBoot_ = false;
+  uint32_t bootStartedAtMs_ = 0;
+  DeviceActivity deviceActivity_ = DeviceActivity::BOOTING;
+  SyncMode syncMode_ = SyncMode::FAST;
+  uint32_t statusRevision_ = 1;
+  uint32_t confirmedStatusRevision_ = 0;
+  bool statusDirty_ = true;
+  uint32_t normalPollSeconds_ = 15;
+  uint32_t slowPollSeconds_ = 10 * 60;
+  uint8_t sleepTimeoutMinutes_ = 5;
   SessionEngine session_;
   HalFile firmwareFile_;
   uint64_t firmwareExpectedSize_ = 0;
@@ -67,6 +77,11 @@ class CompanionService {
   void sendAck(uint32_t messageId);
   void sendNack(uint32_t messageId, const char* reason);
   void sendCapabilities(MessageType type = MessageType::CAPABILITIES);
+  void observeDeviceActivity();
+  void setDeviceActivity(DeviceActivity activity, SyncMode syncMode);
+  void sendDeviceStatus(MessageType type = MessageType::STATUS_CHANGED);
+  bool setPowerConfig(const EnvelopeView& envelope);
+  bool confirmStatus(const EnvelopeView& envelope);
   bool scanLibrary();
   void scanDirectory(const char* path, uint8_t depth);
   void sendNextLibraryItem();
@@ -80,8 +95,10 @@ class CompanionService {
   void begin();
   void loop();
   bool connected() const;
-  bool requiresBleSafeClock() const { return initialized_; }
+  bool requiresBleSafeClock() const { return initialized_ && !connected(); }
   bool requiresFullClock() const;
+  bool shouldSleepAfterUnpairedBoot(uint32_t inactiveForMs) const;
+  void prepareForSleep();
   SessionEngine& session() { return session_; }
   void onWrite(const uint8_t* bytes, size_t length);
   void onClientConnected(uint16_t connectionHandle);

@@ -246,15 +246,33 @@ void HomeActivity::render(RenderLock&&) {
     menuIcons.insert(menuIcons.begin(), Book);
   }
 
+  constexpr int noPhonePillHeight = 54;
+  const int noPhonePillGap = noPhoneSleepNotice ? metrics.verticalSpacing : 0;
+  const int reservedNoticeHeight = noPhoneSleepNotice ? noPhonePillHeight + noPhonePillGap : 0;
   GUI.drawButtonMenu(
       renderer,
       Rect{0, metrics.homeTopPadding + metrics.homeCoverTileHeight + metrics.homeMenuTopOffset, pageWidth,
            pageHeight - (metrics.headerHeight + metrics.homeTopPadding + metrics.verticalSpacing +
-                         metrics.homeMenuTopOffset + metrics.buttonHintsHeight)},
+                         metrics.homeMenuTopOffset + metrics.buttonHintsHeight + reservedNoticeHeight)},
       static_cast<int>(menuItems.size()),
       metrics.homeContinueReadingInMenu ? selectorIndex : selectorIndex - recentBooks.size(),
       [&menuItems](int index) { return std::string(menuItems[index]); },
       [&menuIcons](int index) { return menuIcons[index]; });
+
+  if (noPhoneSleepNotice) {
+    const int pillX = metrics.contentSidePadding;
+    const int pillY = pageHeight - metrics.buttonHintsHeight - noPhonePillHeight - metrics.verticalSpacing;
+    const int pillWidth = pageWidth - metrics.contentSidePadding * 2;
+    renderer.fillRoundedRect(pillX, pillY, pillWidth, noPhonePillHeight, noPhonePillHeight / 2, Color::LightGray);
+    renderer.drawCenteredText(
+        SMALL_FONT_ID,
+        pillY + 10,
+        "No phone nearby - sleeping to save battery");
+    renderer.drawCenteredText(
+        SMALL_FONT_ID,
+        pillY + 29,
+        "Press power to reconnect");
+  }
 
   const auto labels = mappedInput.mapLabels("", tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);

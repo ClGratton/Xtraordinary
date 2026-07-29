@@ -1,6 +1,9 @@
 package com.xteink.companion.ui
 
 import com.xteink.companion.data.FirmwareSource
+import com.xteink.companion.protocol.DeviceActivity
+import com.xteink.companion.protocol.DeviceSyncMode
+import com.xteink.companion.protocol.PowerSyncConfig
 
 enum class CompanionVisualTheme {
     Expressive,
@@ -145,6 +148,8 @@ data class ReadUiState(
     val importing: Boolean = false,
     val syncing: Boolean = false,
     val folderLinked: Boolean = false,
+    val transferInProgress: Boolean = false,
+    val transferProgress: Float? = null,
 )
 
 enum class FirmwareCheckPhase { Idle, Checking, Available, UpToDate, Downloading, Transferring, Complete, Error }
@@ -158,6 +163,11 @@ data class DeviceUiState(
     val usbMessage: String? = null,
     val firmwareVersion: String? = null,
     val libraryRevision: UInt = 0u,
+    val activity: DeviceActivity? = null,
+    val syncMode: DeviceSyncMode? = null,
+    val statusRevision: UInt = 0u,
+    val lastStatusAtEpochMs: Long? = null,
+    val lowPowerGraceExpired: Boolean = false,
     val firmwareCheckPhase: FirmwareCheckPhase = FirmwareCheckPhase.Idle,
     val firmwareSource: FirmwareSource = FirmwareSource.Xtraordinary,
     val latestFirmwareVersion: String? = null,
@@ -172,8 +182,11 @@ data class CompanionUiState(
     val read: ReadUiState = ReadUiState(),
     val ticket: TicketUiState = TicketUiState(),
     val device: DeviceUiState = DeviceUiState(),
-    // This is the logical, user-visible relationship: a managed device remains
-    // connected while its short-lived BLE transport is intentionally idle.
+    val powerSyncConfig: PowerSyncConfig = PowerSyncConfig(),
+    // A managed device is remembered and eligible for reconnect/queued work.
+    // Connected always means the BLE transport is live; UI must never present
+    // a remembered device as connected.
+    val hasManagedX3: Boolean = false,
     val isX3Connected: Boolean = false,
     val isX3TransportConnected: Boolean = false,
     val connectedDeviceModel: String? = null,
@@ -187,6 +200,7 @@ sealed interface UiNotice {
     data object EpubImportFailed : UiNotice
     data object ConnectX3ToDelete : UiNotice
     data class X3DeleteQueued(val count: Int) : UiNotice
+    data class BooksSentToX3(val count: Int) : UiNotice
     data class BooksImported(
         val added: Int,
         val duplicates: Int,

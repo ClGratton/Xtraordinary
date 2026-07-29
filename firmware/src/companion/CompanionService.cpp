@@ -15,7 +15,10 @@
 #include <cstring>
 #include <iterator>
 
+#include "CrossPointSettings.h"
 #include "MappedInputManager.h"
+#include "activities/Activity.h"
+#include "activities/ActivityManager.h"
 #include "CompanionUiBridge.h"
 #include "network/FirmwareFlasher.h"
 
@@ -30,12 +33,16 @@ constexpr char EVENTS_UUID[] = "7e400004-b5a3-f393-e0a9-e50e24dcca9e";
 constexpr char STATUS_UUID[] = "7e400005-b5a3-f393-e0a9-e50e24dcca9e";
 constexpr char FIRMWARE_PATH[] = "/.crosspoint/companion/firmware.bin";
 constexpr uint16_t ADVERTISING_INTERVAL = 800;  // 500 ms in 0.625 ms units
-constexpr uint32_t FULL_CLOCK_AFTER_BLE_ACTIVITY_MS = 5000;
 constexpr uint32_t CONNECTION_PARAMETER_DELAY_MS = 3000;
 constexpr uint16_t IDLE_CONNECTION_INTERVAL_MIN = 48;  // 60 ms in 1.25 ms units
 constexpr uint16_t IDLE_CONNECTION_INTERVAL_MAX = 80;  // 100 ms in 1.25 ms units
 constexpr uint16_t IDLE_CONNECTION_LATENCY = 1;  // At most ~200 ms idle response at the negotiated maximum.
 constexpr uint16_t CONNECTION_SUPERVISION_TIMEOUT = 600;  // 6 s in 10 ms units
+constexpr uint16_t READING_CONNECTION_INTERVAL_MIN = 160;  // 200 ms in 1.25 ms units
+constexpr uint16_t READING_CONNECTION_INTERVAL_MAX = 240;  // 300 ms in 1.25 ms units
+constexpr uint16_t READING_CONNECTION_LATENCY = 3;
+constexpr uint16_t READING_CONNECTION_SUPERVISION_TIMEOUT = 1000;  // 10 s in 10 ms units
+constexpr uint32_t UNPAIRED_BOOT_SLEEP_MS = 2UL * 60UL * 1000UL;
 
 bool hasBookExtension(const char* path) {
   const char* dot = std::strrchr(path, '.');
@@ -96,6 +103,12 @@ ServerCallbacks serverCallbacks;
 CompanionService companionService;
 
 void CompanionService::begin() {
+  bootStartedAtMs_ = millis();
+  sleepTimeoutMinutes_ = std::clamp<uint8_t>(SETTINGS.sleepTimeoutMinutes, 1, 5);
+  if (SETTINGS.sleepTimeoutMinutes != sleepTimeoutMinutes_) {
+    SETTINGS.sleepTimeoutMinutes = sleepTimeoutMinutes_;
+    SETTINGS.saveToFile();
+  }
   commandQueue_ = xQueueCreateStatic(COMMAND_QUEUE_DEPTH, sizeof(CommandPacket), commandQueueStorage_.data(),
                                      &commandQueueState_);
   if (!commandQueue_) {
@@ -154,17 +167,22 @@ void CompanionService::begin() {
 
 bool CompanionService::connected() const { return server_ && server_->getConnectedCount() > 0; }
 
-bool CompanionService::requiresFullClock() const {
-  return connected() && static_cast<uint32_t>(millis() - lastBleActivityMs_) < FULL_CLOCK_AFTER_BLE_ACTIVITY_MS;
-}
+bool CompanionService::requiresFullClock() const { return connected(); }
 
 void CompanionService::loop() {
+  observeDeviceActivity();
   if (connectionParamsPending_ && connected() &&
       static_cast<uint32_t>(millis() - connectedAtMs_) >= CONNECTION_PARAMETER_DELAY_MS) {
     connectionParamsPending_ = false;
-    server_->updateConnParams(connectionHandle_, IDLE_CONNECTION_INTERVAL_MIN, IDLE_CONNECTION_INTERVAL_MAX,
-                              IDLE_CONNECTION_LATENCY, CONNECTION_SUPERVISION_TIMEOUT);
-    LOG_INF("CMP", "Requested idle BLE connection parameters for handle %u", connectionHandle_);
+    const bool confirmedSlow = syncMode_ == SyncMode::SLOW && confirmedStatusRevision_ == statusRevision_;
+    server_->updateConnParams(
+        connectionHandle_,
+        confirmedSlow ? READING_CONNECTION_INTERVAL_MIN : IDLE_CONNECTION_INTERVAL_MIN,
+        confirmedSlow ? READING_CONNECTION_INTERVAL_MAX : IDLE_CONNECTION_INTERVAL_MAX,
+        confirmedSlow ? READING_CONNECTION_LATENCY : IDLE_CONNECTION_LATENCY,
+        confirmedSlow ? READING_CONNECTION_SUPERVISION_TIMEOUT : CONNECTION_SUPERVISION_TIMEOUT);
+    LOG_INF("CMP", "Requested %s BLE connection parameters for handle %u", confirmedSlow ? "reading" : "normal",
+            connectionHandle_);
   }
   bool transportQueueAvailable = true;
   if (pendingResponse_) {
@@ -178,6 +196,7 @@ void CompanionService::loop() {
   if (transportQueueAvailable && commandQueue_ && xQueueReceive(commandQueue_, &command, 0) == pdTRUE) {
     handlePacket(command.bytes, command.length);
   }
+  if (transportQueueAvailable && !pendingResponse_ && statusDirty_ && connected()) sendDeviceStatus();
   session_.update();
   if (transportQueueAvailable && !pendingResponse_ && librarySendPending_ && connected()) sendNextLibraryItem();
   if (applyPending_ && static_cast<int32_t>(millis() - applyAtMs_) >= 0) {
@@ -204,6 +223,8 @@ void CompanionService::onClientConnected(uint16_t connectionHandle) {
   connectedAtMs_ = millis();
   lastBleActivityMs_ = connectedAtMs_;
   connectionParamsPending_ = true;
+  connectedOnceSinceBoot_ = true;
+  statusDirty_ = true;
 }
 
 void CompanionService::onClientDisconnected() {
@@ -217,9 +238,17 @@ void CompanionService::handlePacket(const uint8_t* bytes, size_t length) {
   bool ok = true;
   switch (envelope.type) {
     case MessageType::HELLO:
-    case MessageType::GET_STATUS:
       sendCapabilities();
       return;
+    case MessageType::GET_STATUS:
+      sendDeviceStatus();
+      return;
+    case MessageType::SET_POWER_CONFIG:
+      ok = setPowerConfig(envelope);
+      break;
+    case MessageType::CONFIRM_STATUS:
+      ok = confirmStatus(envelope);
+      break;
     case MessageType::START_SESSION: {
       if (envelope.payloadLength < 14) {
         ok = false;
@@ -250,6 +279,12 @@ void CompanionService::handlePacket(const uint8_t* bytes, size_t length) {
     case MessageType::DELETE_LIBRARY_ENTRIES:
       ok = deleteLibraryEntries(envelope);
       break;
+    case MessageType::START_LIBRARY_TRANSFER:
+      activityManager.goToCompanionFileTransfer();
+      break;
+    case MessageType::STOP_LIBRARY_TRANSFER:
+      activityManager.goHome();
+      break;
     case MessageType::BEGIN_FIRMWARE:
       ok = beginFirmware(envelope);
       break;
@@ -274,6 +309,87 @@ void CompanionService::handlePacket(const uint8_t* bytes, size_t length) {
     sendAck(envelope.messageId);
   else
     sendNack(envelope.messageId, "Command rejected");
+}
+
+void CompanionService::observeDeviceActivity() {
+  DeviceActivity activity = DeviceActivity::AWAKE;
+  SyncMode syncMode = SyncMode::FAST;
+  if (activityManager.isCurrentActivity("Sleep")) {
+    activity = DeviceActivity::SLEEPING;
+    syncMode = SyncMode::OFF;
+  } else if (activityManager.isCurrentActivity("CrossPointWebServer")) {
+    activity = DeviceActivity::TRANSFER;
+  } else if (session_.active() || activityManager.isCurrentActivity("CompanionFocus")) {
+    activity = DeviceActivity::FOCUS;
+  } else if (activityManager.isReaderActivity()) {
+    activity = DeviceActivity::READING;
+    syncMode = SyncMode::SLOW;
+  }
+  setDeviceActivity(activity, syncMode);
+}
+
+void CompanionService::setDeviceActivity(DeviceActivity activity, SyncMode syncMode) {
+  if (deviceActivity_ == activity && syncMode_ == syncMode) return;
+  deviceActivity_ = activity;
+  syncMode_ = syncMode;
+  ++statusRevision_;
+  if (statusRevision_ == 0) ++statusRevision_;
+  confirmedStatusRevision_ = 0;
+  statusDirty_ = true;
+  connectedAtMs_ = millis();
+  connectionParamsPending_ = connected();
+  LOG_INF("CMP", "Device state changed activity=%u sync=%u revision=%lu", static_cast<unsigned>(activity),
+          static_cast<unsigned>(syncMode), static_cast<unsigned long>(statusRevision_));
+}
+
+void CompanionService::sendDeviceStatus(MessageType type) {
+  uint8_t payload[15];
+  writeU32(payload, statusRevision_);
+  payload[4] = static_cast<uint8_t>(deviceActivity_);
+  payload[5] = static_cast<uint8_t>(syncMode_);
+  writeU32(payload + 6, normalPollSeconds_);
+  writeU32(payload + 10, slowPollSeconds_);
+  payload[14] = sleepTimeoutMinutes_;
+  if (notify(type, payload, sizeof(payload))) statusDirty_ = false;
+}
+
+bool CompanionService::setPowerConfig(const EnvelopeView& envelope) {
+  if (envelope.payloadLength != 9) return false;
+  const uint32_t normalSeconds = readU32(envelope.payload);
+  const uint32_t slowSeconds = readU32(envelope.payload + 4);
+  const uint8_t sleepMinutes = envelope.payload[8];
+  if (normalSeconds < 10 || normalSeconds > 120 || slowSeconds < 60 || slowSeconds > 30UL * 60UL ||
+      sleepMinutes < 1 || sleepMinutes > 5) {
+    return false;
+  }
+  normalPollSeconds_ = normalSeconds;
+  slowPollSeconds_ = slowSeconds;
+  sleepTimeoutMinutes_ = sleepMinutes;
+  if (SETTINGS.sleepTimeoutMinutes != sleepTimeoutMinutes_) {
+    SETTINGS.sleepTimeoutMinutes = sleepTimeoutMinutes_;
+    SETTINGS.saveToFile();
+  }
+  statusDirty_ = true;
+  return true;
+}
+
+bool CompanionService::confirmStatus(const EnvelopeView& envelope) {
+  if (envelope.payloadLength != 4 || readU32(envelope.payload) != statusRevision_) return false;
+  confirmedStatusRevision_ = statusRevision_;
+  connectedAtMs_ = millis();
+  connectionParamsPending_ = connected();
+  return true;
+}
+
+bool CompanionService::shouldSleepAfterUnpairedBoot(uint32_t inactiveForMs) const {
+  return initialized_ && !connectedOnceSinceBoot_ && !connected() && !session_.active() &&
+         static_cast<uint32_t>(millis() - bootStartedAtMs_) >= UNPAIRED_BOOT_SLEEP_MS &&
+         inactiveForMs >= UNPAIRED_BOOT_SLEEP_MS && activityManager.isCurrentActivity("Home");
+}
+
+void CompanionService::prepareForSleep() {
+  setDeviceActivity(DeviceActivity::SLEEPING, SyncMode::OFF);
+  if (connected()) sendDeviceStatus();
 }
 
 bool CompanionService::sendResponse(uint32_t messageId, bool nack) {

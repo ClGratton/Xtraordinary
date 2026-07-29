@@ -237,14 +237,15 @@ static bool loadSleepFrameBuffer() {
 }
 
 // Enter deep sleep mode
-void enterDeepSleep(bool fromTimeout = false) {
+void enterDeepSleep(bool fromTimeout = false, bool preserveCurrentFrame = false) {
   HalPowerManager::Lock powerLock;  // Ensure we are at normal CPU frequency for sleep preparation
   APP_STATE.lastSleepFromReader = activityManager.isReaderActivity();
 
   const bool isQuickResumeSleep =
-      SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::QUICK_RESUME ||
-      (fromTimeout &&
-       SETTINGS.quickResumeSleepScreen == CrossPointSettings::QUICK_RESUME_SLEEP_SCREEN::QUICK_RESUME_AFTER_TIMEOUT);
+      !preserveCurrentFrame &&
+      (SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::QUICK_RESUME ||
+       (fromTimeout &&
+        SETTINGS.quickResumeSleepScreen == CrossPointSettings::QUICK_RESUME_SLEEP_SCREEN::QUICK_RESUME_AFTER_TIMEOUT));
   APP_STATE.showBootScreen = !isQuickResumeSleep;
 
   APP_STATE.saveToFile();
@@ -252,7 +253,11 @@ void enterDeepSleep(bool fromTimeout = false) {
   // Commit to sleeping before goToSleep() runs the outgoing activity's onExit():
   // a WiFi activity would otherwise silentRestart() here and reboot instead.
   deepSleepInProgress = true;
-  activityManager.goToSleep(fromTimeout);
+#ifdef ENABLE_X3_COMPANION
+  companion::companionService.prepareForSleep();
+  if (companion::companionService.connected()) delay(120);
+#endif
+  if (!preserveCurrentFrame) activityManager.goToSleep(fromTimeout);
 
   if (isQuickResumeSleep) {
     saveSleepFrameBuffer();
@@ -564,6 +569,16 @@ void loop() {
   }
 
   const unsigned long sleepTimeoutMs = SETTINGS.getSleepTimeoutMs();
+#ifdef ENABLE_X3_COMPANION
+  if (companion::companionService.shouldSleepAfterUnpairedBoot(millis() - lastActivityTime)) {
+    LOG_DBG("SLP", "No phone connected during the two-minute wake window; sleeping");
+    if (activityManager.showNoPhoneSleepNotice()) {
+      activityManager.requestUpdateAndWait();
+      enterDeepSleep(true, true);
+      return;
+    }
+  }
+#endif
   if (sleepTimeoutMs > 0 && millis() - lastActivityTime >= sleepTimeoutMs) {
     LOG_DBG("SLP", "Auto-sleep triggered after %lu ms of inactivity", sleepTimeoutMs);
     enterDeepSleep(true);
@@ -629,9 +644,11 @@ void loop() {
       delay(50);
     } else {
       if (companionNeedsFullClock) {
-        // Pairing and bursts run at normal speed. Once BLE traffic has been
-        // idle for a measured grace period, the companion-safe 80 MHz floor
-        // is sufficient and avoids holding 160 MHz for the entire link.
+        // Keep the CPU clock stable while a client is attached. Dropping to
+        // the power-saving clock mid-link causes Android to terminate GATT.
+        // The phone disconnects shortly after backgrounding, so the X3 can
+        // return to the proven 80 MHz advertising floor. True device sleep
+        // still enters ESP32-C3 deep sleep.
         powerManager.setPowerSaving(false);
       }
       // Short delay to prevent tight loop while still being responsive

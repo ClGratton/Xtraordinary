@@ -20,6 +20,54 @@ data class DeviceCapabilities(
     val supportsFirmwareUpdate: Boolean,
 )
 
+enum class DeviceActivity(val wireValue: UByte) {
+    Awake(0u),
+    Reading(1u),
+    Focus(2u),
+    Transfer(3u),
+    Sleeping(4u),
+    Booting(5u),
+    ;
+
+    companion object {
+        fun fromWireValue(value: UByte): DeviceActivity =
+            entries.firstOrNull { it.wireValue == value }
+                ?: throw ProtocolException("Unknown device activity: $value")
+    }
+}
+
+enum class DeviceSyncMode(val wireValue: UByte) {
+    Fast(0u),
+    Slow(1u),
+    Off(2u),
+    ;
+
+    companion object {
+        fun fromWireValue(value: UByte): DeviceSyncMode =
+            entries.firstOrNull { it.wireValue == value }
+                ?: throw ProtocolException("Unknown device sync mode: $value")
+    }
+}
+
+data class PowerSyncConfig(
+    val normalPollSeconds: Int = 15,
+    val slowPollSeconds: Int = 10 * 60,
+    val sleepTimeoutMinutes: Int = 5,
+) {
+    init {
+        require(normalPollSeconds in 10..120) { "Normal sync interval must be between 10 and 120 seconds" }
+        require(slowPollSeconds in 60..30 * 60) { "Reading sync interval must be between 1 and 30 minutes" }
+        require(sleepTimeoutMinutes in 1..5) { "Sleep timeout must be between 1 and 5 minutes" }
+    }
+}
+
+data class DeviceStatus(
+    val revision: UInt,
+    val activity: DeviceActivity,
+    val syncMode: DeviceSyncMode,
+    val powerConfig: PowerSyncConfig,
+)
+
 data class SessionStart(
     val deadlineEpochSeconds: Long,
     val durationSeconds: Int,
@@ -70,6 +118,51 @@ object PayloadCodec {
 
     fun decodeCapabilities(bytes: ByteArray): DeviceCapabilities = reader(bytes) {
         DeviceCapabilities(utf8(24), utf8(48), int.toUInt(), get().toInt() != 0)
+    }
+
+    fun encodePowerSyncConfig(value: PowerSyncConfig): ByteArray = writer(9) {
+        putInt(value.normalPollSeconds)
+        putInt(value.slowPollSeconds)
+        put(value.sleepTimeoutMinutes.toByte())
+    }
+
+    fun decodePowerSyncConfig(bytes: ByteArray): PowerSyncConfig = reader(bytes) {
+        PowerSyncConfig(
+            normalPollSeconds = int,
+            slowPollSeconds = int,
+            sleepTimeoutMinutes = get().toInt() and 0xff,
+        )
+    }
+
+    fun encodeDeviceStatus(value: DeviceStatus): ByteArray = writer(15) {
+        putInt(value.revision.toInt())
+        put(value.activity.wireValue.toByte())
+        put(value.syncMode.wireValue.toByte())
+        putInt(value.powerConfig.normalPollSeconds)
+        putInt(value.powerConfig.slowPollSeconds)
+        put(value.powerConfig.sleepTimeoutMinutes.toByte())
+    }
+
+    fun decodeDeviceStatus(bytes: ByteArray): DeviceStatus = reader(bytes) {
+        require(bytes.size == 15) { "Device status payload must be 15 bytes" }
+        DeviceStatus(
+            revision = int.toUInt(),
+            activity = DeviceActivity.fromWireValue(get().toUByte()),
+            syncMode = DeviceSyncMode.fromWireValue(get().toUByte()),
+            powerConfig = PowerSyncConfig(
+                normalPollSeconds = int,
+                slowPollSeconds = int,
+                sleepTimeoutMinutes = get().toInt() and 0xff,
+            ),
+        )
+    }
+
+    fun encodeStatusConfirmation(revision: UInt): ByteArray =
+        ByteBuffer.allocate(4).little().putInt(revision.toInt()).array()
+
+    fun decodeStatusConfirmation(bytes: ByteArray): UInt {
+        require(bytes.size == 4) { "Status confirmation payload must be 4 bytes" }
+        return ByteBuffer.wrap(bytes).little().int.toUInt()
     }
 
     fun encodeLibraryPage(value: LibraryPagePayload): ByteArray = writer(64 + value.entries.sumOf { it.path.length }) {

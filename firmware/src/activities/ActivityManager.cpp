@@ -176,6 +176,12 @@ void ActivityManager::goToFileTransfer() {
   replaceActivity(std::make_unique<CrossPointWebServerActivity>(renderer, mappedInput));
 }
 
+#ifdef ENABLE_X3_COMPANION
+void ActivityManager::goToCompanionFileTransfer() {
+  replaceActivity(std::make_unique<CrossPointWebServerActivity>(renderer, mappedInput, true));
+}
+#endif
+
 void ActivityManager::goToSettings() { replaceActivity(std::make_unique<SettingsActivity>(renderer, mappedInput)); }
 
 void ActivityManager::goToFileBrowser(std::string path) {
@@ -266,6 +272,16 @@ bool ActivityManager::isReaderActivity() const {
   return std::any_of(stackActivities.begin(), stackActivities.end(),
                      [](const auto& activity) { return activity->isReaderActivity(); }) ||
          (currentActivity && currentActivity->isReaderActivity());
+}
+
+bool ActivityManager::isCurrentActivity(const char* name) const {
+  return currentActivity && name && currentActivity->name == name;
+}
+
+bool ActivityManager::showNoPhoneSleepNotice() {
+  if (!isCurrentActivity("Home")) return false;
+  static_cast<HomeActivity*>(currentActivity.get())->showNoPhoneSleepNotice();
+  return true;
 }
 
 bool ActivityManager::skipLoopDelay() const { return currentActivity && currentActivity->skipLoopDelay(); }

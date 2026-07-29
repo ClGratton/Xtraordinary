@@ -257,6 +257,62 @@ That interim build was discovered 82 seconds after disconnect and reached GATT C
 
 The next bounded battery step does not pretend that the precompiled framework has modem sleep. It keeps the proven 80 MHz BLE floor, requests a 60-100 ms connection interval with one interval of peripheral latency, and holds 160 MHz only for the first five seconds after a connection or BLE traffic. BLE callbacks merely stamp activity and enqueue data; the main loop restores full speed before it handles a command or renders. Android separately treats a paired XTEINK as a logical managed device while the transport is intentionally idle, queues focus/deletion intent, and only labels the device `Reconnecting` after an unexpected link failure. Library pages advance only when NimBLE accepts the notification, so transmit congestion cannot silently turn a non-empty SD library into a zero-book snapshot. SD inventory scans also rewind every directory, close skipped entries, filter generated diagnostics, and construct root paths with the filename argument rather than accidentally reducing every root file to `//`.
 
+The 2026-07-26 dev2-dev4 hardware runs failed the reader-stability gate and therefore must not be treated as release candidates. NimBLE initialization reduced free heap from 137,256 bytes to roughly 72 KiB; the normal post-boot UI then settled near 55 KiB. Dev2 crashed while the cached CSS selector map rehashed, and dev3 crashed while a containment attempt pre-reserved that map. Dev4 correctly skipped optional CSS at low heap, then exposed the actual architecture error when the loaded EPUB transitioned from `unique_ptr` to `shared_ptr`.
+
+The dev4 panic instruction was `amoadd.w` inside `__gnu_cxx::__atomic_add`. The X3's ESP32-C3 implements RV32IMC and has no RISC-V `A` extension, but PlatformIO had linked the toolchain's root RV32IMAC `libstdc++`. The permanent fix is to compile and link with `-march=rv32imc_zicsr_zifencei -mabi=ilp32`, prepend the matching multilib directory, and fail the build unless the link map proves that `atomicity.o` came from `rv32imc_zicsr_zifencei/ilp32/libstdc++.a`. The exact procedure and fast incremental-build rules are in [the X3 firmware runbook](firmware-build-runbook.md).
+
+Low-memory CSS remains optional: cached CSS is skipped when BLE leaves insufficient reader headroom. That containment avoids spending the reader's safety reserve, but it is not a substitute for the ISA fix and does not make the BLE memory or power audit complete.
+
+The first architecture-correct dev5 hardware run opened Project Hail Mary, rendered the reader, completed multiple display refreshes, returned to the library, and remained alive at roughly 55 KiB free. It also exposed a separate nonfatal memory boundary: library cover regeneration declined to start because the JPEG decoder required 53,248 bytes while 53,228 bytes were free. Keep that thumbnail failure in the BLE memory backlog; do not confuse it with the resolved reader panic or claim the complete memory audit has passed.
+
+### Battery-aware device state contract
+
+The companion protocol now separates the physical BLE transport from the X3's
+operational state:
+
+- `Awake`, `Focus`, and `Transfer` request normal sync.
+- `Reading` requests slow sync.
+- `Sleeping` requests no sync.
+
+Each status carries a monotonically changing boot-local revision. Android
+updates its UI first and confirms that exact revision; the firmware ignores
+stale confirmations. Only a confirmed `Reading` revision requests the longer
+200-300 ms BLE connection parameters. Any transition out of Reading
+immediately returns to the normal 60-100 ms parameters. The CPU remains at the
+proven normal clock for the lifetime of an attached GATT client; this handshake
+does not reintroduce the failed mid-link clock drop.
+
+Android stores separate normal and reading check-in intervals. They control
+foreground reconnect cadence and the grace period before a missing Reading
+check-in is shown as offline. They are not presented as Bluetooth connection
+intervals and do not pretend to enable ESP32 modem sleep. Backgrounding the app
+still intentionally closes GATT. The last confirmed `Reading` or `Sleeping`
+state remains visible instead of being collapsed into `Disconnected`.
+Foregrounding the app is an explicit user action and performs one immediate
+reconnect attempt even when the cached state is slow or sleeping.
+
+The following edge cases are deterministic:
+
+| Event | Firmware behavior | Android behavior |
+| --- | --- | --- |
+| Reader opens while connected | Sends revisioned `Reading/Slow`; applies slow BLE parameters only after confirmation | Shows `Reading - low-power sync`, confirms the revision |
+| Reader opens while the app is absent | Continues locally; never waits indefinitely for a phone | Learns the state on the next foreground connection |
+| Reader closes while connected | Sends a new `Awake/Fast` revision and restores normal parameters | Replaces Reading immediately |
+| Reader closes while Android is backgrounded | Advertises using the existing fixed safe policy | Learns Awake on the next user-driven connection; Android cannot be woken for free |
+| X3 enters deep sleep while connected | Sends `Sleeping/Off` before display and modem teardown | Caches Sleeping and stops automatic retries |
+| X3 is already off | Cannot transmit from deep sleep | Keeps Sleeping; a user wake plus foreground reconnect refreshes state |
+| No phone connects for two inactive minutes after boot | Paints a retained gray Home pill, then deep-sleeps without replacing that frame | Reconnects normally after the user wakes the X3 |
+| App-configured idle timeout | Clamped and persisted to 1-5 minutes | Offers 1, 2, 3, or 5 minutes |
+| Transfer permission or Wi-Fi preflight fails | Never enters transfer mode | Shows a product message, never a raw permission exception |
+| Transfer mode receives no upload | Leaves after 90 seconds; a stalled upload leaves after 60 seconds; a completed batch gets an 8-second grace | Releases the temporary network and reconciles the library on reconnect |
+
+The remaining active-reading drain cannot be honestly solved by Android
+polling alone: the current precompiled framework still holds an 80 MHz BLE-safe
+floor while disconnected advertising is active. Runtime advertiser stop/start
+remains prohibited by the hardware failures above. The owned-framework modem
+sleep milestone is still required before claiming the reader-idle battery audit
+complete.
+
 The target behavior is:
 
 1. A physical wake or first-time setup opens a bounded fast-advertising window.
@@ -271,6 +327,8 @@ The current pioarduino framework is precompiled with both `CONFIG_PM_ENABLE` and
 
 - rebuilds the Arduino framework libraries from an owned `sdkconfig`, or
 - moves the X3 companion target to Arduino as an ESP-IDF component so the project owns those settings.
+
+The stock ESP32-C3 framework also enables NimBLE central, peripheral, broadcaster, and observer roles, three simultaneous connections, a 5,120-byte host task stack, and the default MSYS pools. Xtraordinary uses one peripheral connection. The owned framework milestone must reduce those roles, connection slots, and buffers only after the 247-byte ATT MTU protocol path and reconnect matrix pass with the smaller configuration.
 
 That milestone is a measured replacement for the interim 80 MHz BLE-safe floor, not a speculative cleanup. Compare it against the known-good firmware and the 80 MHz implementation for reader boot, EPUB open, page turn, rendering, pairing, encrypted service discovery, library transfer, focus updates, input latency, reconnect reliability, watchdog resets, heap, and current draw. Coordinated dynamic frequency scaling should be allowed to return to 160 MHz for active work and lower the clock only when idle; keep it only if the hardware results preserve or improve interactive performance while reducing energy use.
 

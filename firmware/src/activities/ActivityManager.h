@@ -87,6 +87,9 @@ class ActivityManager {
 
   // goTo... functions are convenient wrapper for replaceActivity()
   void goToFileTransfer();
+#ifdef ENABLE_X3_COMPANION
+  void goToCompanionFileTransfer();
+#endif
   void goToSettings();
   void goToFileBrowser(std::string path = {});
   void goToRecentBooks();
@@ -110,6 +113,8 @@ class ActivityManager {
 
   bool preventAutoSleep() const;
   bool isReaderActivity() const;
+  bool isCurrentActivity(const char* name) const;
+  bool showNoPhoneSleepNotice();
   bool skipLoopDelay() const;
   ScreenshotInfo getScreenshotInfo() const;
 

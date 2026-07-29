@@ -14,6 +14,8 @@ enum class MessageType : uint8_t {
   HELLO = 0x01,
   CAPABILITIES = 0x02,
   GET_STATUS = 0x03,
+  SET_POWER_CONFIG = 0x04,
+  CONFIRM_STATUS = 0x05,
   START_SESSION = 0x20,
   PAUSE_SESSION = 0x21,
   RESUME_SESSION = 0x22,
@@ -21,6 +23,8 @@ enum class MessageType : uint8_t {
   GET_LIBRARY = 0x40,
   LIBRARY_PAGE = 0x41,
   DELETE_LIBRARY_ENTRIES = 0x42,
+  START_LIBRARY_TRANSFER = 0x43,
+  STOP_LIBRARY_TRANSFER = 0x44,
   BEGIN_FIRMWARE = 0x50,
   FIRMWARE_CHUNK = 0x51,
   COMMIT_FIRMWARE = 0x52,
@@ -31,6 +35,21 @@ enum class MessageType : uint8_t {
   LIBRARY_CHANGED = 0x84,
   FIRMWARE_PROGRESS = 0x85,
   ERROR = 0xff,
+};
+
+enum class DeviceActivity : uint8_t {
+  AWAKE = 0,
+  READING = 1,
+  FOCUS = 2,
+  TRANSFER = 3,
+  SLEEPING = 4,
+  BOOTING = 5,
+};
+
+enum class SyncMode : uint8_t {
+  FAST = 0,
+  SLOW = 1,
+  OFF = 2,
 };
 
 struct EnvelopeView {

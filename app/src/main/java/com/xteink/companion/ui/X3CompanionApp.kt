@@ -25,8 +25,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.xteink.companion.R
 import com.xteink.companion.data.FirmwareSource
+import com.xteink.companion.monetization.AccessState
+import com.xteink.companion.monetization.PremiumAction
 import com.xteink.companion.ui.components.CompanionNavigation
 import com.xteink.companion.ui.components.CompanionTopBar
+import com.xteink.companion.ui.components.ConnectedAccessPrompt
 import com.xteink.companion.ui.components.ControlDeckFocusContent
 import com.xteink.companion.ui.components.DeviceConnectionSheet
 import com.xteink.companion.ui.components.PassesToolContent
@@ -37,9 +40,14 @@ import com.xteink.companion.ui.components.ToolsHubContent
 @Composable
 fun X3CompanionApp(
     state: CompanionUiState,
+    access: AccessState,
     onSetVisualTheme: (CompanionVisualTheme) -> Unit,
+    onSetNormalPollSeconds: (Int) -> Unit,
+    onSetSlowPollSeconds: (Int) -> Unit,
+    onSetSleepTimeoutMinutes: (Int) -> Unit,
     onSetDuration: (Int) -> Unit,
     onStartFocus: () -> Unit,
+    onStartFocusPhoneOnly: () -> Unit,
     onTogglePause: () -> Unit,
     onEndFocus: () -> Unit,
     onResetFocus: () -> Unit,
@@ -53,6 +61,7 @@ fun X3CompanionApp(
     onChooseBookFolder: () -> Unit,
     onOpenEpub: () -> Unit,
     onDeleteBooksFromX3: (Set<String>) -> Unit,
+    onSendBooksToX3: (Set<String>) -> Unit,
     onOpenPasses: () -> Unit,
     onShowToolHub: () -> Unit,
     onSelectPass: (String) -> Unit,
@@ -62,17 +71,24 @@ fun X3CompanionApp(
     onOpenSetup: () -> Unit,
     onDismissNotice: () -> Unit,
     onConnectDevice: (String) -> Unit = {},
+    onDisconnectDevice: () -> Unit = {},
     onCheckFirmware: (String, FirmwareSource) -> Unit = { _, _ -> },
     onFlashFirmware: () -> Unit = {},
+    onWatchAd: ((() -> Unit) -> Unit) = {},
+    onGetPro: () -> Unit = {},
+    onShowPrivacyOptions: () -> Unit = {},
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     var devicesVisible by rememberSaveable { mutableStateOf(false) }
+    var gatedAction by remember { mutableStateOf<PremiumAction?>(null) }
+    var gatedBookIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     val noticeText = when (val notice = state.notice) {
         UiNotice.FocusStartedWithoutX3 -> stringResource(R.string.focus_started_without_x3)
         UiNotice.PairBeforeSend -> stringResource(R.string.pair_before_send)
         UiNotice.EpubImportFailed -> stringResource(R.string.epub_import_failed)
         UiNotice.ConnectX3ToDelete -> stringResource(R.string.connect_x3_to_delete)
         is UiNotice.X3DeleteQueued -> stringResource(R.string.x3_delete_queued, notice.count)
+        is UiNotice.BooksSentToX3 -> stringResource(R.string.books_sent_to_x3, notice.count)
         is UiNotice.BooksImported -> stringResource(
             R.string.books_import_result,
             notice.added,
@@ -123,7 +139,10 @@ fun X3CompanionApp(
         ) {
             CompanionTopBar(
                 isX3Connected = state.isX3Connected,
+                hasManagedX3 = state.hasManagedX3,
                 isX3Reconnecting = state.device.reconnecting,
+                deviceActivity = state.device.activity,
+                lowPowerGraceExpired = state.device.lowPowerGraceExpired,
                 connectedDeviceModel = state.connectedDeviceModel,
                 onShowDevices = { devicesVisible = true },
                 onShowSettings = { onShowSettings(true) },
@@ -139,14 +158,17 @@ fun X3CompanionApp(
                             focus = state.focus,
                             visualTheme = state.visualTheme,
                             onSetDuration = onSetDuration,
-                            onStartFocus = onStartFocus,
+                            onStartFocus = {
+                                if (!state.hasManagedX3 || access.hasConnectedAccess()) onStartFocus()
+                                else gatedAction = PremiumAction.FocusOnDevice
+                            },
                             onTogglePause = onTogglePause,
                             onEndFocus = onEndFocus,
                             onResetFocus = onResetFocus,
                         )
                         CompanionSurface.Read -> ReadContent(
                             state = state.read,
-                            isX3Connected = state.isX3Connected,
+                            isX3Connected = state.hasManagedX3,
                             connectedDeviceModel = state.connectedDeviceModel,
                             onSetQuery = onSetReadQuery,
                             onSetSort = onSetReadSort,
@@ -156,6 +178,13 @@ fun X3CompanionApp(
                             onOpenEpub = onOpenEpub,
                             onOpenSettings = { onShowSettings(true) },
                             onDeleteBooksFromX3 = onDeleteBooksFromX3,
+                            onSendBooksToX3 = { bookIds ->
+                                if (access.hasConnectedAccess()) onSendBooksToX3(bookIds)
+                                else {
+                                    gatedBookIds = bookIds
+                                    gatedAction = PremiumAction.PushBooks
+                                }
+                            },
                         )
                         CompanionSurface.Tools -> when (toolDestination) {
                             ToolDestination.Hub -> ToolsHubContent(
@@ -166,7 +195,10 @@ fun X3CompanionApp(
                                 ticket = state.ticket,
                                 onSelectPass = onSelectPass,
                                 onSetTicketMode = onSetTicketMode,
-                                onSendTicket = onSendTicket,
+                                onSendTicket = {
+                                    if (access.hasConnectedAccess()) onSendTicket()
+                                    else gatedAction = PremiumAction.SendPass
+                                },
                                 onBack = onShowToolHub,
                             )
                         }
@@ -179,7 +211,14 @@ fun X3CompanionApp(
     if (state.settingsVisible) {
         SettingsSheet(
             visualTheme = state.visualTheme,
+            powerSyncConfig = state.powerSyncConfig,
+            access = access,
             onSetVisualTheme = onSetVisualTheme,
+            onSetNormalPollSeconds = onSetNormalPollSeconds,
+            onSetSlowPollSeconds = onSetSlowPollSeconds,
+            onSetSleepTimeoutMinutes = onSetSleepTimeoutMinutes,
+            onGetPro = onGetPro,
+            onShowPrivacyOptions = onShowPrivacyOptions,
             onOpenSetup = onOpenSetup,
             onDismiss = { onShowSettings(false) },
         )
@@ -189,9 +228,35 @@ fun X3CompanionApp(
             onDismiss = { devicesVisible = false },
             device = state.device,
             isConnected = state.isX3Connected,
+            isManaged = state.hasManagedX3,
+            connectedDeviceModel = state.connectedDeviceModel,
             onConnect = onConnectDevice,
+            onDisconnect = onDisconnectDevice,
             onCheckFirmware = onCheckFirmware,
             onFlashFirmware = onFlashFirmware,
+        )
+    }
+    gatedAction?.let { action ->
+        ConnectedAccessPrompt(
+            action = action,
+            access = access,
+            onWatchAd = {
+                onWatchAd {
+                    when (action) {
+                        PremiumAction.FocusOnDevice -> onStartFocus()
+                        PremiumAction.SendPass -> onSendTicket()
+                        PremiumAction.PushBooks -> onSendBooksToX3(gatedBookIds)
+                    }
+                    gatedBookIds = emptySet()
+                    gatedAction = null
+                }
+            },
+            onUsePhoneOnly = if (action == PremiumAction.FocusOnDevice) onStartFocusPhoneOnly else null,
+            onGetPro = onGetPro,
+            onDismiss = {
+                gatedBookIds = emptySet()
+                gatedAction = null
+            },
         )
     }
 }

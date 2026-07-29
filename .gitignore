@@ -5,5 +5,6 @@
 *.iml
 local.properties
 **/build/
+backend/node_modules/
 captures/
 .externalNativeBuild/

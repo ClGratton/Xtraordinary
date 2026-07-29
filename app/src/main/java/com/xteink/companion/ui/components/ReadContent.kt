@@ -96,6 +96,7 @@ fun ReadContent(
     onOpenEpub: () -> Unit,
     onOpenSettings: () -> Unit,
     onDeleteBooksFromX3: (Set<String>) -> Unit,
+    onSendBooksToX3: (Set<String>) -> Unit,
     modifier: Modifier = Modifier,
     initialSelectedBookIds: Set<String> = emptySet(),
 ) {
@@ -133,6 +134,9 @@ fun ReadContent(
     val visibleIds = visibleBooks.mapTo(linkedSetOf()) { it.id }
     val selectedOnX3Ids = selectedBookIds.filterTo(linkedSetOf()) { id ->
         state.books.any { it.id == id && it.isOnX3 }
+    }
+    val selectedOnPhoneIds = selectedBookIds.filterTo(linkedSetOf()) { id ->
+        state.books.any { it.id == id && it.isOnPhone && it.sourceUri.isNotBlank() }
     }
 
     LaunchedEffect(state.books) {
@@ -265,12 +269,16 @@ fun ReadContent(
 
         val selectionMode = selectedBookIds.isNotEmpty()
         val canDelete = selectedOnX3Ids.isNotEmpty()
+        val canSend = selectedOnPhoneIds.isNotEmpty()
         LibraryBottomActions(
             selectionMode = selectionMode,
             importing = state.importing,
+            sending = state.transferInProgress,
             canDelete = canDelete,
+            canSend = canSend,
             importDescription = stringResource(R.string.import_epubs),
             deleteDescription = stringResource(R.string.delete_selected_from_device, deviceLabel),
+            sendDescription = stringResource(R.string.send_selected_to_device, deviceLabel),
             onClearSelection = { selectedBookIds = emptySet() },
             onImport = {
                 haptics.performHapticFeedback(HapticFeedbackType.Confirm)
@@ -280,6 +288,10 @@ fun ReadContent(
                 haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
                 if (isX3Connected) showDeleteConfirmation = true
                 else onDeleteBooksFromX3(selectedOnX3Ids)
+            },
+            onSend = {
+                haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                onSendBooksToX3(selectedOnPhoneIds)
             },
             modifier = Modifier.align(Alignment.BottomCenter),
         )
@@ -322,12 +334,16 @@ fun ReadContent(
 private fun LibraryBottomActions(
     selectionMode: Boolean,
     importing: Boolean,
+    sending: Boolean,
     canDelete: Boolean,
+    canSend: Boolean,
     importDescription: String,
     deleteDescription: String,
+    sendDescription: String,
     onClearSelection: () -> Unit,
     onImport: () -> Unit,
     onDelete: () -> Unit,
+    onSend: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val splitProgress by animateFloatAsState(
@@ -343,20 +359,6 @@ private fun LibraryBottomActions(
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "library action corner",
     )
-    val actionContainer by animateColorAsState(
-        targetValue = if (selectionMode) MaterialTheme.colorScheme.errorContainer
-        else MaterialTheme.colorScheme.primary,
-        animationSpec = tween(220),
-        label = "library action container",
-    )
-    val actionContent by animateColorAsState(
-        targetValue = if (selectionMode) MaterialTheme.colorScheme.onErrorContainer
-        else MaterialTheme.colorScheme.onPrimary,
-        animationSpec = tween(220),
-        label = "library action content",
-    )
-    val actionEnabled = if (selectionMode) canDelete else !importing
-
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
@@ -386,46 +388,101 @@ private fun LibraryBottomActions(
         }
 
         Surface(
-            onClick = if (selectionMode) onDelete else onImport,
-            enabled = actionEnabled,
+            onClick = onImport,
+            enabled = !importing,
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .size(68.dp)
-                .alpha(if (selectionMode && !canDelete) 0.45f else 1f)
+                .graphicsLayer {
+                    alpha = 1f - splitProgress
+                    scaleX = 1f - (0.22f * splitProgress)
+                    scaleY = scaleX
+                    translationX = -38.dp.toPx() * splitProgress
+                }
                 .semantics {
-                    contentDescription = if (selectionMode) deleteDescription else importDescription
-                    if (!actionEnabled) disabled()
+                    contentDescription = importDescription
+                    if (importing) disabled()
                 },
             shape = RoundedCornerShape(actionCorner),
-            color = actionContainer,
-            contentColor = actionContent,
+            color = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
             shadowElevation = 0.dp,
             tonalElevation = 0.dp,
         ) {
             Box(contentAlignment = Alignment.Center) {
-                if (importing && !selectionMode) {
+                if (importing) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
-                        color = actionContent,
+                        color = MaterialTheme.colorScheme.onPrimary,
                         strokeWidth = 2.dp,
                     )
                 } else {
                     ImportBookIcon(
-                        color = actionContent,
-                        modifier = Modifier.graphicsLayer {
-                            alpha = 1f - splitProgress
-                            scaleX = 1f - (0.18f * splitProgress)
-                            scaleY = scaleX
-                        },
+                        color = MaterialTheme.colorScheme.onPrimary,
                     )
-                    TrashIcon(
-                        color = actionContent,
-                        modifier = Modifier.graphicsLayer {
-                            alpha = splitProgress
-                            scaleX = 0.82f + (0.18f * splitProgress)
-                            scaleY = scaleX
+                }
+            }
+        }
+
+        if (splitProgress > 0.001f) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .graphicsLayer {
+                        alpha = splitProgress
+                        scaleX = 0.78f + (0.22f * splitProgress)
+                        scaleY = scaleX
+                        translationX = 42.dp.toPx() * (1f - splitProgress)
+                        transformOrigin = TransformOrigin(1f, 0.5f)
+                    },
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Surface(
+                    onClick = onSend,
+                    enabled = canSend && !sending,
+                    modifier = Modifier
+                        .size(68.dp)
+                        .semantics {
+                            contentDescription = sendDescription
+                            if (!canSend || sending) disabled()
                         },
-                    )
+                    shape = RoundedCornerShape(26.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        if (sending) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            SendToX3Icon(
+                                modifier = Modifier.size(29.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                            )
+                        }
+                    }
+                }
+                Surface(
+                    onClick = onDelete,
+                    enabled = canDelete,
+                    modifier = Modifier
+                        .size(68.dp)
+                        .semantics {
+                            contentDescription = deleteDescription
+                            if (!canDelete) disabled()
+                        },
+                    shape = RoundedCornerShape(26.dp),
+                    color = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        TrashIcon(
+                            color = MaterialTheme.colorScheme.onError,
+                        )
+                    }
                 }
             }
         }
