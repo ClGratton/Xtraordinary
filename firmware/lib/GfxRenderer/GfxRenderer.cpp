@@ -1353,6 +1353,12 @@ void GfxRenderer::displayBuffer(const HalDisplay::RefreshMode refreshMode) const
   display.displayBuffer(refreshMode, fadingFix);
 }
 
+void GfxRenderer::displayReaderCleanup() const {
+  auto elapsed = millis() - start_ms;
+  LOG_DBG("GFX", "Time = %lu ms from clearScreen to reader cleanup", elapsed);
+  display.displayReaderCleanup(fadingFix);
+}
+
 std::string GfxRenderer::truncatedText(const int fontId, const char* text, const int maxWidth,
                                        const EpdFontFamily::Style style) const {
   if (!text || maxWidth <= 0) return "";

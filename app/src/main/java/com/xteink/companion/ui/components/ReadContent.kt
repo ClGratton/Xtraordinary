@@ -79,6 +79,7 @@ import com.xteink.companion.R
 import com.xteink.companion.ui.ImportedBookUiState
 import com.xteink.companion.ui.ReadSort
 import com.xteink.companion.ui.ReadService
+import com.xteink.companion.ui.ReadLocation
 import com.xteink.companion.ui.ReadUiState
 import java.util.Locale
 
@@ -91,10 +92,11 @@ fun ReadContent(
     onSetQuery: (String) -> Unit,
     onSetSort: (ReadSort) -> Unit,
     onSetService: (ReadService) -> Unit,
-    onSetOnX3Only: (Boolean) -> Unit,
+    onSetReadLocation: (ReadLocation) -> Unit,
     onChooseBookFolder: () -> Unit,
     onOpenEpub: () -> Unit,
     onOpenSettings: () -> Unit,
+    onUploadBooksToX3: (Set<String>) -> Unit,
     onDeleteBooksFromX3: (Set<String>) -> Unit,
     modifier: Modifier = Modifier,
     initialSelectedBookIds: Set<String> = emptySet(),
@@ -104,7 +106,7 @@ fun ReadContent(
     var selectedBookIds by remember(initialSelectedBookIds) { mutableStateOf(initialSelectedBookIds) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var showServiceReminder by rememberSaveable { mutableStateOf(true) }
-    val visibleBooks = remember(state.books, state.query, state.sort, state.service, state.onX3Only) {
+    val visibleBooks = remember(state.books, state.query, state.sort, state.service, state.location) {
         val terms = state.query.trim().lowercase().split(Regex("\\s+")).filter { it.isNotBlank() }
         val matching = state.books.filter { book ->
             val haystack = listOfNotNull(
@@ -116,7 +118,11 @@ fun ReadContent(
                 book.fileName,
             ).joinToString(" ").lowercase()
             terms.all(haystack::contains) &&
-                (!state.onX3Only || book.isOnX3) &&
+                when (state.location) {
+                    ReadLocation.Anywhere -> true
+                    ReadLocation.Phone -> book.isOnPhone
+                    ReadLocation.X3 -> book.isOnX3
+                } &&
                 (state.service != ReadService.LocalEpub || book.metadataSource.startsWith("EPUB", ignoreCase = true))
         }
         when (state.sort) {
@@ -133,6 +139,9 @@ fun ReadContent(
     val visibleIds = visibleBooks.mapTo(linkedSetOf()) { it.id }
     val selectedOnX3Ids = selectedBookIds.filterTo(linkedSetOf()) { id ->
         state.books.any { it.id == id && it.isOnX3 }
+    }
+    val selectedPhoneOnlyIds = selectedBookIds.filterTo(linkedSetOf()) { id ->
+        state.books.any { it.id == id && it.isOnPhone && !it.isOnX3 }
     }
 
     LaunchedEffect(state.books) {
@@ -222,14 +231,7 @@ fun ReadContent(
                 ) {
                     SortFilterMenu(selected = state.sort, onSelected = onSetSort)
                     ServiceFilterMenu(selected = state.service, onSelected = onSetService)
-                    FilterChip(
-                        selected = state.onX3Only,
-                        onClick = {
-                            haptics.performHapticFeedback(HapticFeedbackType.ToggleOn)
-                            onSetOnX3Only(!state.onX3Only)
-                        },
-                        label = { Text(stringResource(R.string.on_device, deviceLabel)) },
-                    )
+                    LocationFilterMenu(selected = state.location, deviceLabel = deviceLabel, onSelected = onSetReadLocation)
                 }
             }
             if (visibleBooks.isEmpty()) {
@@ -268,13 +270,21 @@ fun ReadContent(
         LibraryBottomActions(
             selectionMode = selectionMode,
             importing = state.importing,
+            uploading = state.uploadingToX3,
+            uploadProgress = state.uploadProgress,
+            canUpload = selectedPhoneOnlyIds.isNotEmpty() && isX3Connected,
             canDelete = canDelete,
             importDescription = stringResource(R.string.import_epubs),
+            uploadDescription = stringResource(R.string.upload_selected_to_device, deviceLabel),
             deleteDescription = stringResource(R.string.delete_selected_from_device, deviceLabel),
             onClearSelection = { selectedBookIds = emptySet() },
             onImport = {
                 haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                 onOpenEpub()
+            },
+            onUpload = {
+                haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                onUploadBooksToX3(selectedPhoneOnlyIds)
             },
             onDelete = {
                 haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
@@ -322,11 +332,16 @@ fun ReadContent(
 private fun LibraryBottomActions(
     selectionMode: Boolean,
     importing: Boolean,
+    uploading: Boolean,
+    uploadProgress: Float?,
+    canUpload: Boolean,
     canDelete: Boolean,
     importDescription: String,
+    uploadDescription: String,
     deleteDescription: String,
     onClearSelection: () -> Unit,
     onImport: () -> Unit,
+    onUpload: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -355,7 +370,7 @@ private fun LibraryBottomActions(
         animationSpec = tween(220),
         label = "library action content",
     )
-    val actionEnabled = if (selectionMode) canDelete else !importing
+    val actionEnabled = !importing && !uploading
 
     BoxWithConstraints(
         modifier = modifier
@@ -363,7 +378,7 @@ private fun LibraryBottomActions(
             .height(104.dp)
             .padding(horizontal = 18.dp, vertical = 18.dp),
     ) {
-        val clearWidth = 112.dp
+        val clearWidth = 104.dp
         val splitTravel = maxWidth - (clearWidth / 2) - 34.dp
         if (splitProgress > 0.001f) {
             FilledTonalButton(
@@ -385,50 +400,89 @@ private fun LibraryBottomActions(
             }
         }
 
-        Surface(
-            onClick = if (selectionMode) onDelete else onImport,
-            enabled = actionEnabled,
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .size(68.dp)
-                .alpha(if (selectionMode && !canDelete) 0.45f else 1f)
-                .semantics {
-                    contentDescription = if (selectionMode) deleteDescription else importDescription
+        if (selectionMode && splitProgress > 0.001f) {
+            Row(
+                modifier = Modifier.align(Alignment.CenterEnd),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Surface(
+                    onClick = onUpload,
+                    enabled = canUpload && actionEnabled,
+                    modifier = Modifier.size(68.dp).semantics {
+                        contentDescription = uploadDescription
+                        if (!canUpload || !actionEnabled) disabled()
+                    },
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    tonalElevation = 3.dp,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        if (uploading) {
+                            CircularProgressIndicator(
+                                progress = { uploadProgress ?: 0f },
+                                modifier = Modifier.size(30.dp),
+                                strokeWidth = 3.dp,
+                            )
+                        } else {
+                            UploadToDeviceIcon()
+                        }
+                    }
+                }
+                Surface(
+                    onClick = onDelete,
+                    enabled = canDelete && actionEnabled,
+                    modifier = Modifier.size(68.dp).semantics {
+                        contentDescription = deleteDescription
+                        if (!canDelete || !actionEnabled) disabled()
+                    },
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    tonalElevation = 3.dp,
+                ) {
+                    Box(contentAlignment = Alignment.Center) { TrashIcon(MaterialTheme.colorScheme.onErrorContainer) }
+                }
+            }
+        } else {
+            Surface(
+                onClick = onImport,
+                enabled = actionEnabled,
+                modifier = Modifier.align(Alignment.CenterEnd).size(68.dp).semantics {
+                    contentDescription = importDescription
                     if (!actionEnabled) disabled()
                 },
-            shape = RoundedCornerShape(actionCorner),
-            color = actionContainer,
-            contentColor = actionContent,
-            shadowElevation = 0.dp,
-            tonalElevation = 0.dp,
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                if (importing && !selectionMode) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = actionContent,
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    ImportBookIcon(
-                        color = actionContent,
-                        modifier = Modifier.graphicsLayer {
-                            alpha = 1f - splitProgress
-                            scaleX = 1f - (0.18f * splitProgress)
-                            scaleY = scaleX
-                        },
-                    )
-                    TrashIcon(
-                        color = actionContent,
-                        modifier = Modifier.graphicsLayer {
-                            alpha = splitProgress
-                            scaleX = 0.82f + (0.18f * splitProgress)
-                            scaleY = scaleX
-                        },
-                    )
+                shape = RoundedCornerShape(actionCorner),
+                color = actionContainer,
+                contentColor = actionContent,
+                shadowElevation = 0.dp,
+                tonalElevation = 3.dp,
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    if (importing) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = actionContent, strokeWidth = 2.dp)
+                    } else {
+                        ImportBookIcon(color = actionContent)
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun UploadToDeviceIcon(
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.onPrimaryContainer,
+) {
+    Canvas(modifier = modifier.size(29.dp)) {
+        val stroke = 2.dp.toPx()
+        drawRoundRect(color, Offset(size.width * .13f, size.height * .12f), Size(size.width * .74f, size.height * .78f),
+            androidx.compose.ui.geometry.CornerRadius(4.dp.toPx()), style = Stroke(stroke))
+        drawLine(color, Offset(size.width * .5f, size.height * .68f), Offset(size.width * .5f, size.height * .31f), stroke, StrokeCap.Round)
+        drawLine(color, Offset(size.width * .5f, size.height * .31f), Offset(size.width * .35f, size.height * .46f), stroke, StrokeCap.Round)
+        drawLine(color, Offset(size.width * .5f, size.height * .31f), Offset(size.width * .65f, size.height * .46f), stroke, StrokeCap.Round)
     }
 }
 
@@ -449,13 +503,14 @@ private fun LibrarySelectionSummary(
             stringResource(R.string.books_selected, selectedCount),
             style = MaterialTheme.typography.titleMedium,
         )
-        Text(
-            text = stringResource(if (allVisibleSelected) R.string.all_selected else R.string.select_all),
-            style = MaterialTheme.typography.labelLarge,
-            color = if (allVisibleSelected) MaterialTheme.colorScheme.onSurfaceVariant
-            else MaterialTheme.colorScheme.primary,
-            modifier = if (allVisibleSelected) Modifier else Modifier.clickable(onClick = onSelectAll),
-        )
+        FilledTonalButton(
+            onClick = onSelectAll,
+            enabled = !allVisibleSelected,
+            shape = RoundedCornerShape(16.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        ) {
+            Text(stringResource(if (allVisibleSelected) R.string.all_selected else R.string.select_all))
+        }
     }
 }
 
@@ -512,6 +567,43 @@ private fun SortFilterMenu(
                     text = { Text(label) },
                     onClick = {
                         onSelected(sort)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocationFilterMenu(
+    selected: ReadLocation,
+    deviceLabel: String,
+    onSelected: (ReadLocation) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val label = when (selected) {
+        ReadLocation.Anywhere -> stringResource(R.string.location_anywhere)
+        ReadLocation.Phone -> stringResource(R.string.location_phone)
+        ReadLocation.X3 -> stringResource(R.string.on_device, deviceLabel)
+    }
+    Box {
+        AssistChip(
+            onClick = { expanded = true },
+            label = { Text(stringResource(R.string.location_filter, label)) },
+            trailingIcon = { Text("▾") },
+        )
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            ReadLocation.entries.forEach { location ->
+                val itemLabel = when (location) {
+                    ReadLocation.Anywhere -> stringResource(R.string.location_anywhere)
+                    ReadLocation.Phone -> stringResource(R.string.location_phone)
+                    ReadLocation.X3 -> stringResource(R.string.on_device, deviceLabel)
+                }
+                DropdownMenuItem(
+                    text = { Text(itemLabel) },
+                    onClick = {
+                        onSelected(location)
                         expanded = false
                     },
                 )
@@ -683,20 +775,36 @@ private fun ImportedBookCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(
-                    if (book.isOnX3) {
-                        book.x3Path?.let { path ->
-                            stringResource(R.string.on_device_at, deviceLabel, path)
-                        } ?: stringResource(R.string.on_device, deviceLabel)
-                    } else if (book.isOnPhone) {
-                        stringResource(R.string.phone_only)
-                    } else {
-                        stringResource(R.string.book_unavailable)
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                )
+                val locationText = if (book.isOnX3) {
+                    book.x3Path?.let { path ->
+                        stringResource(R.string.on_device_at, deviceLabel, path)
+                    } ?: stringResource(R.string.on_device, deviceLabel)
+                } else if (book.isOnPhone) {
+                    stringResource(R.string.phone_only)
+                } else {
+                    stringResource(R.string.book_unavailable)
+                }
+                if (book.isOnPhone && !book.isOnX3) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        shape = CircleShape,
+                    ) {
+                        Text(
+                            locationText,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
+                            maxLines = 1,
+                        )
+                    }
+                } else {
+                    Text(
+                        locationText,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                    )
+                }
             }
         }
     }

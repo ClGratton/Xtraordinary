@@ -10,6 +10,8 @@ class ConnectionPolicyTest {
     fun `remembered device is available but not connected without live transport`() {
         assertTrue(devicePresence(true, false, false) == DevicePresence.Available)
         assertTrue(devicePresence(true, false, true) == DevicePresence.Reconnecting)
+        assertTrue(devicePresence(true, false, true, true) == DevicePresence.NeedsBluetoothReset)
+        assertTrue(devicePresence(true, false, false, false, true) == DevicePresence.Connecting)
         assertTrue(devicePresence(true, true, false) == DevicePresence.Connected)
         assertTrue(devicePresence(false, false, false) == DevicePresence.None)
     }

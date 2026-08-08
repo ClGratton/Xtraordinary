@@ -1,5 +1,6 @@
 #include <HalDisplay.h>
 #include <HalGPIO.h>
+#include <Logging.h>
 
 // Global HalDisplay instance
 HalDisplay display;
@@ -63,6 +64,12 @@ void HalDisplay::displayBuffer(HalDisplay::RefreshMode mode, bool turnOffScreen)
   }
 
   einkDisplay.displayBuffer(convertRefreshMode(mode), turnOffScreen);
+}
+
+void HalDisplay::displayReaderCleanup(bool turnOffScreen) {
+  const uint32_t startedAt = millis();
+  einkDisplay.displayBuffer(EInkDisplay::HALF_REFRESH, turnOffScreen);
+  LOG_INF("EPD", "Reader cleanup half-refresh completed in %lu ms", millis() - startedAt);
 }
 
 void HalDisplay::refreshDisplay(HalDisplay::RefreshMode mode, bool turnOffScreen) {

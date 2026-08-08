@@ -4,6 +4,7 @@ import android.content.Context
 import com.xteink.companion.protocol.ReadingStatsChunkPayload
 import org.json.JSONArray
 import org.json.JSONObject
+import java.security.MessageDigest
 
 data class ReadingPageStat(
     val elapsedMs: Long,
@@ -71,7 +72,13 @@ class ReadingStatsRepository(context: Context) {
     @Synchronized
     fun accept(chunk: ReadingStatsChunkPayload): ReadingSessionStat? {
         val existing = load()
-        existing.firstOrNull { it.id == chunk.sessionId }?.let { return it }
+        existing.firstOrNull {
+            it.id == chunk.sessionId &&
+                it.title == chunk.title.ifBlank { "Untitled book" } &&
+                it.startedAtEpochMs / 1_000L == chunk.startedEpochSeconds &&
+                it.endedAtEpochMs / 1_000L == chunk.endedEpochSeconds &&
+                it.pages.size == chunk.totalPages
+        }?.let { return it }
         val assembly = pending.getOrPut(chunk.sessionId) {
             PendingSession(
                 title = chunk.title,
@@ -99,12 +106,50 @@ class ReadingStatsRepository(context: Context) {
             hasWordCounts = assembly.hasWordCounts,
             pages = assembly.pages.toList(),
         )
-        val sessions = (existing.filterNot { it.id == session.id } + session)
+        val sessions = (existing.filterNot { it.contentFingerprint() == session.contentFingerprint() } + session)
             .sortedByDescending { it.endedAtEpochMs }
             .take(MaxSessions)
         if (!save(sessions)) return null
         pending.remove(chunk.sessionId)
         return session
+    }
+
+    /**
+     * Cloud backup is intentionally limited to reading history and its display
+     * filter. EPUB files, covers, passes, device identifiers, and app settings
+     * are not included.
+     */
+    fun exportCloudJson(): JSONObject = JSONObject().apply {
+        put("schema", CloudSchema)
+        put("minimumPageSeconds", minimumPageSeconds())
+        put("sessions", JSONArray().apply {
+            load().forEach { session ->
+                put(session.toJson().put("key", session.contentFingerprint()))
+            }
+        })
+    }
+
+    /** Merges immutable sessions and returns how many remote sessions were new. */
+    @Synchronized
+    fun mergeCloudJson(root: JSONObject): Int {
+        require(root.optInt("schema", -1) == CloudSchema) { "Unsupported reading backup schema" }
+        val local = load()
+        val byKey = local.associateByTo(linkedMapOf()) { it.contentFingerprint() }
+        val remote = root.optJSONArray("sessions") ?: JSONArray()
+        var added = 0
+        repeat(remote.length()) { index ->
+            val session = remote.getJSONObject(index).toSession()
+            val key = session.contentFingerprint()
+            if (key !in byKey) {
+                byKey[key] = session
+                added += 1
+            }
+        }
+        val merged = byKey.values.sortedByDescending { it.endedAtEpochMs }.take(MaxSessions)
+        check(save(merged)) { "Could not persist merged reading history" }
+        val remoteMinimum = root.optInt("minimumPageSeconds", minimumPageSeconds())
+        if (remoteMinimum in MinimumPageSecondsOptions) setMinimumPageSeconds(remoteMinimum)
+        return added
     }
 
     private fun save(sessions: List<ReadingSessionStat>): Boolean {
@@ -131,6 +176,23 @@ class ReadingStatsRepository(context: Context) {
                 })
             }
         })
+    }
+
+    private fun ReadingSessionStat.contentFingerprint(): String {
+        val canonical = buildString {
+            append(title).append('\u0000')
+            append(startedAtEpochMs).append('\u0000')
+            append(endedAtEpochMs).append('\u0000')
+            append(hasWordCounts).append('\u0000')
+            pages.forEach { page ->
+                append(page.elapsedMs).append(':')
+                append(page.words).append(':')
+                append(page.pageNumber).append(';')
+            }
+        }
+        return MessageDigest.getInstance("SHA-256")
+            .digest(canonical.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
     }
 
     private fun JSONObject.toSession(): ReadingSessionStat {
@@ -162,6 +224,7 @@ class ReadingStatsRepository(context: Context) {
 
     private companion object {
         const val SessionsKey = "sessions"
+        const val CloudSchema = 1
         const val MinimumPageSecondsKey = "minimum_page_seconds"
         const val MaxSessions = 500
         const val DefaultMinimumPageSeconds = 5

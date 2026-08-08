@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.xteink.companion.R
 import com.xteink.companion.data.FirmwareSource
+import com.xteink.companion.data.CloudBackupState
 import com.xteink.companion.ui.components.CompanionNavigation
 import com.xteink.companion.ui.components.CompanionTopBar
 import com.xteink.companion.ui.components.ControlDeckFocusContent
@@ -52,9 +53,10 @@ fun X3CompanionApp(
     onSetReadQuery: (String) -> Unit,
     onSetReadSort: (ReadSort) -> Unit,
     onSetReadService: (ReadService) -> Unit,
-    onSetOnX3Only: (Boolean) -> Unit,
+    onSetReadLocation: (ReadLocation) -> Unit,
     onChooseBookFolder: () -> Unit,
     onOpenEpub: () -> Unit,
+    onUploadBooksToX3: (Set<String>) -> Unit,
     onDeleteBooksFromX3: (Set<String>) -> Unit,
     onOpenPasses: () -> Unit,
     onOpenStats: () -> Unit,
@@ -75,6 +77,9 @@ fun X3CompanionApp(
     onConnectDevice: (String) -> Unit = {},
     onCheckFirmware: (String, FirmwareSource) -> Unit = { _, _ -> },
     onFlashFirmware: () -> Unit = {},
+    cloudBackupState: CloudBackupState = CloudBackupState(),
+    onSyncGoogleBackup: () -> Unit = {},
+    onDeleteGoogleBackup: () -> Unit = {},
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     var devicesVisible by rememberSaveable { mutableStateOf(false) }
@@ -147,6 +152,8 @@ fun X3CompanionApp(
                 hasManagedX3 = state.isX3Connected,
                 isX3TransportConnected = state.isX3TransportConnected,
                 isX3Reconnecting = state.device.reconnecting,
+                isX3Connecting = state.device.linkPhase == "Scanning" || state.device.linkPhase == "Connecting",
+                requiresBluetoothReset = state.device.requiresBluetoothReset,
                 connectedDeviceModel = state.connectedDeviceModel,
                 batteryPercentage = state.device.batteryPercentage,
                 charging = state.device.charging,
@@ -176,10 +183,11 @@ fun X3CompanionApp(
                             onSetQuery = onSetReadQuery,
                             onSetSort = onSetReadSort,
                             onSetService = onSetReadService,
-                            onSetOnX3Only = onSetOnX3Only,
+                            onSetReadLocation = onSetReadLocation,
                             onChooseBookFolder = onChooseBookFolder,
                             onOpenEpub = onOpenEpub,
                             onOpenSettings = { onShowSettings(true) },
+                            onUploadBooksToX3 = onUploadBooksToX3,
                             onDeleteBooksFromX3 = onDeleteBooksFromX3,
                         )
                         CompanionSurface.Tools -> when (toolDestination) {
@@ -222,6 +230,9 @@ fun X3CompanionApp(
             onSetRadioPolicy = onSetRadioPolicy,
             onSetMinimumReadingPageSeconds = onSetMinimumReadingPageSeconds,
             onOpenSetup = onOpenSetup,
+            cloudBackupState = cloudBackupState,
+            onSyncGoogleBackup = onSyncGoogleBackup,
+            onDeleteGoogleBackup = onDeleteGoogleBackup,
             onDismiss = { onShowSettings(false) },
         )
     }

@@ -21,6 +21,9 @@
 // Minimum file size (in bytes) to show indexing popup - smaller chapters don't benefit from it
 constexpr size_t MIN_SIZE_FOR_POPUP = 10 * 1024;  // 10KB
 constexpr size_t PARSE_BUFFER_SIZE = 1024;
+constexpr size_t IMAGE_ZIP_CHUNK_SIZE = 1024;
+constexpr size_t IMAGE_INFLATE_DICTIONARY_SIZE = 32 * 1024;
+constexpr size_t IMAGE_EXTRACTION_HEAP_RESERVE = 10 * 1024;
 
 // Keep token storage below the 512-entry vector growth boundary. A single Expat
 // character-data callback can contain hundreds of short words, so checking only
@@ -515,8 +518,16 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
             // Extract image to cache file
             HalFile cachedImageFile;
             bool extractSuccess = false;
-            if (Storage.openFileForWrite("EHP", cachedImagePath, cachedImageFile)) {
-              extractSuccess = self->epub->readItemContentsToStream(resolvedPath, cachedImageFile, 4096);
+            const size_t imageWorkingSet = IMAGE_INFLATE_DICTIONARY_SIZE + (2 * IMAGE_ZIP_CHUNK_SIZE);
+            const bool hasImageHeap = ESP.getFreeHeap() >= imageWorkingSet + IMAGE_EXTRACTION_HEAP_RESERVE &&
+                                      ESP.getMaxAllocHeap() >= IMAGE_INFLATE_DICTIONARY_SIZE;
+            if (!hasImageHeap) {
+              LOG_ERR("EHP", "Skipping image extraction: free=%u max=%u need=%u contiguous",
+                      static_cast<unsigned>(ESP.getFreeHeap()), static_cast<unsigned>(ESP.getMaxAllocHeap()),
+                      static_cast<unsigned>(IMAGE_INFLATE_DICTIONARY_SIZE));
+            } else if (Storage.openFileForWrite("EHP", cachedImagePath, cachedImageFile)) {
+              extractSuccess =
+                  self->epub->readItemContentsToStream(resolvedPath, cachedImageFile, IMAGE_ZIP_CHUNK_SIZE);
               cachedImageFile.flush();
               cachedImageFile.close();
               delay(50);  // Give SD card time to sync
@@ -709,6 +720,7 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
               }
             } else {
               LOG_ERR("EHP", "Failed to extract image");
+              Storage.remove(cachedImagePath.c_str());
             }
           }  // isFormatSupported
         }

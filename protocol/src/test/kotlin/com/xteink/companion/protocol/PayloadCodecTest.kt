@@ -122,4 +122,21 @@ class PayloadCodecTest {
         assertEquals(expected.sizeBytes, actual.sizeBytes)
         assertTrue(expected.sha256.contentEquals(actual.sha256))
     }
+
+    @Test
+    fun bookUploadBeginRoundTrips() {
+        val expected = BookUploadBegin("Carrying the Fire.epub", 8_765_432, ByteArray(32) { (31 - it).toByte() })
+        val actual = PayloadCodec.decodeBookUploadBegin(PayloadCodec.encodeBookUploadBegin(expected))
+        assertEquals(expected.fileName, actual.fileName)
+        assertEquals(expected.sizeBytes, actual.sizeBytes)
+        assertTrue(expected.sha256.contentEquals(actual.sha256))
+    }
+
+    @Test
+    fun bookUploadChunkKeepsOffsetAndBytes() {
+        val payload = PayloadCodec.encodeBookUploadChunk(432, byteArrayOf(1, 2, 3, 4))
+        val decoded = PayloadCodec.decodeFirmwareChunk(payload)
+        assertEquals(432, decoded.first)
+        assertTrue(byteArrayOf(1, 2, 3, 4).contentEquals(decoded.second))
+    }
 }

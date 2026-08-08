@@ -2,10 +2,12 @@ package com.xteink.companion.data
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothGattConnectionSettings
 import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothGattService
 import android.bluetooth.BluetoothManager
@@ -29,6 +31,8 @@ import androidx.core.content.ContextCompat
 import com.xteink.companion.protocol.DeviceCapabilities
 import com.xteink.companion.protocol.DeviceStatus
 import com.xteink.companion.protocol.BoardingPassPayload
+import com.xteink.companion.protocol.BOOK_UPLOAD_CHUNK_BYTES
+import com.xteink.companion.protocol.BookUploadBegin
 import com.xteink.companion.protocol.Envelope
 import com.xteink.companion.protocol.EnvelopeCodec
 import com.xteink.companion.protocol.FIRMWARE_CHUNK_BYTES
@@ -45,6 +49,7 @@ import com.xteink.companion.protocol.XTEINK_EVENTS_UUID
 import com.xteink.companion.protocol.XTEINK_SERVICE_UUID
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -54,7 +59,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
+import java.io.InputStream
 import java.io.RandomAccessFile
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -70,6 +77,7 @@ data class CompanionLinkState(
     val deviceStatus: DeviceStatus? = null,
     val message: String? = null,
     val transferProgress: Float? = null,
+    val requiresBluetoothReset: Boolean = false,
 )
 
 data class DeviceLibrarySnapshot(val revision: UInt, val entries: List<LibraryEntry>)
@@ -87,6 +95,10 @@ class BluetoothCompanionClient(private val context: Context) {
     private var service: BluetoothGattService? = null
     private var scanCallback: ScanCallback? = null
     private var bondReceiver: BroadcastReceiver? = null
+    private var adapterReceiver: BroadcastReceiver? = null
+    private var preferAutoConnect = false
+    private var gracefulDisconnectGatt: BluetoothGatt? = null
+    private var gracefulDisconnectCompletion: CompletableDeferred<Unit>? = null
 
     private val _state = MutableStateFlow(CompanionLinkState())
     val state: StateFlow<CompanionLinkState> = _state.asStateFlow()
@@ -97,6 +109,33 @@ class BluetoothCompanionClient(private val context: Context) {
     // repository is committing the completed session on the IO dispatcher.
     private val _readingStats = MutableSharedFlow<ReadingStatsChunkPayload>(extraBufferCapacity = 64)
     val readingStats: SharedFlow<ReadingStatsChunkPayload> = _readingStats.asSharedFlow()
+
+    init {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(receiverContext: Context, intent: Intent) {
+                when (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)) {
+                    BluetoothAdapter.STATE_TURNING_OFF, BluetoothAdapter.STATE_OFF -> preferAutoConnect = false
+                    BluetoothAdapter.STATE_ON -> {
+                        preferAutoConnect = false
+                        if (_state.value.requiresBluetoothReset) {
+                            _state.value = _state.value.copy(
+                                phase = LinkPhase.Disconnected,
+                                message = null,
+                                requiresBluetoothReset = false,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        adapterReceiver = receiver
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED),
+            ContextCompat.RECEIVER_EXPORTED,
+        )
+    }
 
     fun hasPermissions(): Boolean = requiredPermissions().all {
         ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
@@ -170,6 +209,9 @@ class BluetoothCompanionClient(private val context: Context) {
         unregisterBondReceiver()
         gatt?.disconnect()
         gatt?.close()
+        gracefulDisconnectCompletion?.complete(Unit)
+        gracefulDisconnectCompletion = null
+        gracefulDisconnectGatt = null
         gatt = null
         service = null
         writes.clear()
@@ -179,7 +221,72 @@ class BluetoothCompanionClient(private val context: Context) {
         _state.value = CompanionLinkState(
             requestedModel = previousState.requestedModel,
             deviceStatus = previousState.deviceStatus,
+            requiresBluetoothReset = previousState.requiresBluetoothReset,
         )
+    }
+
+    /**
+     * Releases Android's native GATT client before the X3 is deliberately reset.
+     * Closing immediately before a firmware reset can leave Android 17 with a
+     * stale direct-GATT operation that absorbs every later connectGatt call.
+     */
+    @SuppressLint("MissingPermission")
+    suspend fun prepareForPeripheralReset() {
+        val completion = withContext(Dispatchers.Main.immediate) {
+            stopScan()
+            unregisterBondReceiver()
+            writes.clear()
+            writeInFlight = false
+            pendingAcks.values.forEach { it.cancel() }
+            pendingAcks.clear()
+            service = null
+
+            val currentGatt = gatt
+            _state.value = _state.value.copy(
+                phase = LinkPhase.Disconnected,
+                message = "Preparing X3 restart",
+                transferProgress = null,
+            )
+            if (currentGatt == null) {
+                null
+            } else {
+                CompletableDeferred<Unit>().also { deferred ->
+                    gracefulDisconnectGatt = currentGatt
+                    gracefulDisconnectCompletion = deferred
+                    runCatching { currentGatt.disconnect() }
+                        .onFailure { deferred.complete(Unit) }
+                }
+            }
+        }
+
+        if (completion != null) {
+            withTimeoutOrNull(GattGracefulDisconnectTimeoutMs) { completion.await() }
+        }
+        withContext(Dispatchers.Main.immediate) {
+            val releasingGatt = gracefulDisconnectGatt
+            if (releasingGatt != null) runCatching { releasingGatt.close() }
+            if (gatt === releasingGatt) gatt = null
+            gracefulDisconnectCompletion = null
+            gracefulDisconnectGatt = null
+        }
+        // BluetoothGatt.close() unregisters the native client asynchronously.
+        // Do not reset the peripheral in the same scheduler turn.
+        delay(GattReleaseSettleMs)
+    }
+
+    fun resetConnectionRecovery() {
+        preferAutoConnect = false
+        _state.value = _state.value.copy(
+            phase = LinkPhase.Disconnected,
+            requiresBluetoothReset = false,
+            message = null,
+        )
+    }
+
+    fun close() {
+        disconnect()
+        adapterReceiver?.let { receiver -> runCatching { context.unregisterReceiver(receiver) } }
+        adapterReceiver = null
     }
 
     @SuppressLint("MissingPermission")
@@ -225,36 +332,124 @@ class BluetoothCompanionClient(private val context: Context) {
             IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED),
             ContextCompat.RECEIVER_EXPORTED,
         )
-        if (!device.createBond(BluetoothDevice.TRANSPORT_LE)) {
+        @Suppress("DEPRECATION")
+        if (!device.createBond()) {
             unregisterBondReceiver()
             _state.value = _state.value.copy(phase = LinkPhase.Error, message = "Could not start pairing")
         }
     }
 
     @SuppressLint("MissingPermission")
-    private fun connectGatt(device: BluetoothDevice) {
-        Log.i(LogTag, "opening GATT address=${device.address} bond=${device.bondState}")
+    private fun connectGatt(device: BluetoothDevice, autoConnect: Boolean = preferAutoConnect) {
+        Log.i(LogTag, "opening GATT address=${device.address} bond=${device.bondState} auto=$autoConnect")
         _state.value = _state.value.copy(
             phase = LinkPhase.Connecting,
-            message = "Connecting",
+            message = if (autoConnect) "Recovering Bluetooth" else "Connecting",
             capabilities = null,
         )
         // Keep the initial link on the mandatory 1M PHY. Some Android controllers
         // otherwise leave a direct connection pending after service discovery,
         // even though the X3 is still advertising strongly on the legacy PHY.
-        val pendingGatt = device.connectGatt(
-            context,
-            false,
-            gattCallback,
-            BluetoothDevice.TRANSPORT_LE,
-            BluetoothDevice.PHY_LE_1M_MASK,
-        )
+        val pendingGatt = (if (Build.VERSION.SDK_INT >= 37) {
+            val settings = BluetoothGattConnectionSettings.Builder()
+                .setAutoConnectEnabled(autoConnect)
+                .setAutomaticMtuEnabled(false)
+                .setOpportunisticEnabled(false)
+                .setTransport(BluetoothDevice.TRANSPORT_LE)
+                .build()
+            Log.i(LogTag, "using API 37 GATT connection settings auto=$autoConnect")
+            device.connectGatt(settings, context.mainExecutor, gattCallback)
+        } else {
+            device.connectGatt(
+                context,
+                autoConnect,
+                gattCallback,
+                BluetoothDevice.TRANSPORT_LE,
+                BluetoothDevice.PHY_LE_1M_MASK,
+                handler,
+            )
+        }) ?: run {
+            failLink("Android could not create a Bluetooth GATT client")
+            return
+        }
         gatt = pendingGatt
         handler.postDelayed({
             if (gatt === pendingGatt && _state.value.phase == LinkPhase.Connecting) {
-                failLink("X3 connection timed out. Toggle Bluetooth once if it remains stuck, then retry.")
+                if (!autoConnect) {
+                    if (Build.VERSION.SDK_INT >= 37) {
+                        // API 37 already uses the current connection-settings API. On the
+                        // observed Pixel failure, retrying the same wedged native client as
+                        // auto-connect only hid the actionable presence result for 25 seconds.
+                        Log.w(LogTag, "API 37 direct GATT produced no callback; probing X3 presence")
+                        probeDeviceAfterGattTimeout(device, pendingGatt)
+                    } else {
+                        Log.w(LogTag, "direct GATT produced no callback; switching to auto-connect recovery")
+                        preferAutoConnect = true
+                        runCatching { pendingGatt.disconnect() }
+                        runCatching { pendingGatt.close() }
+                        if (gatt === pendingGatt) gatt = null
+                        service = null
+                        handler.postDelayed({
+                            if (gatt == null && _state.value.phase == LinkPhase.Connecting) {
+                                connectGatt(device, autoConnect = true)
+                            }
+                        }, GattRecoverySettleMs)
+                    }
+                } else {
+                    probeDeviceAfterGattTimeout(device, pendingGatt)
+                }
             }
-        }, GattConnectTimeoutMs)
+        }, if (autoConnect) GattRecoveryTimeoutMs else GattConnectTimeoutMs)
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun probeDeviceAfterGattTimeout(device: BluetoothDevice, pendingGatt: BluetoothGatt) {
+        Log.w(LogTag, "GATT produced no callback; verifying that X3 is still advertising")
+        runCatching { pendingGatt.disconnect() }
+        runCatching { pendingGatt.close() }
+        if (gatt === pendingGatt) gatt = null
+        service = null
+        preferAutoConnect = false
+        _state.value = _state.value.copy(message = "Checking X3 availability")
+
+        val scanner = bluetoothManager.adapter?.bluetoothLeScanner ?: run {
+            failLink("X3 connection is unavailable. We'll retry when it can be reached.")
+            return
+        }
+        val callback = object : ScanCallback() {
+            override fun onScanResult(callbackType: Int, result: ScanResult) {
+                if (result.device.address != device.address) return
+                Log.w(LogTag, "presence probe still sees X3 rssi=${result.rssi}; Android GATT reset required")
+                stopScan()
+                failLink(
+                    "Android's Bluetooth connection is stuck. Tap Fix Bluetooth to recover it.",
+                    requiresBluetoothReset = true,
+                )
+            }
+
+            override fun onBatchScanResults(results: MutableList<ScanResult>) {
+                results.firstOrNull { it.device.address == device.address }?.let { onScanResult(0, it) }
+            }
+
+            override fun onScanFailed(errorCode: Int) {
+                if (scanCallback !== this) return
+                stopScan()
+                failLink("X3 connection is unavailable. We'll retry when it can be reached.")
+            }
+        }
+        scanCallback = callback
+        scanner.startScan(
+            emptyList<ScanFilter>(),
+            ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build(),
+            callback,
+        )
+        handler.postDelayed({
+            if (scanCallback === callback && _state.value.phase == LinkPhase.Connecting) {
+                Log.i(LogTag, "presence probe found no X3 advertisement; treating link as unavailable, not wedged")
+                stopScan()
+                failLink("X3 is out of range, asleep, or saving power. We'll reconnect when it becomes available.")
+            }
+        }, GattPresenceProbeMs)
     }
 
     private fun unregisterBondReceiver() {
@@ -300,6 +495,46 @@ class BluetoothCompanionClient(private val context: Context) {
         refreshLibrary()
     }
 
+    suspend fun uploadBook(
+        fileName: String,
+        sizeBytes: Long,
+        sha256: ByteArray,
+        input: InputStream,
+        onProgress: (Float) -> Unit = {},
+    ) = withContext(Dispatchers.IO) {
+        var begun = false
+        try {
+            sendAwaitingAck(
+                MessageType.BeginBookUpload,
+                PayloadCodec.encodeBookUploadBegin(BookUploadBegin(fileName, sizeBytes, sha256)),
+                timeoutMillis = 20_000,
+            )
+            begun = true
+            val buffer = ByteArray(BOOK_UPLOAD_CHUNK_BYTES)
+            var offset = 0L
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                if (count == 0) continue
+                check(offset + count <= sizeBytes) { "Book source grew while it was uploading" }
+                sendAwaitingAck(
+                    MessageType.BookUploadChunk,
+                    PayloadCodec.encodeBookUploadChunk(offset.toInt(), buffer.copyOf(count)),
+                    timeoutMillis = 20_000,
+                )
+                offset += count
+                onProgress((offset.toFloat() / sizeBytes).coerceIn(0f, 1f))
+            }
+            check(offset == sizeBytes) { "Book source changed before upload completed" }
+            sendAwaitingAck(MessageType.CommitBookUpload, timeoutMillis = 60_000)
+            onProgress(1f)
+            refreshLibrary()
+        } catch (error: Throwable) {
+            if (begun && isReady()) runCatching { sendAwaitingAck(MessageType.AbortBookUpload) }
+            throw error
+        }
+    }
+
     suspend fun flashFirmware(release: FirmwareRelease, file: File) = withContext(Dispatchers.IO) {
         val digest = release.sha256.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
         sendAwaitingAck(
@@ -324,8 +559,9 @@ class BluetoothCompanionClient(private val context: Context) {
             }
         }
         sendAwaitingAck(MessageType.CommitFirmware, timeoutMillis = 60_000)
-        send(MessageType.ApplyFirmware, byteArrayOf(), awaitAck = false)
+        sendAwaitingAck(MessageType.ApplyFirmware, timeoutMillis = 10_000)
         _state.value = _state.value.copy(transferProgress = 1f, message = "Device is restarting")
+        prepareForPeripheralReset()
     }
 
     private suspend fun sendAwaitingAck(
@@ -343,7 +579,10 @@ class BluetoothCompanionClient(private val context: Context) {
         val deferred = if (awaitAck) CompletableDeferred<Unit>().also { pendingAcks[id] = it } else null
         val bytes = EnvelopeCodec.encode(Envelope(messageType = type, messageId = id, payload = payload))
         Log.i(LogTag, "queue send type=$type id=$id bytes=${bytes.size} awaitAck=$awaitAck")
-        val uuid = if (type == MessageType.FirmwareChunk || type == MessageType.SceneChunk) {
+        val uuid = if (
+            type == MessageType.FirmwareChunk || type == MessageType.SceneChunk ||
+            type == MessageType.BookUploadChunk
+        ) {
             UUID.fromString(XTEINK_DATA_UUID)
         } else {
             UUID.fromString(XTEINK_CONTROL_UUID)
@@ -388,6 +627,11 @@ class BluetoothCompanionClient(private val context: Context) {
     private val gattCallback = object : BluetoothGattCallback() {
         @SuppressLint("MissingPermission")
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
+            if (gatt === gracefulDisconnectGatt && newState == BluetoothProfile.STATE_DISCONNECTED) {
+                Log.i(LogTag, "graceful GATT release completed status=$status")
+                gracefulDisconnectCompletion?.complete(Unit)
+                return
+            }
             if (gatt !== this@BluetoothCompanionClient.gatt) {
                 Log.i(LogTag, "ignoring stale GATT callback status=$status state=$newState")
                 gatt.close()
@@ -403,7 +647,10 @@ class BluetoothCompanionClient(private val context: Context) {
                 failLink(message)
                 return
             }
-            if (newState == BluetoothProfile.STATE_CONNECTED) gatt.discoverServices()
+            if (newState == BluetoothProfile.STATE_CONNECTED) {
+                preferAutoConnect = false
+                gatt.discoverServices()
+            }
         }
 
         @SuppressLint("MissingPermission")
@@ -519,17 +766,23 @@ class BluetoothCompanionClient(private val context: Context) {
         scanCallback = null
     }
 
-    private fun failLink(message: String) {
+    @SuppressLint("MissingPermission")
+    private fun failLink(message: String, requiresBluetoothReset: Boolean = false) {
         Log.w(LogTag, "link failed: $message")
         val failure = IllegalStateException(message)
         pendingAcks.values.forEach { it.completeExceptionally(failure) }
         pendingAcks.clear()
         writes.clear()
         writeInFlight = false
-        gatt?.close()
+        if (hasPermissions()) runCatching { gatt?.close() }
         gatt = null
         service = null
-        _state.value = _state.value.copy(phase = LinkPhase.Error, message = message, transferProgress = null)
+        _state.value = _state.value.copy(
+            phase = LinkPhase.Error,
+            message = message,
+            transferProgress = null,
+            requiresBluetoothReset = requiresBluetoothReset,
+        )
     }
 
     private data class PendingWrite(val characteristicUuid: UUID, val value: ByteArray)
@@ -538,7 +791,12 @@ class BluetoothCompanionClient(private val context: Context) {
         private const val CompanionDeviceName = "XTEINK Companion"
         private const val LogTag = "XteinkBle"
         private const val GattConnectTimeoutMs = 12_000L
+        private const val GattRecoverySettleMs = 500L
+        private const val GattRecoveryTimeoutMs = 25_000L
+        private const val GattPresenceProbeMs = 6_000L
         private const val GattConnectionTimeoutStatus = 147
+        private const val GattGracefulDisconnectTimeoutMs = 2_000L
+        private const val GattReleaseSettleMs = 750L
 
         fun requiredPermissions(): Array<String> = if (Build.VERSION.SDK_INT >= 31) {
             arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)

@@ -1,6 +1,6 @@
 # X3 power, Bluetooth, synchronization, and app-state flow
 
-**Canonical behavior for:** Android `0.2.0-dev9` and X3 firmware `xtraordinary-v0.2.6-dev7`
+**Canonical behavior for:** Android `0.2.0-dev10` and X3 firmware `xtraordinary-v0.2.6-dev9-local`
 **Defaults:** 5-minute fast discovery, 2-second slow BLE interval, 10-minute inactivity sleep, full reader cleanup every 15 pages.
 
 ## Terms and sources of truth
@@ -60,7 +60,7 @@ If the user changes another setting while an older write is in flight, the older
 
 Configurable app choices:
 
-- Fast discovery: 1, 5, or 10 minutes; default 5.
+- Switch to low-power Bluetooth after: 1, 5, or 10 minutes; default 5. This is the time before Home shows its low-power Bluetooth button tip.
 - Focus/Live slow advertising and connection interval: 1, 2, or 4 seconds; default 2.
 - Inactivity sleep: 5, 10, or 20 minutes; default 10 and always longer than the fast window.
 - Reader full cleanup: every 1, 5, 10, 15, or 30 pages; default 15.
@@ -104,7 +104,18 @@ Configurable app choices:
 
 ### Periodic reader cleanup timing
 
-The configured N-page cleanup currently reaches `ReaderUtils::displayWithRefreshCycle()`, which asks for `HALF_REFRESH`. On X3, `HalDisplay::displayBuffer()` immediately calls `requestResync(1)` for every half refresh. The driver therefore promotes that request to a full resync, waits for panel power-on before the first visible display-refresh command, then runs one normal conditioning pass and a no-op post-full fast settle. This forced sequence, not EPUB pagination or an application `delay()`, explains the observed roughly 2.5-second pause before the panel visibly goes black. Do not tune the delay in isolation: changing this path requires a physical ghosting and first-fast-after-cleanup test because the extra passes were added to avoid residue and a garbled first differential update.
+The observed roughly 2.5-second pause was not EPUB pagination or an application `delay()`. The configured N-page cleanup asked for `HALF_REFRESH`, but the generic X3 HAL promoted every half refresh into a full resync: panel power-on wait, full black/white transition, one conditioning pass, and a post-full settle.
+
+Reader cleanup now has a dedicated `displayReaderCleanup()` path. It uses the X3 half waveform directly and logs its total duration, while sleep screens, arbitrary full-screen transitions, and grayscale-base fallbacks retain the defensive full-resync behavior. This is built but intentionally not flashed while the device owner is away. Hardware acceptance must cross at least two configured cleanup boundaries and verify: time from page input to first black transition, final text legibility, residual ghosting, and the first fast page after cleanup. Any corruption fails the change and requires restoring the promoted resync rather than adding an unexplained delay.
+
+## Book upload
+
+- Android uploads only selected books that still have a readable phone URI and are not already present on X3.
+- The BLE transaction is `BeginBookUpload`, ordered 216-byte chunks, `CommitBookUpload`, or `AbortBookUpload`. Every step is individually ACKed.
+- Begin carries a basename, exact size, and SHA-256. X3 accepts supported book extensions only, refuses traversal/separators and existing destinations, and writes to `/.crosspoint/companion/book-upload.tmp`.
+- X3 temporarily requests a fast BLE connection interval and holds full CPU clock only for the active transfer. Commit closes the file, recomputes SHA-256 from SD, atomically renames it into `/Books`, rescans the library, then returns to the configured slow connection policy.
+- A disconnect, explicit abort, size mismatch, hash mismatch, or write failure removes the temporary file. It never exposes a partial book in the library.
+- This path uses BLE and Android's existing document URI permission. It does not require Wi-Fi, `CHANGE_NETWORK_STATE`, or `WRITE_SETTINGS`.
 
 ## Static ticket
 
@@ -153,7 +164,24 @@ Active Focus timing and an in-progress firmware byte transfer are process/sessio
 ## Failure behavior
 
 - Ordinary idle discovery failure returns to **Paired**; it does not loop forever.
+- Every app-controlled X3 reset has a release handshake. Android first stops scans and queued writes, requests GATT disconnection, waits up to two seconds for the callback, closes the native client, and allows another 750 ms for asynchronous unregister. BLE firmware apply is ACKed before this release; firmware waits four seconds after the apply command before rebooting. Desktop USB deployment sends the debug app an explicit preparation intent and requires its `PERIPHERAL_RESET_READY` confirmation before stopping the process and opening COM7. The app's reconnect watchdog stays intentionally idle throughout the reset and resumes only after the X3 boot window.
+- Desktop flashing must use `scripts/flash-x3-companion.ps1`. A raw esptool reset while the app owns GATT recreates the stale Android connection this protocol is designed to prevent.
+- Android can rarely wedge its own GATT service-discovery client: scanning still sees a strong X3 advertisement and the bond remains valid, but `connectGatt` produces no connection-state callback and `dumpsys bluetooth_manager` shows a stale `bta_dm_disc_gatt` direct connection with no ACL link. This is a phone-stack failure, not proof that X3 stopped advertising.
+- Android 17/API 37 makes one 12-second direct attempt through `BluetoothGattConnectionSettings`, then closes GATT and runs a six-second presence scan. Retrying the same API 37 native client with auto-connect was observed to produce no callback and only delayed diagnosis by another 25 seconds. Older Android versions retain one direct attempt and one 25-second auto-connect recovery attempt before the presence scan. Only seeing the same X3 still advertising during that probe classifies the phone stack as wedged and enters **Bluetooth reset needed**. No advertisement means the X3 is out of range, asleep, or radio-quiet; normal pending-work backoff continues without blaming the phone stack.
+- **Fix Bluetooth** opens Android's Bluetooth settings because ordinary apps targeting Android 13 or newer cannot switch the adapter themselves. The user turns Bluetooth off and on there, then returns; the adapter OFF/ON broadcast clears the blocked state and Xtraordinary reconnects automatically. If no Bluetooth settings activity exists, the button falls back to wireless settings, then to one bounded retry.
 - A failure while durable work, Focus, Live, or transfer is pending shows **Reconnecting…** and retries after 1, 3, 8, then 15 seconds (15 seconds thereafter), with the scan/connect time in addition.
 - Expected radio silence in Reading/Static does not produce a destructive action or clear the queued desired state.
 - Every durable device mutation is removed from the pending set only after its matching ACK. Disconnects, timeouts, or process interruption leave durable commands pending and idempotently resend them.
 - Pairing keys, service UUIDs, and bond data are not changed by these transitions or application-partition firmware flashes.
+
+## 2026-08-08 Bluetooth reset acceptance
+
+Artifact under test: Android `0.2.0-dev10`; X3 `xtraordinary-v0.2.6-dev9-local`; firmware SHA-256 `602F19D7D9CFD958FE093D9BF1652F306D86C12BCD9C0FE07A434C8FC25F0335`.
+
+- The old desktop procedure was first reproduced rather than assumed fixed: after a raw force-stop/flash, X3 advertised and remained bonded but Android returned GATT status 133. One Bluetooth controller restart restored the healthy baseline; the bond was never deleted.
+- The desktop workflow was then changed to require the app's explicit `PERIPHERAL_RESET_READY` marker after graceful disconnect, close, and native-client settle. Three consecutive application flashes each confirmed release, verified the written hash, rebooted, used the API 37 connection path, subscribed notifications, and decoded capabilities. None required a Bluetooth restart or bond deletion.
+- Three consecutive abrupt app process deaths recovered after waiting beyond the X3's ten-second BLE supervision timeout. A fourth fresh process connection verified capabilities plus ACKed `SetRadioPolicy` and `SetReaderPolicy`.
+- Five background/foreground cycles retained the required encrypted GATT transport because persistent work was active. Android `dumpsys bluetooth_manager` confirmed the live package-owned connection; the harness distinguishes this valid retained-link case from a missing reconnect.
+- The real Focus control was exercised from the Pixel UI. Start queued `StartSession` and received ACK, the UI changed to Pause/Stop, and Stop queued `StopSession`, received ACK, and restored Start.
+
+This matrix is the release regression test. A single connection after a radio restart is not sufficient evidence.

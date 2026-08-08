@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.android.tools.screenshot.PreviewTest
+import com.xteink.companion.data.CloudBackupState
 import com.xteink.companion.ui.components.SettingsSheetContent
 import com.xteink.companion.ui.components.DeviceConnectionSheetContent
 import com.xteink.companion.ui.components.DeviceSetupStep
@@ -117,10 +118,11 @@ fun readContentSelectedScreenshot() {
                 onSetQuery = {},
                 onSetSort = {},
                 onSetService = {},
-                onSetOnX3Only = {},
+                onSetReadLocation = {},
                 onChooseBookFolder = {},
                 onOpenEpub = {},
                 onOpenSettings = {},
+                onUploadBooksToX3 = {},
                 onDeleteBooksFromX3 = {},
                 initialSelectedBookIds = setOf("sample-book"),
             )
@@ -207,10 +209,16 @@ fun settingsThemesScreenshot() {
                 SettingsSheetContent(
                     visualTheme = CompanionVisualTheme.Expressive,
                     radioPolicy = RadioPolicyUiState(),
+                    minimumReadingPageSeconds = 5,
                     settingsSyncPending = true,
                     onSetVisualTheme = {},
                     onSetRadioPolicy = {},
+                    onSetMinimumReadingPageSeconds = {},
                     onOpenSetup = {},
+                    cloudBackupState = CloudBackupState(),
+                    onSyncGoogleBackup = {},
+                    onDeleteGoogleBackup = {},
+                    onOpenLegal = {},
                     onDismiss = {},
                     modifier = Modifier.padding(top = 20.dp),
                 )
@@ -272,9 +280,10 @@ private fun ScreenshotApp(state: CompanionUiState) {
             onSetReadQuery = {},
             onSetReadSort = {},
             onSetReadService = {},
-            onSetOnX3Only = {},
+            onSetReadLocation = {},
             onChooseBookFolder = {},
             onOpenEpub = {},
+            onUploadBooksToX3 = {},
             onDeleteBooksFromX3 = {},
             onOpenPasses = {},
             onOpenStats = {},

@@ -1,5 +1,7 @@
 package com.xteink.companion.ui.components
 
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -52,6 +54,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -182,8 +185,11 @@ fun DeviceConnectionSheetContent(
                             hasManagedDevice = true,
                             transportConnected = isTransportConnected,
                             reconnecting = device.reconnecting,
+                            requiresBluetoothReset = device.requiresBluetoothReset,
+                            connecting = device.linkPhase == "Scanning" || device.linkPhase == "Connecting",
                         ),
                         onConnectAnother = { stepName = DeviceSetupStep.ChooseModel.name },
+                        onRetry = { onConnect(managedDeviceModel ?: XteinkModel.X3.label) },
                     )
                 } else {
                     EmptyDevicesState(
@@ -257,11 +263,15 @@ private fun ManagedDeviceState(
     device: DeviceUiState,
     presence: DevicePresence,
     onConnectAnother: () -> Unit,
+    onRetry: () -> Unit,
 ) {
+    val context = LocalContext.current
     val status = stringResource(
         when (presence) {
             DevicePresence.Connected -> R.string.device_connected
+            DevicePresence.NeedsBluetoothReset -> R.string.settings_device_bluetooth_reset
             DevicePresence.Reconnecting -> R.string.settings_device_reconnecting
+            DevicePresence.Connecting -> R.string.settings_device_connecting
             DevicePresence.Available -> R.string.device_available
             DevicePresence.None -> R.string.settings_device_value
         },
@@ -296,10 +306,10 @@ private fun ManagedDeviceState(
                     Text(
                         text = status,
                         style = MaterialTheme.typography.labelLarge,
-                        color = if (presence == DevicePresence.Connected) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
+                        color = when (presence) {
+                            DevicePresence.Connected -> MaterialTheme.colorScheme.primary
+                            DevicePresence.NeedsBluetoothReset -> MaterialTheme.colorScheme.error
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
                         },
                     )
                     device.firmwareVersion?.takeIf { it.isNotBlank() }?.let { version ->
@@ -319,7 +329,29 @@ private fun ManagedDeviceState(
                 }
             }
         }
-        device.message?.takeIf { it.isNotBlank() }?.let { message ->
+        if (device.requiresBluetoothReset) {
+            Text(
+                text = stringResource(R.string.bluetooth_reset_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+            Spacer(Modifier.height(12.dp))
+            Button(
+                onClick = {
+                    runCatching {
+                        context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+                    }.recoverCatching {
+                        context.startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS))
+                    }.onFailure {
+                        onRetry()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(58.dp),
+            ) {
+                Text(stringResource(R.string.fix_bluetooth))
+            }
+        } else device.message?.takeIf { it.isNotBlank() }?.let { message ->
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyMedium,

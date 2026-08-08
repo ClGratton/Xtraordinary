@@ -126,6 +126,10 @@
     <string name="settings_device_connected">Connected</string>
     <string name="settings_device_available">Paired</string>
     <string name="settings_device_reconnecting">Reconnecting…</string>
+    <string name="settings_device_connecting">Connecting&#8230;</string>
+    <string name="settings_device_bluetooth_reset">Bluetooth reset needed</string>
+    <string name="bluetooth_reset_body">Open Bluetooth, turn it off and back on, then return here. Xtraordinary reconnects automatically.</string>
+    <string name="fix_bluetooth">Fix Bluetooth</string>
     <string name="settings_notifications">Notification rules</string>
     <string name="settings_notifications_value">Rules not configured</string>
     <string name="settings_gemini">Gemini &amp; privacy</string>
@@ -136,10 +140,10 @@
     <string name="settings_radio_policy">Battery &amp; Bluetooth</string>
     <string name="settings_waiting_for_x3">Saved on phone · waiting for X3</string>
     <string name="settings_synced_to_x3">Synced to X3</string>
-    <string name="settings_fast_discovery">Fast discovery window</string>
+    <string name="settings_fast_discovery">Switch to low-power Bluetooth after</string>
     <string name="settings_slow_poll">Focus / Live slow interval</string>
     <string name="settings_sleep_after">Sleep after inactivity</string>
-    <string name="settings_radio_policy_body">Reading and static tickets silence the radio. Home advertises quickly, then at the slow interval; Focus and Live use the same low-duty link interval.</string>
+    <string name="settings_radio_policy_body">On Home, X3 stays quick to connect for this time, then shows the low-power Bluetooth tip. Reading and static passes turn the radio off; Focus and Live keep their low-duty connection.</string>
     <string name="settings_reader_refresh">Reading</string>
     <string name="settings_full_refresh_pages">Full refresh every (pages)</string>
     <string name="settings_full_refresh_pages_body">A full cleanup reduces ghosting but makes that page turn visibly slower.</string>
@@ -242,6 +246,9 @@
     <string name="service_gutenberg_short">Gutenberg</string>
     <string name="not_linked">Not linked</string>
     <string name="phone_only">Phone only</string>
+    <string name="location_anywhere">Anywhere</string>
+    <string name="location_phone">On phone</string>
+    <string name="location_filter">Location: %1$s</string>
     <string name="book_unavailable">File unavailable</string>
     <string name="choose_book_folder">Choose EPUB folder</string>
     <string name="folder_linked">EPUB folder linked</string>
@@ -251,6 +258,7 @@
     <string name="clear_all">Clear all</string>
     <string name="all_selected">All selected</string>
     <string name="delete_selected_from_device">Delete selected books from %1$s</string>
+    <string name="upload_selected_to_device">Upload selected books to %1$s</string>
     <string name="delete_books_from_device_title">Delete from %1$s?</string>
     <plurals name="delete_books_from_device_body">
         <item quantity="one">This permanently deletes %1$d book from the %2$s SD card.</item>

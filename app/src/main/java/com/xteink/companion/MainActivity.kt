@@ -1,15 +1,20 @@
 package com.xteink.companion
 
+import android.accounts.Account
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -24,7 +29,13 @@ import com.xteink.companion.data.EpubMetadataReader
 import com.xteink.companion.data.EpubFolderScanner
 import com.xteink.companion.data.FlightPassImporter
 import com.xteink.companion.data.FlightPassPhotoImporter
+import com.xteink.companion.data.CloudBackupState
+import com.xteink.companion.data.GoogleDriveReadingSync
 import com.xteink.companion.data.OpenLibraryMetadataClient
+import com.google.android.gms.auth.api.identity.AuthorizationRequest
+import com.google.android.gms.auth.api.identity.Identity
+import com.google.android.gms.auth.api.identity.RevokeAccessRequest
+import com.google.android.gms.common.api.Scope
 import com.xteink.companion.ui.CompanionViewModel
 import com.xteink.companion.ui.CompanionVisualTheme
 import com.xteink.companion.ui.X3CompanionApp
@@ -35,14 +46,22 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+private const val PrepareX3ResetAction = "com.xteink.companion.action.PREPARE_X3_RESET"
+private const val DeployLogTag = "XteinkDeploy"
+
 class MainActivity : ComponentActivity() {
     private val viewModel by viewModels<CompanionViewModel>()
     private lateinit var bookLibrary: BookLibraryRepository
+    private lateinit var googleReadingSync: GoogleDriveReadingSync
+    private var externalResetPreparationRequested = false
+
+    private enum class CloudAction { Sync, Delete }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         bookLibrary = BookLibraryRepository(this)
+        googleReadingSync = GoogleDriveReadingSync(this)
         viewModel.restoreBooks(bookLibrary.load())
         val linkedFolder = bookLibrary.linkedFolderUri()
         viewModel.setLibrarySyncState(syncing = linkedFolder != null, folderLinked = linkedFolder != null)
@@ -54,6 +73,102 @@ class MainActivity : ComponentActivity() {
                 mutableStateOf(setupPreferences.getBoolean("setup_complete", false))
             }
             var pendingDeviceModel by rememberSaveable { mutableStateOf<String?>(null) }
+            var cloudState by remember { mutableStateOf(googleReadingSync.loadState()) }
+            var cloudConsentAccepted by rememberSaveable {
+                mutableStateOf(googleReadingSync.consentAccepted())
+            }
+            var pendingCloudAction by rememberSaveable { mutableStateOf(CloudAction.Sync) }
+
+            fun setCloudMessage(message: String, needsAuthorization: Boolean = false) {
+                cloudState = cloudState.copy(
+                    syncing = false,
+                    needsAuthorization = needsAuthorization,
+                    message = message,
+                )
+            }
+
+            fun finishCloudAction(accessToken: String) {
+                val action = pendingCloudAction
+                cloudState = cloudState.copy(syncing = true, message = null)
+                lifecycleScope.launch {
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            when (action) {
+                                CloudAction.Sync -> googleReadingSync.sync(accessToken)
+                                CloudAction.Delete -> {
+                                    googleReadingSync.deleteCloudBackup(accessToken)
+                                    null
+                                }
+                            }
+                        }
+                    }.onSuccess { result ->
+                        if (action == CloudAction.Sync) {
+                            viewModel.reloadReadingStats()
+                            cloudState = googleReadingSync.loadState().copy(
+                                message = if ((result?.remoteSessionsAdded ?: 0) > 0) {
+                                    "Synced · restored ${result?.remoteSessionsAdded} sessions"
+                                } else {
+                                    "Reading history is up to date"
+                                },
+                            )
+                        } else {
+                            val email = cloudState.accountEmail
+                            cloudState = CloudBackupState(message = "Cloud backup deleted and Google disconnected")
+                            if (email != null) {
+                                val revoke = RevokeAccessRequest.builder()
+                                    .setAccount(Account(email, "com.google"))
+                                    .setScopes(GoogleDriveReadingSync.Scopes.map(::Scope))
+                                    .build()
+                                Identity.getAuthorizationClient(this@MainActivity).revokeAccess(revoke)
+                            }
+                        }
+                    }.onFailure { error ->
+                        setCloudMessage(error.message ?: "Google backup could not be updated", needsAuthorization = true)
+                    }
+                }
+            }
+
+            val googleAuthorizationLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.StartIntentSenderForResult(),
+            ) { activityResult ->
+                runCatching {
+                    Identity.getAuthorizationClient(this@MainActivity)
+                        .getAuthorizationResultFromIntent(activityResult.data)
+                }.onSuccess { result ->
+                    result.accessToken?.let(::finishCloudAction)
+                        ?: setCloudMessage("Google did not return an access token", needsAuthorization = true)
+                }.onFailure {
+                    setCloudMessage("Google backup was not authorized", needsAuthorization = true)
+                }
+            }
+
+            fun requestGoogleAuthorization(action: CloudAction, interactive: Boolean) {
+                pendingCloudAction = action
+                cloudState = cloudState.copy(syncing = true, message = null)
+                val request = AuthorizationRequest.builder()
+                    .setRequestedScopes(GoogleDriveReadingSync.Scopes.map(::Scope))
+                    .build()
+                Identity.getAuthorizationClient(this@MainActivity).authorize(request)
+                    .addOnSuccessListener { result ->
+                        when {
+                            result.hasResolution() && interactive -> {
+                                cloudState = cloudState.copy(syncing = false)
+                                googleAuthorizationLauncher.launch(
+                                    IntentSenderRequest.Builder(result.pendingIntent!!.intentSender).build(),
+                                )
+                            }
+                            result.hasResolution() -> setCloudMessage(
+                                "Reconnect Google in Settings to resume backup",
+                                needsAuthorization = true,
+                            )
+                            result.accessToken != null -> finishCloudAction(result.accessToken!!)
+                            else -> setCloudMessage("Google did not return an access token", needsAuthorization = true)
+                        }
+                    }
+                    .addOnFailureListener { error ->
+                        setCloudMessage(error.message ?: "Google backup is unavailable", needsAuthorization = true)
+                    }
+            }
             val nearbyPermissionLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.RequestMultiplePermissions(),
             ) { grants ->
@@ -94,6 +209,14 @@ class MainActivity : ComponentActivity() {
                     isAppearanceLightNavigationBars = lightSystemBars
                 }
             }
+            val readingHistorySignature = state.readingStats.sessions.joinToString("|") {
+                "${it.id}:${it.endedAtEpochMs}:${it.pages.size}"
+            }
+            LaunchedEffect(cloudState.enabled, readingHistorySignature) {
+                if (cloudState.enabled && !cloudState.syncing) {
+                    requestGoogleAuthorization(CloudAction.Sync, interactive = false)
+                }
+            }
             X3CompanionTheme(visualTheme = state.visualTheme) {
                 if (setupComplete) {
                     X3CompanionApp(
@@ -111,7 +234,8 @@ class MainActivity : ComponentActivity() {
                         onSetReadQuery = viewModel::setReadQuery,
                         onSetReadSort = viewModel::setReadSort,
                         onSetReadService = viewModel::setReadService,
-                        onSetOnX3Only = viewModel::setOnX3Only,
+                        onSetReadLocation = viewModel::setReadLocation,
+                        onUploadBooksToX3 = viewModel::requestUploadBooksToX3,
                         onDeleteBooksFromX3 = viewModel::requestDeleteBooksFromX3,
                         onChooseBookFolder = { folderPicker.launch(null) },
                         onOpenEpub = {
@@ -158,6 +282,13 @@ class MainActivity : ComponentActivity() {
                         onConnectDevice = connectDevice,
                         onCheckFirmware = viewModel::checkFirmware,
                         onFlashFirmware = viewModel::flashLatestFirmware,
+                        cloudBackupState = cloudState,
+                        onSyncGoogleBackup = {
+                            requestGoogleAuthorization(CloudAction.Sync, interactive = true)
+                        },
+                        onDeleteGoogleBackup = {
+                            requestGoogleAuthorization(CloudAction.Delete, interactive = true)
+                        },
                     )
                 } else {
                     SetupScreen(
@@ -167,6 +298,13 @@ class MainActivity : ComponentActivity() {
                         onConnectDevice = connectDevice,
                         onCheckFirmware = viewModel::checkFirmware,
                         onFlashFirmware = viewModel::flashLatestFirmware,
+                        cloudBackupState = cloudState,
+                        cloudConsentAccepted = cloudConsentAccepted,
+                        onCloudConsentChanged = { cloudConsentAccepted = it },
+                        onConnectGoogle = {
+                            googleReadingSync.recordConsent()
+                            requestGoogleAuthorization(CloudAction.Sync, interactive = true)
+                        },
                         onChooseBookFolder = { folderPicker.launch(null) },
                         onFinish = {
                             setupPreferences.edit().putBoolean("setup_complete", true).apply()
@@ -176,23 +314,38 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        handleSharedFlightPass(intent)
+        if (!handleExternalResetIntent(intent)) handleSharedFlightPass(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        handleSharedFlightPass(intent)
+        if (!handleExternalResetIntent(intent)) handleSharedFlightPass(intent)
     }
 
     override fun onStart() {
         super.onStart()
-        viewModel.onAppForegrounded()
+        if (!externalResetPreparationRequested) viewModel.onAppForegrounded()
     }
 
     override fun onStop() {
         viewModel.onAppBackgrounded()
         super.onStop()
+    }
+
+    private fun handleExternalResetIntent(intent: Intent): Boolean {
+        val isDebuggable = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+        if (!isDebuggable || intent.action != PrepareX3ResetAction) {
+            externalResetPreparationRequested = false
+            return false
+        }
+        externalResetPreparationRequested = true
+        lifecycleScope.launch {
+            runCatching { viewModel.prepareForExternalDeviceReset() }
+                .onSuccess { Log.i(DeployLogTag, "PERIPHERAL_RESET_READY") }
+                .onFailure { Log.e(DeployLogTag, "PERIPHERAL_RESET_FAILED", it) }
+        }
+        return true
     }
 
     private fun importFlightPass(uri: android.net.Uri) {

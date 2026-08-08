@@ -57,6 +57,12 @@ class CompanionService {
   uint8_t firmwareExpectedSha_[32] = {};
   char firmwareModel_[25] = {};
   bool firmwareValidated_ = false;
+  HalFile bookUploadFile_;
+  uint64_t bookUploadExpectedSize_ = 0;
+  uint64_t bookUploadReceived_ = 0;
+  uint8_t bookUploadExpectedSha_[32] = {};
+  char bookUploadFinalPath_[181] = {};
+  bool bookUploadActive_ = false;
   bool applyPending_ = false;
   uint32_t applyAtMs_ = 0;
   uint32_t outgoingMessageId_ = 1;
@@ -115,6 +121,10 @@ class CompanionService {
   bool beginFirmware(const EnvelopeView& envelope);
   bool writeFirmwareChunk(const EnvelopeView& envelope);
   bool commitFirmware();
+  bool beginBookUpload(const EnvelopeView& envelope);
+  bool writeBookUploadChunk(const EnvelopeView& envelope);
+  bool commitBookUpload();
+  void abortBookUpload(bool restoreSlowConnection = true);
   bool deleteLibraryEntries(const EnvelopeView& envelope);
   bool notify(MessageType type, const uint8_t* payload, size_t payloadLength);
 

@@ -36,6 +36,7 @@ constexpr char STATUS_UUID[] = "7e400005-b5a3-f393-e0a9-e50e24dcca9e";
 constexpr char FIRMWARE_PATH[] = "/.crosspoint/companion/firmware.bin";
 constexpr char TICKET_PATH[] = "/.crosspoint/companion/ticket.bin";
 constexpr char RADIO_POLICY_PATH[] = "/.crosspoint/companion/radio.bin";
+constexpr char BOOK_UPLOAD_TEMP_PATH[] = "/.crosspoint/companion/book-upload.tmp";
 constexpr uint32_t TICKET_MAGIC = 0x544b5431;  // TKT1
 constexpr uint16_t TICKET_STORAGE_VERSION = 1;
 constexpr uint16_t ADVERTISING_INTERVAL = 800;  // 500 ms in 0.625 ms units
@@ -200,7 +201,7 @@ bool CompanionService::requiresFullClock() const {
   // Starting/reconfiguring the controller and processing traffic stay at full
   // speed. Once advertising is running, the BLE-safe 80 MHz floor is enough;
   // keeping 160 MHz for the entire fast-discovery window only wastes battery.
-  return radioResumePending_ ||
+  return radioResumePending_ || bookUploadActive_ ||
          (connected() && static_cast<uint32_t>(millis() - lastBleActivityMs_) < FULL_CLOCK_AFTER_BLE_ACTIVITY_MS);
 }
 
@@ -362,6 +363,7 @@ void CompanionService::onClientConnected(uint16_t connectionHandle) {
 }
 
 void CompanionService::onClientDisconnected() {
+  if (bookUploadActive_) abortBookUpload(false);
   connectionHandle_ = 0xffff;
   connectionParamsPending_ = false;
   revisionedStatusSupported_ = false;
@@ -493,6 +495,19 @@ void CompanionService::handlePacket(const uint8_t* bytes, size_t length) {
         }
       }
       break;
+    case MessageType::BEGIN_BOOK_UPLOAD:
+      ok = beginBookUpload(envelope);
+      break;
+    case MessageType::BOOK_UPLOAD_CHUNK:
+      ok = writeBookUploadChunk(envelope);
+      break;
+    case MessageType::COMMIT_BOOK_UPLOAD:
+      ok = envelope.payloadLength == 0 && commitBookUpload();
+      break;
+    case MessageType::ABORT_BOOK_UPLOAD:
+      ok = envelope.payloadLength == 0 && bookUploadActive_;
+      if (ok) abortBookUpload();
+      break;
     case MessageType::BEGIN_FIRMWARE:
       ok = beginFirmware(envelope);
       break;
@@ -506,7 +521,11 @@ void CompanionService::handlePacket(const uint8_t* bytes, size_t length) {
       ok = firmwareValidated_;
       if (ok) {
         applyPending_ = true;
-        applyAtMs_ = millis() + 400;
+        // The phone waits for this command's ACK, requests a clean GATT
+        // disconnect, closes its native client, and lets Android settle before
+        // the X3 disappears. Resetting immediately can wedge Android's GATT
+        // state until the whole Bluetooth adapter is restarted.
+        applyAtMs_ = millis() + 4000;
       }
       break;
     default:
@@ -975,6 +994,105 @@ bool CompanionService::deleteLibraryEntries(const EnvelopeView& envelope) {
     if (path[0] != '/' || std::strstr(path, "..") || !hasBookExtension(path) || !Storage.remove(path)) return false;
   }
   return cursor == envelope.payloadLength && scanLibrary();
+}
+
+bool CompanionService::beginBookUpload(const EnvelopeView& envelope) {
+  if (reading_ || bookUploadActive_ || !Storage.ready() || envelope.payloadLength < 2 + 8 + 32) return false;
+  const uint16_t nameLength = readU16(envelope.payload);
+  if (nameLength == 0 || nameLength > 160 || envelope.payloadLength != 2u + nameLength + 8u + 32u) return false;
+
+  char fileName[161] = {};
+  std::memcpy(fileName, envelope.payload + 2, nameLength);
+  for (uint16_t i = 0; i < nameLength; ++i) {
+    const unsigned char value = static_cast<unsigned char>(fileName[i]);
+    if (value < 0x20 || fileName[i] == '/' || fileName[i] == '\\') return false;
+  }
+  if (fileName[0] == '.' || std::strstr(fileName, "..") || !hasBookExtension(fileName)) return false;
+
+  bookUploadExpectedSize_ = readU64(envelope.payload + 2 + nameLength);
+  if (bookUploadExpectedSize_ == 0 || bookUploadExpectedSize_ > 128u * 1024u * 1024u) return false;
+  std::memcpy(bookUploadExpectedSha_, envelope.payload + 2 + nameLength + 8, sizeof(bookUploadExpectedSha_));
+  if (std::snprintf(bookUploadFinalPath_, sizeof(bookUploadFinalPath_), "/Books/%s", fileName) <= 0 ||
+      Storage.exists(bookUploadFinalPath_)) {
+    return false;
+  }
+  if (!Storage.ensureDirectoryExists("/.crosspoint/companion") || !Storage.ensureDirectoryExists("/Books")) {
+    return false;
+  }
+  Storage.remove(BOOK_UPLOAD_TEMP_PATH);
+  bookUploadFile_ = Storage.open(BOOK_UPLOAD_TEMP_PATH, O_WRITE | O_CREAT | O_TRUNC);
+  if (!bookUploadFile_) return false;
+
+  bookUploadReceived_ = 0;
+  bookUploadActive_ = true;
+  connectionParamsPending_ = false;
+  if (connected()) {
+    server_->updateConnParams(connectionHandle_, 12, 24, 0, CONNECTION_SUPERVISION_TIMEOUT);
+  }
+  LOG_INF("CMP", "Book upload started path=%s bytes=%llu", bookUploadFinalPath_, bookUploadExpectedSize_);
+  return true;
+}
+
+bool CompanionService::writeBookUploadChunk(const EnvelopeView& envelope) {
+  if (!bookUploadActive_ || !bookUploadFile_ || envelope.payloadLength < 5) return false;
+  const uint32_t offset = readU32(envelope.payload);
+  const size_t count = envelope.payloadLength - 4;
+  if (offset != bookUploadReceived_ || bookUploadReceived_ + count > bookUploadExpectedSize_) return false;
+  if (bookUploadFile_.write(envelope.payload + 4, count) != count) return false;
+  bookUploadReceived_ += count;
+  return true;
+}
+
+bool CompanionService::commitBookUpload() {
+  if (!bookUploadActive_ || !bookUploadFile_ || bookUploadReceived_ != bookUploadExpectedSize_) return false;
+  bookUploadFile_.flush();
+  if (!bookUploadFile_.close()) {
+    abortBookUpload();
+    return false;
+  }
+
+  HalFile input = Storage.open(BOOK_UPLOAD_TEMP_PATH, O_RDONLY);
+  if (!input) {
+    abortBookUpload();
+    return false;
+  }
+  mbedtls_sha256_context context;
+  mbedtls_sha256_init(&context);
+  bool hashOk = mbedtls_sha256_starts(&context, 0) == 0;
+  uint8_t buffer[1024];
+  while (hashOk && input.available()) {
+    const int count = input.read(buffer, sizeof(buffer));
+    hashOk = count > 0 && mbedtls_sha256_update(&context, buffer, count) == 0;
+  }
+  uint8_t actual[32] = {};
+  hashOk = hashOk && mbedtls_sha256_finish(&context, actual) == 0 &&
+           std::memcmp(actual, bookUploadExpectedSha_, sizeof(actual)) == 0;
+  mbedtls_sha256_free(&context);
+  input.close();
+  if (!hashOk || !Storage.rename(BOOK_UPLOAD_TEMP_PATH, bookUploadFinalPath_)) {
+    abortBookUpload();
+    return false;
+  }
+
+  LOG_INF("CMP", "Book upload committed path=%s", bookUploadFinalPath_);
+  bookUploadActive_ = false;
+  bookUploadFinalPath_[0] = '\0';
+  connectedAtMs_ = millis();
+  connectionParamsPending_ = connected();
+  return scanLibrary();
+}
+
+void CompanionService::abortBookUpload(bool restoreSlowConnection) {
+  if (bookUploadFile_) bookUploadFile_.close();
+  Storage.remove(BOOK_UPLOAD_TEMP_PATH);
+  bookUploadActive_ = false;
+  bookUploadReceived_ = 0;
+  bookUploadExpectedSize_ = 0;
+  bookUploadFinalPath_[0] = '\0';
+  if (restoreSlowConnection) {
+    connectedAtMs_ = millis();
+    connectionParamsPending_ = connected();
+  }
 }
 
 bool CompanionService::beginFirmware(const EnvelopeView& envelope) {

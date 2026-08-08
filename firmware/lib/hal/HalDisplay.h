@@ -39,6 +39,9 @@ class HalDisplay {
                             bool fromProgmem = false) const;
 
   void displayBuffer(RefreshMode mode = RefreshMode::FAST_REFRESH, bool turnOffScreen = false);
+  // Periodic reader cleanup using the X3 half waveform without promoting it
+  // to the multi-pass full resync used for arbitrary screen transitions.
+  void displayReaderCleanup(bool turnOffScreen = false);
   void refreshDisplay(RefreshMode mode = RefreshMode::FAST_REFRESH, bool turnOffScreen = false);
 
   // Power management

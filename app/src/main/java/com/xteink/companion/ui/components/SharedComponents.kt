@@ -29,6 +29,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -42,6 +46,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.xteink.companion.R
+import com.xteink.companion.data.CloudBackupState
 import com.xteink.companion.ui.CompanionSurface
 import com.xteink.companion.ui.CompanionVisualTheme
 import com.xteink.companion.ui.DevicePresence
@@ -53,6 +58,8 @@ fun CompanionTopBar(
     hasManagedX3: Boolean,
     isX3TransportConnected: Boolean,
     isX3Reconnecting: Boolean,
+    isX3Connecting: Boolean,
+    requiresBluetoothReset: Boolean,
     connectedDeviceModel: String?,
     batteryPercentage: Int?,
     charging: Boolean,
@@ -60,7 +67,13 @@ fun CompanionTopBar(
     onShowSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val presence = devicePresence(hasManagedX3, isX3TransportConnected, isX3Reconnecting)
+    val presence = devicePresence(
+        hasManagedX3,
+        isX3TransportConnected,
+        isX3Reconnecting,
+        requiresBluetoothReset,
+        isX3Connecting,
+    )
     val settingsDescription = stringResource(R.string.open_settings)
     val devicesDescription = stringResource(
         if (presence == DevicePresence.Connected) R.string.open_connected_device else R.string.open_devices,
@@ -100,13 +113,19 @@ fun CompanionTopBar(
                         text = stringResource(
                             when {
                                 presence == DevicePresence.Connected -> R.string.settings_device_connected
+                                presence == DevicePresence.NeedsBluetoothReset -> R.string.settings_device_bluetooth_reset
                                 presence == DevicePresence.Reconnecting -> R.string.settings_device_reconnecting
+                                presence == DevicePresence.Connecting -> R.string.settings_device_connecting
                                 presence == DevicePresence.Available -> R.string.settings_device_available
                                 else -> R.string.settings_device_value
                             },
                         ),
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (presence == DevicePresence.NeedsBluetoothReset) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                     )
                 }
                 batteryPercentage?.let {
@@ -397,8 +416,12 @@ fun SettingsSheet(
     onSetRadioPolicy: (RadioPolicyUiState) -> Unit,
     onSetMinimumReadingPageSeconds: (Int) -> Unit,
     onOpenSetup: () -> Unit,
+    cloudBackupState: CloudBackupState,
+    onSyncGoogleBackup: () -> Unit,
+    onDeleteGoogleBackup: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    var legalDocument by remember { mutableStateOf<LegalDocument?>(null) }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         SettingsSheetContent(
             visualTheme = visualTheme,
@@ -409,8 +432,15 @@ fun SettingsSheet(
             onSetRadioPolicy = onSetRadioPolicy,
             onSetMinimumReadingPageSeconds = onSetMinimumReadingPageSeconds,
             onOpenSetup = onOpenSetup,
+            cloudBackupState = cloudBackupState,
+            onSyncGoogleBackup = onSyncGoogleBackup,
+            onDeleteGoogleBackup = onDeleteGoogleBackup,
+            onOpenLegal = { legalDocument = it },
             onDismiss = onDismiss,
         )
+    }
+    legalDocument?.let { document ->
+        LegalDocumentDialog(document = document, onDismiss = { legalDocument = null })
     }
 }
 
@@ -424,6 +454,10 @@ fun SettingsSheetContent(
     onSetRadioPolicy: (RadioPolicyUiState) -> Unit,
     onSetMinimumReadingPageSeconds: (Int) -> Unit,
     onOpenSetup: () -> Unit,
+    cloudBackupState: CloudBackupState,
+    onSyncGoogleBackup: () -> Unit,
+    onDeleteGoogleBackup: () -> Unit,
+    onOpenLegal: (LegalDocument) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -565,6 +599,55 @@ fun SettingsSheetContent(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Spacer(Modifier.height(12.dp))
+        Text("Google backup", style = MaterialTheme.typography.titleMedium)
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            shape = MaterialTheme.shapes.large,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (cloudBackupState.enabled) {
+                    Text(
+                        cloudBackupState.accountName ?: cloudBackupState.accountEmail ?: "Google connected",
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    cloudBackupState.accountEmail?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Text(
+                        "Only reading history is stored in Drive app data. Books and passes stay local.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    cloudBackupState.message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(
+                            onClick = onSyncGoogleBackup,
+                            enabled = !cloudBackupState.syncing,
+                        ) { Text(if (cloudBackupState.syncing) "Syncing…" else "Sync now") }
+                        TextButton(
+                            onClick = onDeleteGoogleBackup,
+                            enabled = !cloudBackupState.syncing,
+                        ) { Text("Delete & disconnect") }
+                    }
+                } else {
+                    Text("Not connected", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "Run setup again to opt in. Local reading history works without Google.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { onOpenLegal(LegalDocument.Privacy) }) { Text("Privacy") }
+                    TextButton(onClick = { onOpenLegal(LegalDocument.Terms) }) { Text("Terms") }
+                }
+            }
+        }
         Spacer(Modifier.height(12.dp))
         Surface(
             onClick = onOpenSetup,

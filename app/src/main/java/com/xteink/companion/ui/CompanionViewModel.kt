@@ -1,6 +1,7 @@
 package com.xteink.companion.ui
 
 import android.app.Application
+import android.net.Uri
 import android.util.Base64
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
@@ -31,6 +32,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.security.MessageDigest
 
 class CompanionViewModel(application: Application) : AndroidViewModel(application) {
     private val readingStatsRepository = ReadingStatsRepository(application)
@@ -118,8 +120,13 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 }
                 val managedModel = managedDeviceModel()
                 val transportConnected = link.phase == LinkPhase.Connected
-                val unexpectedDisconnect = link.phase == LinkPhase.Error && !intentionalTransportIdle
+                val connectionBlocked = link.requiresBluetoothReset
+                val unexpectedDisconnect = link.phase == LinkPhase.Error && !intentionalTransportIdle && !connectionBlocked
                 val reconnectRequired = unexpectedDisconnect && requiresPersistentTransport()
+                if (connectionBlocked) {
+                    reconnectJob?.cancel()
+                    reconnectJob = null
+                }
                 if (unexpectedDisconnect && !reconnectRequired) {
                     // Foreground discovery is a one-shot status probe. An idle,
                     // sleeping, Reading, or Static-ticket X3 is still a managed
@@ -153,11 +160,12 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                         connectedDeviceModel = capabilities?.model ?: managedModel ?: state.connectedDeviceModel,
                         device = state.device.copy(
                             linkPhase = link.phase.name,
-                            reconnecting = shouldShowReconnecting(
+                            reconnecting = if (connectionBlocked) false else shouldShowReconnecting(
                                 previous = state.device.reconnecting,
                                 phase = link.phase,
                                 intentionalTransportIdle = intentionalTransportIdle,
                             ),
+                            requiresBluetoothReset = connectionBlocked,
                             message = if (reconnectRequired) null else link.message,
                             firmwareVersion = capabilities?.firmwareVersion ?: state.device.firmwareVersion,
                             libraryRevision = capabilities?.libraryRevision ?: state.device.libraryRevision,
@@ -183,7 +191,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                     drainPendingTicketSend()
                     drainPendingTicketRemoval()
                     if (link.deviceStatus?.activity == DeviceActivity.Reading) scheduleReadingRadioQuiet()
-                } else if (reconnectRequired) {
+                } else if (reconnectRequired && !connectionBlocked) {
                     scheduleReconnect()
                 }
             }
@@ -258,6 +266,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 // or connection attempt is already active.
                 val linkPhase = companionClient.state.value.phase
                 if (canMaintainTransport() && !intentionalTransportIdle && requiresPersistentTransport() &&
+                    !_uiState.value.device.requiresBluetoothReset &&
                     !_uiState.value.isX3TransportConnected && reconnectJob?.isActive != true &&
                     linkPhase != LinkPhase.Scanning && linkPhase != LinkPhase.Connecting
                 ) {
@@ -452,6 +461,17 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun reloadReadingStats() {
+        _uiState.update {
+            it.copy(
+                readingStats = it.readingStats.copy(
+                    sessions = readingStatsRepository.load(),
+                    minimumPageSeconds = readingStatsRepository.minimumPageSeconds(),
+                ),
+            )
+        }
+    }
+
     fun selectReadingSession(sessionId: UInt?) {
         _uiState.update { it.copy(readingStats = it.readingStats.copy(selectedSessionId = sessionId)) }
     }
@@ -535,8 +555,8 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         _uiState.update { it.copy(read = it.read.copy(service = service)) }
     }
 
-    fun setOnX3Only(enabled: Boolean) {
-        _uiState.update { it.copy(read = it.read.copy(onX3Only = enabled)) }
+    fun setReadLocation(location: ReadLocation) {
+        _uiState.update { it.copy(read = it.read.copy(location = location)) }
     }
 
     fun requestDeleteBooksFromX3(bookIds: Set<String>) {
@@ -561,6 +581,10 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         intentionalTransportIdle = false
         reconnectJob?.cancel()
         reconnectJob = null
+        companionClient.resetConnectionRecovery()
+        _uiState.update {
+            it.copy(device = it.device.copy(requiresBluetoothReset = false, reconnecting = false, message = null))
+        }
         companionClient.connect(model)
     }
 
@@ -579,6 +603,21 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 isX3TransportConnected = false,
                 connectedDeviceModel = null,
                 device = it.device.copy(reconnecting = false),
+            )
+        }
+    }
+
+    suspend fun prepareForExternalDeviceReset() {
+        intentionalTransportIdle = true
+        reconnectJob?.cancel()
+        reconnectJob = null
+        backgroundDisconnectJob?.cancel()
+        backgroundDisconnectJob = null
+        companionClient.prepareForPeripheralReset()
+        _uiState.update {
+            it.copy(
+                isX3TransportConnected = false,
+                device = it.device.copy(reconnecting = false, message = "X3 is ready to restart"),
             )
         }
     }
@@ -673,24 +712,24 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 val file = firmwareReleases.downloadVerified(release)
                 _uiState.update { it.copy(device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Transferring)) }
                 if (useUsb) {
+                    prepareForExternalDeviceReset()
                     usbFlasher.flash(file)
                 } else {
                     companionClient.awaitConnected()
+                    intentionalTransportIdle = true
                     companionClient.flashFirmware(release, file)
                 }
             }
             if (flashResult.isSuccess) {
                 _uiState.update { it.copy(device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Complete)) }
-                if (useUsb) {
-                    delay(7_000)
-                    runCatching { usbFlasher.readCrashReport() }
-                        .onSuccess { report ->
-                            getApplication<Application>().filesDir.resolve("x3_crash_report.txt").writeText(report)
-                            Log.i("XtraordinaryCrash", report)
-                        }
-                        .onFailure { Log.e("XtraordinaryCrash", "Could not retrieve X3 crash report", it) }
-                }
+                // USB flashing returns after hard reset; BLE flashing returns
+                // before the delayed on-device copy and reboot. Keep Android
+                // from opening a new GATT client inside either reset window.
+                delay(if (useUsb) 7_000 else 12_000)
+                intentionalTransportIdle = false
+                ensureTransportConnected()
             } else {
+                intentionalTransportIdle = false
                 flashResult.exceptionOrNull()?.let(::reportDeviceError)
             }
         }
@@ -698,7 +737,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
 
     override fun onCleared() {
         usbFlasher.close()
-        companionClient.disconnect()
+        companionClient.close()
         super.onCleared()
     }
 
@@ -720,6 +759,59 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     fun reportFolderSync(found: Int, added: Int) {
         _uiState.update {
             it.copy(surface = CompanionSurface.Read)
+        }
+    }
+
+    fun requestUploadBooksToX3(bookIds: Set<String>) {
+        if (bookIds.isEmpty() || _uiState.value.read.uploadingToX3) return
+        val books = _uiState.value.read.books.filter { it.id in bookIds && it.isOnPhone && !it.isOnX3 }
+        if (books.isEmpty()) return
+        if (!_uiState.value.isX3Connected) {
+            _uiState.update { it.copy(notice = UiNotice.DeviceMessage("Pair an X3 before uploading books")) }
+            return
+        }
+        intentionalTransportIdle = false
+        ensureTransportConnected()
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.update { it.copy(read = it.read.copy(uploadingToX3 = true, uploadProgress = 0f)) }
+            val result = runCatching {
+                companionClient.awaitConnected()
+                books.forEachIndexed { index, book ->
+                    val uri = Uri.parse(book.sourceUri)
+                    val resolver = getApplication<Application>().contentResolver
+                    val digest = MessageDigest.getInstance("SHA-256")
+                    var size = 0L
+                    resolver.openInputStream(uri)?.use { input ->
+                        val buffer = ByteArray(16 * 1024)
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            if (count == 0) continue
+                            digest.update(buffer, 0, count)
+                            size += count
+                        }
+                    } ?: error("${book.title} is no longer available on this phone")
+                    check(size > 0) { "${book.title} is empty" }
+                    resolver.openInputStream(uri)?.use { input ->
+                        companionClient.uploadBook(book.fileName, size, digest.digest(), input) { bookProgress ->
+                            val overall = (index + bookProgress) / books.size.toFloat()
+                            _uiState.update { state ->
+                                state.copy(read = state.read.copy(uploadProgress = overall.coerceIn(0f, 1f)))
+                            }
+                        }
+                    } ?: error("${book.title} is no longer available on this phone")
+                }
+            }
+            _uiState.update { state ->
+                state.copy(
+                    read = state.read.copy(uploadingToX3 = false, uploadProgress = null),
+                    notice = result.fold(
+                        onSuccess = { UiNotice.DeviceMessage("${books.size} book${if (books.size == 1) "" else "s"} uploaded to X3") },
+                        onFailure = { UiNotice.DeviceMessage(it.message ?: "Book upload failed") },
+                    ),
+                )
+            }
+            releaseBackgroundTransportIfIdle()
         }
     }
 
@@ -910,7 +1002,9 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         connectionPreferences.getString(LastConnectedModelKey, null)
 
     private fun ensureTransportConnected() {
-        if (!canMaintainTransport() || intentionalTransportIdle || !companionClient.hasPermissions()) return
+        if (!canMaintainTransport() || intentionalTransportIdle || !companionClient.hasPermissions() ||
+            _uiState.value.device.requiresBluetoothReset
+        ) return
         val model = managedDeviceModel() ?: return
         val phase = _uiState.value.device.linkPhase
         if (phase == LinkPhase.Connected.name || phase == LinkPhase.Connecting.name || phase == LinkPhase.Scanning.name) {
@@ -961,14 +1055,18 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun scheduleReconnect() {
         val model = managedDeviceModel() ?: return
-        if (!canMaintainTransport() || intentionalTransportIdle || reconnectJob?.isActive == true) return
+        if (!canMaintainTransport() || intentionalTransportIdle || reconnectJob?.isActive == true ||
+            _uiState.value.device.requiresBluetoothReset
+        ) return
         _uiState.update { it.copy(device = it.device.copy(reconnecting = true)) }
         val delayMs = ReconnectBackoffMs[reconnectAttempt.coerceAtMost(ReconnectBackoffMs.lastIndex)]
         reconnectAttempt++
         reconnectJob = viewModelScope.launch {
             delay(delayMs)
             reconnectJob = null
-            if (canMaintainTransport() && !intentionalTransportIdle && !_uiState.value.isX3TransportConnected) {
+            if (canMaintainTransport() && !intentionalTransportIdle && !_uiState.value.isX3TransportConnected &&
+                !_uiState.value.device.requiresBluetoothReset
+            ) {
                 companionClient.connect(model)
             }
         }
@@ -991,6 +1089,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     private fun requestFocusSync() {
         if (!_uiState.value.isX3Connected) return
         pendingFocusSync = true
+        intentionalTransportIdle = false
         if (_uiState.value.isX3TransportConnected) drainPendingFocusSync() else ensureTransportConnected()
     }
 

@@ -21,6 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -47,6 +48,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.xteink.companion.R
 import com.xteink.companion.data.FirmwareSource
+import com.xteink.companion.data.CloudBackupState
 import com.xteink.companion.ui.DeviceUiState
 import kotlinx.coroutines.launch
 
@@ -70,6 +72,10 @@ fun SetupScreen(
     onConnectDevice: (String) -> Unit = {},
     onCheckFirmware: (String, FirmwareSource) -> Unit = { _, _ -> },
     onFlashFirmware: () -> Unit = {},
+    cloudBackupState: CloudBackupState = CloudBackupState(),
+    cloudConsentAccepted: Boolean = false,
+    onCloudConsentChanged: (Boolean) -> Unit = {},
+    onConnectGoogle: () -> Unit = {},
 ) {
     val pagerState = rememberPagerState(
         initialPage = initialPage.coerceIn(SetupPages.indices),
@@ -78,6 +84,7 @@ fun SetupScreen(
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
     var devicesVisible by remember { mutableStateOf(false) }
+    var legalDocument by remember { mutableStateOf<LegalDocument?>(null) }
 
     fun moveTo(page: Int) {
         haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
@@ -126,6 +133,11 @@ fun SetupScreen(
                 when (SetupPages[page]) {
                     SetupPage.Welcome -> WelcomeSetupPage(
                         contentColor = contentColor,
+                        cloudBackupState = cloudBackupState,
+                        cloudConsentAccepted = cloudConsentAccepted,
+                        onCloudConsentChanged = onCloudConsentChanged,
+                        onConnectGoogle = onConnectGoogle,
+                        onOpenLegal = { legalDocument = it },
                         onContinue = { moveTo(SetupPage.Library.ordinal) },
                     )
                     SetupPage.Library -> LibrarySetupPage(
@@ -161,10 +173,21 @@ fun SetupScreen(
             startWithFirstTimeFlash = true,
         )
     }
+    legalDocument?.let { document ->
+        LegalDocumentDialog(document = document, onDismiss = { legalDocument = null })
+    }
 }
 
 @Composable
-private fun WelcomeSetupPage(contentColor: Color, onContinue: () -> Unit) {
+private fun WelcomeSetupPage(
+    contentColor: Color,
+    cloudBackupState: CloudBackupState,
+    cloudConsentAccepted: Boolean,
+    onCloudConsentChanged: (Boolean) -> Unit,
+    onConnectGoogle: () -> Unit,
+    onOpenLegal: (LegalDocument) -> Unit,
+    onContinue: () -> Unit,
+) {
     SetupPageColumn {
         SetupPageLabel(step = 1, label = stringResource(R.string.setup_welcome_tab))
         SetupBridgeIllustration(color = contentColor, modifier = Modifier.align(Alignment.CenterHorizontally))
@@ -179,6 +202,55 @@ private fun WelcomeSetupPage(contentColor: Color, onContinue: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            shape = MaterialTheme.shapes.large,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text("Keep reading history with Google", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Optional. Only reading sessions and the page-time filter go to a private app-data file in your Google Drive.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (cloudBackupState.enabled) {
+                    Text(
+                        cloudBackupState.accountEmail ?: "Google backup connected",
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = cloudConsentAccepted,
+                            onCheckedChange = onCloudConsentChanged,
+                        )
+                        Text(
+                            "I agree to the Terms and acknowledge the Privacy policy for optional Google backup.",
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { onOpenLegal(LegalDocument.Privacy) }) { Text("Privacy") }
+                        TextButton(onClick = { onOpenLegal(LegalDocument.Terms) }) { Text("Terms") }
+                    }
+                    FilledTonalButton(
+                        onClick = onConnectGoogle,
+                        enabled = cloudConsentAccepted && !cloudBackupState.syncing,
+                        modifier = Modifier.fillMaxWidth().height(54.dp),
+                    ) {
+                        Text(if (cloudBackupState.syncing) "Connecting…" else "Back up with Google")
+                    }
+                }
+                cloudBackupState.message?.let { message ->
+                    Text(message, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
         Button(
             onClick = onContinue,
             modifier = Modifier.fillMaxWidth().height(58.dp),

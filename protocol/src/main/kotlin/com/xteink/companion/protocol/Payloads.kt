@@ -12,6 +12,7 @@ const val MAX_WIRE_PATH_BYTES = 512
 // 20-byte envelope + 4-byte offset + 216 bytes = 240, safely inside a
 // negotiated 247-byte ATT MTU (244-byte value).
 const val FIRMWARE_CHUNK_BYTES = 216
+const val BOOK_UPLOAD_CHUNK_BYTES = FIRMWARE_CHUNK_BYTES
 
 data class DeviceCapabilities(
     val model: String,
@@ -132,6 +133,17 @@ data class FirmwareBegin(
 ) {
     init {
         require(sha256.size == 32) { "Firmware SHA-256 must contain 32 bytes" }
+    }
+}
+
+data class BookUploadBegin(
+    val fileName: String,
+    val sizeBytes: Long,
+    val sha256: ByteArray,
+) {
+    init {
+        require(sizeBytes in 1..(128L * 1024L * 1024L)) { "Book size is outside the supported range" }
+        require(sha256.size == 32) { "Book SHA-256 must contain 32 bytes" }
     }
 }
 
@@ -313,6 +325,22 @@ object PayloadCodec {
         val count = short.toInt() and 0xffff
         require(count <= 64) { "Too many library paths" }
         revision to List(count) { utf8(MAX_WIRE_PATH_BYTES) }
+    }
+
+    fun encodeBookUploadBegin(value: BookUploadBegin): ByteArray = writer(224) {
+        putUtf8(value.fileName, 180)
+        putLong(value.sizeBytes)
+        put(value.sha256)
+    }
+
+    fun decodeBookUploadBegin(bytes: ByteArray): BookUploadBegin = reader(bytes) {
+        BookUploadBegin(utf8(180), long, ByteArray(32).also(::get))
+    }
+
+    fun encodeBookUploadChunk(offset: Int, data: ByteArray): ByteArray = writer(4 + data.size) {
+        require(data.size <= BOOK_UPLOAD_CHUNK_BYTES) { "Book chunk is too large" }
+        putInt(offset)
+        put(data)
     }
 
     fun encodeFirmwareBegin(value: FirmwareBegin): ByteArray = writer(96) {

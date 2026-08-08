@@ -157,13 +157,21 @@ enum class ReadService {
     LocalEpub,
 }
 
+enum class ReadLocation {
+    Anywhere,
+    Phone,
+    X3,
+}
+
 data class ReadUiState(
     val books: List<ImportedBookUiState> = emptyList(),
     val query: String = "",
     val sort: ReadSort = ReadSort.Recent,
     val service: ReadService = ReadService.All,
-    val onX3Only: Boolean = false,
+    val location: ReadLocation = ReadLocation.Anywhere,
     val importing: Boolean = false,
+    val uploadingToX3: Boolean = false,
+    val uploadProgress: Float? = null,
     val syncing: Boolean = false,
     val folderLinked: Boolean = false,
 )
@@ -173,6 +181,7 @@ enum class FirmwareCheckPhase { Idle, Checking, Available, UpToDate, Downloading
 data class DeviceUiState(
     val linkPhase: String = "Disconnected",
     val reconnecting: Boolean = false,
+    val requiresBluetoothReset: Boolean = false,
     val message: String? = null,
     val usbConnected: Boolean = false,
     val usbPhase: String = "Disconnected",
