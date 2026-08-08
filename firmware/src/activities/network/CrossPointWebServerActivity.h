@@ -51,11 +51,6 @@ class CrossPointWebServerActivity final : public Activity {
 
   // Cached signal-strength bracket (0..4) for the WiFi indicator.
   int lastWifiBars = 0;
-  bool autoStartHotspot = false;
-  unsigned long companionTransferStartedAt = 0;
-  static constexpr unsigned long COMPANION_WAIT_FOR_UPLOAD_MS = 90UL * 1000UL;
-  static constexpr unsigned long COMPANION_UPLOAD_STALL_MS = 60UL * 1000UL;
-  static constexpr unsigned long COMPANION_COMPLETE_GRACE_MS = 8UL * 1000UL;
 
   void renderServerRunning() const;
   void renderWifiIndicator(int subHeaderTop) const;
@@ -66,9 +61,8 @@ class CrossPointWebServerActivity final : public Activity {
   void startWebServer();
 
  public:
-  explicit CrossPointWebServerActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                                       bool startHotspotImmediately = false)
-      : Activity("CrossPointWebServer", renderer, mappedInput), autoStartHotspot(startHotspotImmediately) {}
+  explicit CrossPointWebServerActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
+      : Activity("CrossPointWebServer", renderer, mappedInput) {}
   void onEnter() override;
   void onExit() override;
   void loop() override;

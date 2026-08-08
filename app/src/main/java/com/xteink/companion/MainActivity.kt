@@ -1,13 +1,11 @@
 package com.xteink.companion
 
-import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -18,17 +16,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.core.view.WindowCompat
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.xteink.companion.data.BookLibraryRepository
-import com.xteink.companion.data.BookTransferClient
 import com.xteink.companion.data.BluetoothCompanionClient
 import com.xteink.companion.data.EpubMetadataReader
 import com.xteink.companion.data.EpubFolderScanner
+import com.xteink.companion.data.FlightPassImporter
+import com.xteink.companion.data.FlightPassPhotoImporter
 import com.xteink.companion.data.OpenLibraryMetadataClient
-import com.xteink.companion.monetization.AccessController
-import com.xteink.companion.monetization.AccessControllerFactory
 import com.xteink.companion.ui.CompanionViewModel
 import com.xteink.companion.ui.CompanionVisualTheme
 import com.xteink.companion.ui.X3CompanionApp
@@ -42,29 +38,22 @@ import kotlinx.coroutines.withContext
 class MainActivity : ComponentActivity() {
     private val viewModel by viewModels<CompanionViewModel>()
     private lateinit var bookLibrary: BookLibraryRepository
-    private lateinit var bookTransferClient: BookTransferClient
-    private lateinit var accessController: AccessController
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        accessController = AccessControllerFactory.create(this)
-        accessController.start(this)
         bookLibrary = BookLibraryRepository(this)
-        bookTransferClient = BookTransferClient(this)
         viewModel.restoreBooks(bookLibrary.load())
         val linkedFolder = bookLibrary.linkedFolderUri()
         viewModel.setLibrarySyncState(syncing = linkedFolder != null, folderLinked = linkedFolder != null)
         if (linkedFolder != null) syncLinkedFolder(showNotice = false) else refreshMissingBookMetadata()
         setContent {
             val state by viewModel.uiState.collectAsStateWithLifecycle()
-            val access by accessController.state.collectAsStateWithLifecycle()
             val setupPreferences = remember { getSharedPreferences("xtraordinary_setup", MODE_PRIVATE) }
             var setupComplete by rememberSaveable {
                 mutableStateOf(setupPreferences.getBoolean("setup_complete", false))
             }
             var pendingDeviceModel by rememberSaveable { mutableStateOf<String?>(null) }
-            var pendingBookTransferIds by remember { mutableStateOf<Set<String>>(emptySet()) }
             val nearbyPermissionLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.RequestMultiplePermissions(),
             ) { grants ->
@@ -80,26 +69,14 @@ class MainActivity : ComponentActivity() {
                     nearbyPermissionLauncher.launch(BluetoothCompanionClient.requiredPermissions())
                 }
             }
-            val wifiPermissionLauncher = rememberLauncherForActivityResult(
-                ActivityResultContracts.RequestPermission(),
-            ) { granted ->
-                val bookIds = pendingBookTransferIds
-                pendingBookTransferIds = emptySet()
-                if (granted && bookIds.isNotEmpty()) transferBooksToX3(bookIds)
-            }
-            val sendBooksToX3: (Set<String>) -> Unit = { bookIds ->
-                val permission = wifiTransferPermission()
-                if (permission == null ||
-                    ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
-                ) {
-                    transferBooksToX3(bookIds)
-                } else {
-                    pendingBookTransferIds = bookIds
-                    wifiPermissionLauncher.launch(permission)
-                }
-            }
             val epubPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
                 if (uris.isNotEmpty()) importEpubs(uris)
+            }
+            val flightPassPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+                if (uri != null) importFlightPass(uri)
+            }
+            val flightPhotoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+                if (uri != null) importFlightPassPhoto(uri)
             }
             val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
                 if (uri != null) {
@@ -121,14 +98,10 @@ class MainActivity : ComponentActivity() {
                 if (setupComplete) {
                     X3CompanionApp(
                         state = state,
-                        access = access,
                         onSetVisualTheme = viewModel::setVisualTheme,
-                        onSetNormalPollSeconds = viewModel::setNormalPollSeconds,
-                        onSetSlowPollSeconds = viewModel::setSlowPollSeconds,
-                        onSetSleepTimeoutMinutes = viewModel::setSleepTimeoutMinutes,
+                        onSetRadioPolicy = viewModel::setRadioPolicy,
                         onSetDuration = viewModel::setDuration,
                         onStartFocus = viewModel::startFocus,
-                        onStartFocusPhoneOnly = viewModel::startFocusPhoneOnly,
                         onTogglePause = viewModel::togglePause,
                         onEndFocus = viewModel::endFocus,
                         onResetFocus = viewModel::resetFocus,
@@ -140,7 +113,6 @@ class MainActivity : ComponentActivity() {
                         onSetReadService = viewModel::setReadService,
                         onSetOnX3Only = viewModel::setOnX3Only,
                         onDeleteBooksFromX3 = viewModel::requestDeleteBooksFromX3,
-                        onSendBooksToX3 = sendBooksToX3,
                         onChooseBookFolder = { folderPicker.launch(null) },
                         onOpenEpub = {
                             epubPicker.launch(
@@ -152,10 +124,30 @@ class MainActivity : ComponentActivity() {
                             )
                         },
                         onOpenPasses = viewModel::openPasses,
+                        onOpenStats = viewModel::openStats,
+                        onSetReadingStatsView = viewModel::setReadingStatsView,
+                        onSelectReadingSession = viewModel::selectReadingSession,
+                        onSetMinimumReadingPageSeconds = viewModel::setMinimumReadingPageSeconds,
                         onShowToolHub = viewModel::showToolHub,
                         onSelectPass = viewModel::selectPass,
                         onSetTicketMode = viewModel::setTicketMode,
                         onSendTicket = viewModel::sendTicket,
+                        onRemoveTicket = viewModel::removeTicketFromX3,
+                        onImportPhoto = {
+                            flightPhotoPicker.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                            )
+                        },
+                        onImportWalletLink = ::importFlightPassLink,
+                        onImportPassFile = {
+                            flightPassPicker.launch(
+                                arrayOf(
+                                    "application/vnd.apple.pkpass",
+                                    "application/json",
+                                    "text/plain",
+                                ),
+                            )
+                        },
                         onShowSettings = viewModel::showSettings,
                         onOpenSetup = {
                             viewModel.showSettings(false)
@@ -164,24 +156,14 @@ class MainActivity : ComponentActivity() {
                         },
                         onDismissNotice = viewModel::dismissNotice,
                         onConnectDevice = connectDevice,
-                        onDisconnectDevice = viewModel::disconnectDevice,
                         onCheckFirmware = viewModel::checkFirmware,
                         onFlashFirmware = viewModel::flashLatestFirmware,
-                        onWatchAd = { onGranted ->
-                            accessController.showRewardedAd(this@MainActivity, onGranted)
-                        },
-                        onGetPro = {
-                            accessController.launchProPurchase(this@MainActivity)
-                        },
-                        onShowPrivacyOptions = {
-                            accessController.showPrivacyOptions(this@MainActivity)
-                        },
                     )
                 } else {
                     SetupScreen(
                         folderLinked = state.read.folderLinked,
                         device = state.device,
-                        isDeviceConnected = state.isX3Connected,
+                        isDeviceTransportConnected = state.isX3TransportConnected,
                         onConnectDevice = connectDevice,
                         onCheckFirmware = viewModel::checkFirmware,
                         onFlashFirmware = viewModel::flashLatestFirmware,
@@ -194,11 +176,17 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        handleSharedFlightPass(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleSharedFlightPass(intent)
     }
 
     override fun onStart() {
         super.onStart()
-        accessController.refresh()
         viewModel.onAppForegrounded()
     }
 
@@ -207,9 +195,36 @@ class MainActivity : ComponentActivity() {
         super.onStop()
     }
 
-    override fun onDestroy() {
-        accessController.close()
-        super.onDestroy()
+    private fun importFlightPass(uri: android.net.Uri) {
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { FlightPassImporter.read(this@MainActivity, uri) }
+            }
+            result.onSuccess(viewModel::importFlightPass).onFailure(viewModel::reportFlightPassImportFailure)
+        }
+    }
+
+    private fun importFlightPassPhoto(uri: android.net.Uri) {
+        lifecycleScope.launch {
+            val result = runCatching { FlightPassPhotoImporter.read(this@MainActivity, uri) }
+            result.onSuccess(viewModel::importFlightPass).onFailure(viewModel::reportFlightPassImportFailure)
+        }
+    }
+
+    private fun importFlightPassLink(link: String) {
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { FlightPassImporter.readText(link) }
+            }
+            result.onSuccess(viewModel::importFlightPass).onFailure(viewModel::reportFlightPassImportFailure)
+        }
+    }
+
+    private fun handleSharedFlightPass(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_SEND || intent.type != "text/plain") return
+        val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT)?.trim().orEmpty()
+        if (sharedText.isBlank()) return
+        importFlightPassLink(sharedText)
     }
 
     private fun syncLinkedFolder(showNotice: Boolean) {
@@ -286,58 +301,6 @@ class MainActivity : ComponentActivity() {
                 viewModel.reportEpubImportFailure()
             }
         }
-    }
-
-    private fun transferBooksToX3(bookIds: Set<String>) {
-        lifecycleScope.launch {
-            val books = viewModel.booksForTransfer(bookIds)
-            if (books.isEmpty()) {
-                viewModel.reportBookTransferError(
-                    IllegalStateException("Select at least one EPUB that is available on this phone"),
-                )
-                return@launch
-            }
-            val preflight = runCatching { bookTransferClient.preflight() }
-            if (preflight.isFailure) {
-                viewModel.reportBookTransferError(
-                    preflight.exceptionOrNull() ?: IllegalStateException("Could not prepare book transfer"),
-                )
-                return@launch
-            }
-            val entered = viewModel.enterLibraryTransfer()
-            if (entered.isFailure) {
-                viewModel.reportBookTransferError(
-                    entered.exceptionOrNull() ?: IllegalStateException("Could not start XTEINK transfer mode"),
-                )
-                return@launch
-            }
-            viewModel.setBookTransferProgress(0f)
-            var uploaded = false
-            try {
-                val totalBytes = books.sumOf { it.sizeBytes ?: 0L }.takeIf { it > 0L }
-                bookTransferClient.upload(books) { progress ->
-                    val completedBytes = books.take(progress.completedBooks).sumOf { it.sizeBytes ?: 0L }
-                    val fraction = if (totalBytes != null) {
-                        (completedBytes + progress.currentBytes).toFloat() / totalBytes
-                    } else {
-                        (progress.completedBooks.toFloat() / progress.totalBooks)
-                    }
-                    viewModel.setBookTransferProgress(fraction.coerceIn(0f, 0.99f))
-                }
-                uploaded = true
-            } catch (error: Throwable) {
-                viewModel.reportBookTransferError(error)
-            } finally {
-                viewModel.leaveLibraryTransfer()
-            }
-            if (uploaded) viewModel.reportBooksSent(books.size)
-        }
-    }
-
-    private fun wifiTransferPermission(): String? = when {
-        Build.VERSION.SDK_INT >= 33 -> Manifest.permission.NEARBY_WIFI_DEVICES
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> Manifest.permission.ACCESS_FINE_LOCATION
-        else -> null
     }
 
     private fun importEpubs(uris: List<android.net.Uri>) {

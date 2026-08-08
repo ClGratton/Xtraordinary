@@ -31,6 +31,7 @@
 #include "ProgressMapper.h"
 #include "QrDisplayActivity.h"
 #include "ReaderUtils.h"
+#include "ReadingStatsStore.h"
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -196,6 +197,7 @@ void EpubReaderActivity::onEnter() {
   APP_STATE.openEpubPath = epub->getPath();
   APP_STATE.saveToFile();
   RECENT_BOOKS.addBook(epub->getPath(), epub->getTitle(), epub->getAuthor(), epub->getThumbBmpPath());
+  READING_STATS.beginSession(epub->getTitle());
 
   loadCachedBookmarks();
 
@@ -205,6 +207,8 @@ void EpubReaderActivity::onEnter() {
 
 void EpubReaderActivity::onExit() {
   Activity::onExit();
+
+  READING_STATS.finishSession();
 
   // Reset orientation back to portrait for the rest of the UI
   renderer.setOrientation(GfxRenderer::Orientation::Portrait);
@@ -758,6 +762,7 @@ void EpubReaderActivity::toggleAutoPageTurn(const uint8_t selectedPageTurnOption
 }
 
 void EpubReaderActivity::pageTurn(bool isForwardTurn) {
+  READING_STATS.completeDisplayedPage();
   if (isForwardTurn) {
     if (section->currentPage < section->pageCount - 1) {
       section->currentPage++;
@@ -959,9 +964,13 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     // Collect footnotes from the loaded page
     currentPageFootnotes = std::move(p->footnotes);
 
+    const uint16_t pageWords = static_cast<uint16_t>(std::min<size_t>(p->wordCount(), UINT16_MAX));
     const auto start = millis();
     renderContents(std::move(p), orientedMarginTop, orientedMarginRight, orientedMarginBottom, orientedMarginLeft);
     LOG_DBG("ERS", "Rendered page in %dms", millis() - start);
+    const uint32_t pageKey = (static_cast<uint32_t>(currentSpineIndex & 0xffff) << 16) |
+                             static_cast<uint32_t>(section->currentPage & 0xffff);
+    READING_STATS.showPage(pageKey, static_cast<uint16_t>(section->currentPage + 1), pageWords);
   }
   silentIndexNextChapterIfNeeded(viewportWidth, viewportHeight);
   saveProgress(currentSpineIndex, section->currentPage, section->pageCount);
@@ -1074,24 +1083,35 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   // Tiled grayscale: render each plane band-by-band into a small scratch and
   // stream straight to the controller, leaving the BW framebuffer intact so no
   // full-frame storeBwBuffer is needed; controller RAM is re-synced from the
-  // live framebuffer afterward. The page is re-rendered ceil(H/STRIP_ROWS) times
+  // live framebuffer afterward. The page is re-rendered ceil(H/stripRows) times
   // per plane, but renderCharImpl culls out-of-band glyphs before decode so the
   // cost stays close to one render. Both text (drawPixel) and images
   // (DirectPixelWriter) honor the active strip target.
   if (needsAnyGrayscale && renderer.supportsStripGrayscale()) {
-    constexpr int STRIP_ROWS = 80;
+    // X3 has enough contiguous heap for a 160-row strip in the normal reader
+    // path. This cuts a 528-row grayscale page from 14 full page/cache walks to
+    // 8. Fall back progressively if a complex page has fragmented the heap.
+    constexpr int STRIP_ROW_CANDIDATES[] = {160, 120, 80};
     const int gh = renderer.getDisplayHeight();
     const int gwBytes = renderer.getDisplayWidthBytes();
-
-    auto scratch = makeUniqueNoThrow<uint8_t[]>(static_cast<size_t>(gwBytes) * STRIP_ROWS);
+    int stripRows = 0;
+    std::unique_ptr<uint8_t[]> scratch;
+    for (const int candidate : STRIP_ROW_CANDIDATES) {
+      scratch = makeUniqueNoThrow<uint8_t[]>(static_cast<size_t>(gwBytes) * candidate);
+      if (scratch) {
+        stripRows = candidate;
+        break;
+      }
+    }
     if (!scratch) {
-      LOG_ERR("ERS", "OOM: grayscale strip scratch (%d bytes); skipping AA this page", gwBytes * STRIP_ROWS);
+      LOG_ERR("ERS", "OOM: grayscale strip scratch (%d bytes minimum); skipping AA this page", gwBytes * 80);
     } else {
+      LOG_DBG("ERS", "Grayscale strip=%d rows (%d bytes)", stripRows, gwBytes * stripRows);
       // Bands may be streamed in any order: X4 windows each via setRamArea, X3
       // via PTL.
       renderer.setRenderMode(GfxRenderer::GRAYSCALE_LSB);
-      for (int y = 0; y < gh; y += STRIP_ROWS) {
-        const int rows = (gh - y < STRIP_ROWS) ? (gh - y) : STRIP_ROWS;
+      for (int y = 0; y < gh; y += stripRows) {
+        const int rows = (gh - y < stripRows) ? (gh - y) : stripRows;
         renderer.beginStripTarget(scratch.get(), y, rows);
         renderer.clearScreen(0x00);
         renderGrayscalePass();
@@ -1102,8 +1122,8 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
 
       // MSB plane.
       renderer.setRenderMode(GfxRenderer::GRAYSCALE_MSB);
-      for (int y = 0; y < gh; y += STRIP_ROWS) {
-        const int rows = (gh - y < STRIP_ROWS) ? (gh - y) : STRIP_ROWS;
+      for (int y = 0; y < gh; y += stripRows) {
+        const int rows = (gh - y < stripRows) ? (gh - y) : stripRows;
         renderer.beginStripTarget(scratch.get(), y, rows);
         renderer.clearScreen(0x00);
         renderGrayscalePass();

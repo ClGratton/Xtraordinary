@@ -7,9 +7,8 @@ coreKtx = "1.19.0"
 lifecycle = "2.11.0"
 junit = "4.13.2"
 screenshot = "0.0.1-alpha15"
-billing = "9.1.0"
-googleMobileAds = "25.4.0"
-ump = "4.0.0"
+mlkitText = "16.0.1"
+mlkitBarcode = "17.3.0"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
@@ -28,9 +27,8 @@ androidx-compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4
 androidx-compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
 junit = { module = "junit:junit", version.ref = "junit" }
 screenshot-validation-api = { group = "com.android.tools.screenshot", name = "screenshot-validation-api", version.ref = "screenshot" }
-play-billing = { module = "com.android.billingclient:billing", version.ref = "billing" }
-google-mobile-ads = { module = "com.google.android.gms:play-services-ads", version.ref = "googleMobileAds" }
-google-ump = { module = "com.google.android.ump:user-messaging-platform", version.ref = "ump" }
+mlkit-text-recognition = { module = "com.google.mlkit:text-recognition", version.ref = "mlkitText" }
+mlkit-barcode-scanning = { module = "com.google.mlkit:barcode-scanning", version.ref = "mlkitBarcode" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

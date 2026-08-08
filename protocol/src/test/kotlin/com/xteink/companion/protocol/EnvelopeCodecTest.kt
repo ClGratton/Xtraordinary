@@ -61,5 +61,8 @@ class EnvelopeCodecTest {
         assertEquals(MessageType.LibraryPage, MessageType.fromWireValue(0x41u))
         assertEquals(MessageType.DeleteLibraryEntries, MessageType.fromWireValue(0x42u))
         assertEquals(MessageType.LibraryChanged, MessageType.fromWireValue(0x84u))
+        assertEquals(MessageType.GetReadingStats, MessageType.fromWireValue(0x43u))
+        assertEquals(MessageType.ReadingStatsChunk, MessageType.fromWireValue(0x44u))
+        assertEquals(MessageType.AckReadingStats, MessageType.fromWireValue(0x45u))
     }
 }

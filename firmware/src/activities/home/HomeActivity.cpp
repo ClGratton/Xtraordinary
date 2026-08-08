@@ -4,6 +4,7 @@
 #include <Epub.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
+#include <HalDisplay.h>
 #include <HalStorage.h>
 #include <I18n.h>
 #include <Utf8.h>
@@ -19,6 +20,9 @@
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#ifdef ENABLE_X3_COMPANION
+#include "companion/CompanionService.h"
+#endif
 
 int HomeActivity::getMenuItemCount() const {
   int count = 4;  // File Browser, Recents, File transfer, Settings
@@ -28,6 +32,7 @@ int HomeActivity::getMenuItemCount() const {
   if (hasOpdsServers) {
     count++;
   }
+  if (hasTicket) count++;
   return count;
 }
 
@@ -112,12 +117,20 @@ void HomeActivity::onEnter() {
   Activity::onEnter();
 
   hasOpdsServers = OPDS_STORE.hasServers();
+#ifdef ENABLE_X3_COMPANION
+  hasTicket = companion::companionService.hasTicket();
+#else
+  hasTicket = false;
+#endif
+  fullRefreshOnFirstRender = initialMenuItem == HomeMenuItem::TICKET;
 
   const auto& metrics = UITheme::getInstance().getMetrics();
   loadRecentBooks(metrics.homeRecentBooksCount);
 
   const auto base = static_cast<int>(recentBooks.size());
-  selectorIndex = initialMenuItem == HomeMenuItem::NONE ? 0 : base + menuItemToIndex(initialMenuItem, hasOpdsServers);
+  selectorIndex = initialMenuItem == HomeMenuItem::NONE
+                      ? 0
+                      : base + menuItemToIndex(initialMenuItem, hasOpdsServers, hasTicket);
 
   // Trigger first update
   requestUpdate();
@@ -167,6 +180,13 @@ void HomeActivity::freeCoverBuffer() {
 }
 
 void HomeActivity::loop() {
+#ifdef ENABLE_X3_COMPANION
+  const bool lowPowerBluetooth = companion::companionService.isSlowAdvertising();
+  if (lowPowerBluetoothNotice != lowPowerBluetooth) {
+    lowPowerBluetoothNotice = lowPowerBluetooth;
+    requestUpdate();
+  }
+#endif
   const int menuCount = getMenuItemCount();
 
   buttonNavigator.onNext([this, menuCount] {
@@ -184,12 +204,15 @@ void HomeActivity::loop() {
       onSelectBook(recentBooks[selectorIndex].path);
     } else {
       const int menuIndex = selectorIndex - static_cast<int>(recentBooks.size());
-      switch (indexToMenuItem(menuIndex, hasOpdsServers)) {
+      switch (indexToMenuItem(menuIndex, hasOpdsServers, hasTicket)) {
         case HomeMenuItem::FILE_BROWSER:
           onFileBrowserOpen();
           break;
         case HomeMenuItem::RECENTS:
           onRecentsOpen();
+          break;
+        case HomeMenuItem::TICKET:
+          onTicketOpen();
           break;
         case HomeMenuItem::OPDS_BROWSER:
           onOpdsBrowserOpen();
@@ -240,15 +263,20 @@ void HomeActivity::render(RenderLock&&) {
     menuIcons.insert(menuIcons.begin() + 2, Library);
   }
 
+  if (hasTicket) {
+    menuItems.insert(menuItems.begin() + 2, tr(STR_TICKET));
+    menuIcons.insert(menuIcons.begin() + 2, Book);
+  }
+
   if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
     // Insert Continue Reading at the top if enabled in theme
     menuItems.insert(menuItems.begin(), tr(STR_CONTINUE_READING));
     menuIcons.insert(menuIcons.begin(), Book);
   }
 
-  constexpr int noPhonePillHeight = 54;
-  const int noPhonePillGap = noPhoneSleepNotice ? metrics.verticalSpacing : 0;
-  const int reservedNoticeHeight = noPhoneSleepNotice ? noPhonePillHeight + noPhonePillGap : 0;
+  constexpr int lowPowerPillHeight = 54;
+  const int lowPowerPillGap = lowPowerBluetoothNotice ? metrics.verticalSpacing : 0;
+  const int reservedNoticeHeight = lowPowerBluetoothNotice ? lowPowerPillHeight + lowPowerPillGap : 0;
   GUI.drawButtonMenu(
       renderer,
       Rect{0, metrics.homeTopPadding + metrics.homeCoverTileHeight + metrics.homeMenuTopOffset, pageWidth,
@@ -259,25 +287,20 @@ void HomeActivity::render(RenderLock&&) {
       [&menuItems](int index) { return std::string(menuItems[index]); },
       [&menuIcons](int index) { return menuIcons[index]; });
 
-  if (noPhoneSleepNotice) {
+  if (lowPowerBluetoothNotice) {
     const int pillX = metrics.contentSidePadding;
-    const int pillY = pageHeight - metrics.buttonHintsHeight - noPhonePillHeight - metrics.verticalSpacing;
+    const int pillY = pageHeight - metrics.buttonHintsHeight - lowPowerPillHeight - metrics.verticalSpacing;
     const int pillWidth = pageWidth - metrics.contentSidePadding * 2;
-    renderer.fillRoundedRect(pillX, pillY, pillWidth, noPhonePillHeight, noPhonePillHeight / 2, Color::LightGray);
-    renderer.drawCenteredText(
-        SMALL_FONT_ID,
-        pillY + 10,
-        "No phone nearby - sleeping to save battery");
-    renderer.drawCenteredText(
-        SMALL_FONT_ID,
-        pillY + 29,
-        "Press power to reconnect");
+    renderer.fillRoundedRect(pillX, pillY, pillWidth, lowPowerPillHeight, lowPowerPillHeight / 2, Color::LightGray);
+    renderer.drawCenteredText(SMALL_FONT_ID, pillY + 10, "Low-power Bluetooth");
+    renderer.drawCenteredText(SMALL_FONT_ID, pillY + 29, "Press any button for fast connection");
   }
 
   const auto labels = mappedInput.mapLabels("", tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
-  renderer.displayBuffer();
+  renderer.displayBuffer(fullRefreshOnFirstRender ? HalDisplay::FULL_REFRESH : HalDisplay::FAST_REFRESH);
+  fullRefreshOnFirstRender = false;
 
   if (!firstRenderDone) {
     firstRenderDone = true;
@@ -299,3 +322,11 @@ void HomeActivity::onSettingsOpen() { activityManager.goToSettings(); }
 void HomeActivity::onFileTransferOpen() { activityManager.goToFileTransfer(); }
 
 void HomeActivity::onOpdsBrowserOpen() { activityManager.goToBrowser(); }
+
+void HomeActivity::onTicketOpen() {
+#ifdef ENABLE_X3_COMPANION
+  if (companion::companionService.hasTicket()) {
+    activityManager.goToCompanionTicket(companion::companionService.ticket());
+  }
+#endif
+}

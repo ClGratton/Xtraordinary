@@ -37,9 +37,6 @@ class CrossPointWebServer {
     size_t size = 0;
     bool success = false;
     String error = "";
-    unsigned long startedAt = 0;
-    unsigned long lastActivityAt = 0;
-    unsigned long completedAt = 0;
 
     // Upload write buffer - batches small writes into larger SD card operations
     // 4KB is a good balance: large enough to reduce syscall overhead, small enough

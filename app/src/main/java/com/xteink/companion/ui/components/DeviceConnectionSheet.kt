@@ -36,9 +36,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -63,8 +61,9 @@ import androidx.compose.ui.unit.dp
 import com.xteink.companion.R
 import com.xteink.companion.data.FirmwareSource
 import com.xteink.companion.ui.DeviceUiState
-import com.xteink.companion.protocol.DeviceActivity
+import com.xteink.companion.ui.DevicePresence
 import com.xteink.companion.ui.FirmwareCheckPhase
+import com.xteink.companion.ui.devicePresence
 
 enum class DeviceSetupStep {
     Devices,
@@ -92,11 +91,10 @@ private val XteinkModels = XteinkModel.entries
 fun DeviceConnectionSheet(
     onDismiss: () -> Unit,
     device: DeviceUiState = DeviceUiState(),
-    isConnected: Boolean = false,
-    isManaged: Boolean = false,
-    connectedDeviceModel: String? = null,
+    hasManagedDevice: Boolean = false,
+    managedDeviceModel: String? = null,
+    isTransportConnected: Boolean = false,
     onConnect: (String) -> Unit = {},
-    onDisconnect: () -> Unit = {},
     onCheckFirmware: (String, FirmwareSource) -> Unit = { _, _ -> },
     onFlashFirmware: () -> Unit = {},
     showFirmwareUpdate: Boolean = true,
@@ -111,11 +109,10 @@ fun DeviceConnectionSheet(
         DeviceConnectionSheetContent(
             onDismiss = onDismiss,
             device = device,
-            isConnected = isConnected,
-            isManaged = isManaged,
-            connectedDeviceModel = connectedDeviceModel,
+            hasManagedDevice = hasManagedDevice,
+            managedDeviceModel = managedDeviceModel,
+            isTransportConnected = isTransportConnected,
             onConnect = onConnect,
-            onDisconnect = onDisconnect,
             onCheckFirmware = onCheckFirmware,
             onFlashFirmware = onFlashFirmware,
             showFirmwareUpdate = showFirmwareUpdate,
@@ -131,40 +128,15 @@ fun DeviceConnectionSheetContent(
     modifier: Modifier = Modifier,
     initialStep: DeviceSetupStep = DeviceSetupStep.Devices,
     device: DeviceUiState = DeviceUiState(),
-    isConnected: Boolean = false,
-    isManaged: Boolean = false,
-    connectedDeviceModel: String? = null,
+    hasManagedDevice: Boolean = false,
+    managedDeviceModel: String? = null,
+    isTransportConnected: Boolean = false,
     onConnect: (String) -> Unit = {},
-    onDisconnect: () -> Unit = {},
     onCheckFirmware: (String, FirmwareSource) -> Unit = { _, _ -> },
     onFlashFirmware: () -> Unit = {},
     showFirmwareUpdate: Boolean = true,
     startWithFirstTimeFlash: Boolean = false,
 ) {
-    if (isConnected) {
-        ConnectedDeviceContent(
-            device = device,
-            connectedDeviceModel = connectedDeviceModel,
-            onCheckFirmware = onCheckFirmware,
-            onFlashFirmware = onFlashFirmware,
-            onDisconnect = onDisconnect,
-            onDismiss = onDismiss,
-            modifier = modifier,
-        )
-        return
-    }
-    if (isManaged) {
-        RememberedDeviceContent(
-            device = device,
-            connectedDeviceModel = connectedDeviceModel,
-            onReconnect = { onConnect(connectedDeviceModel ?: XteinkModel.X3.label) },
-            onDisconnect = onDisconnect,
-            onDismiss = onDismiss,
-            modifier = modifier,
-        )
-        return
-    }
-
     var stepName by rememberSaveable { mutableStateOf(initialStep.name) }
     var selectedModelName by rememberSaveable { mutableStateOf(XteinkModel.X3.name) }
     var connectionPathName by rememberSaveable {
@@ -201,9 +173,24 @@ fun DeviceConnectionSheetContent(
         )
         Spacer(Modifier.height(14.dp))
         when (step) {
-            DeviceSetupStep.Devices -> EmptyDevicesState(
-                onConnect = { stepName = DeviceSetupStep.ChooseModel.name },
-            )
+            DeviceSetupStep.Devices -> {
+                if (hasManagedDevice) {
+                    ManagedDeviceState(
+                        model = managedDeviceModel ?: stringResource(R.string.xteink_device_short),
+                        device = device,
+                        presence = devicePresence(
+                            hasManagedDevice = true,
+                            transportConnected = isTransportConnected,
+                            reconnecting = device.reconnecting,
+                        ),
+                        onConnectAnother = { stepName = DeviceSetupStep.ChooseModel.name },
+                    )
+                } else {
+                    EmptyDevicesState(
+                        onConnect = { stepName = DeviceSetupStep.ChooseModel.name },
+                    )
+                }
+            }
             DeviceSetupStep.ChooseModel -> ModelPicker(
                 selectedModel = selectedModel,
                 onSelectedModel = { selectedModelName = it.name },
@@ -212,7 +199,7 @@ fun DeviceConnectionSheetContent(
             DeviceSetupStep.Discover -> DiscoveryHandoff(
                 model = selectedModel,
                 device = device,
-                isConnected = isConnected,
+                isConnected = isTransportConnected,
                 connectionPath = connectionPath,
                 onConnectionPath = { connectionPathName = it.name },
                 onConnect = { onConnect(selectedModel.label) },
@@ -245,188 +232,6 @@ fun DeviceConnectionSheetContent(
 }
 
 @Composable
-private fun ConnectedDeviceContent(
-    device: DeviceUiState,
-    connectedDeviceModel: String?,
-    onCheckFirmware: (String, FirmwareSource) -> Unit,
-    onFlashFirmware: () -> Unit,
-    onDisconnect: () -> Unit,
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val modelLabel = connectedDeviceModel ?: XteinkModel.X3.label
-    var selectedTab by rememberSaveable { mutableStateOf(0) }
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp)
-            .padding(bottom = 30.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(modelLabel, style = MaterialTheme.typography.headlineMedium)
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
-        }
-        Spacer(Modifier.height(10.dp))
-        PrimaryTabRow(selectedTabIndex = selectedTab) {
-            listOf(R.string.device_status_tab, R.string.device_firmware_tab).forEachIndexed { index, label ->
-                Tab(
-                    selected = selectedTab == index,
-                    onClick = { selectedTab = index },
-                    text = { Text(stringResource(label)) },
-                )
-            }
-        }
-        Spacer(Modifier.height(22.dp))
-        when (selectedTab) {
-            0 -> {
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    shape = MaterialTheme.shapes.large,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(22.dp),
-                        horizontalArrangement = Arrangement.spacedBy(18.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        DeviceModelIcon(modifier = Modifier.size(58.dp), color = MaterialTheme.colorScheme.onPrimaryContainer)
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(
-                                text = stringResource(R.string.device_connected),
-                                style = MaterialTheme.typography.titleLarge,
-                            )
-                            Text(
-                                text = stringResource(R.string.connected_over_bluetooth),
-                                style = MaterialTheme.typography.bodyLarge,
-                            )
-                        }
-                    }
-                }
-                Spacer(Modifier.height(18.dp))
-                DeviceStatusValue(
-                    label = stringResource(R.string.installed_firmware),
-                    value = device.firmwareVersion ?: stringResource(R.string.status_unknown),
-                )
-                DeviceStatusValue(
-                    label = stringResource(R.string.library_revision),
-                    value = device.libraryRevision.toString(),
-                )
-                Spacer(Modifier.height(12.dp))
-                TextButton(onClick = onDisconnect, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.forget_device))
-                }
-            }
-            else -> DefaultFirmwarePage(
-                model = XteinkModel.X3,
-                device = device,
-                onCheckFirmware = { onCheckFirmware(modelLabel, FirmwareSource.Xtraordinary) },
-                onFlashFirmware = onFlashFirmware,
-                onChooseAlternative = { onCheckFirmware(modelLabel, FirmwareSource.CrossPoint) },
-            )
-        }
-    }
-}
-
-@Composable
-private fun DeviceStatusValue(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge)
-        Text(
-            value,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun RememberedDeviceContent(
-    device: DeviceUiState,
-    connectedDeviceModel: String?,
-    onReconnect: () -> Unit,
-    onDisconnect: () -> Unit,
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val reconnecting = device.linkPhase == "Scanning" || device.linkPhase == "Connecting"
-    val sleeping = device.activity == DeviceActivity.Sleeping
-    val reading = device.activity == DeviceActivity.Reading && !device.lowPowerGraceExpired
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp)
-            .padding(bottom = 30.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(connectedDeviceModel ?: XteinkModel.X3.label, style = MaterialTheme.typography.headlineMedium)
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
-        }
-        Spacer(Modifier.height(22.dp))
-        DeviceModelIcon(modifier = Modifier.size(64.dp), color = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.height(16.dp))
-        Text(
-            stringResource(
-                when {
-                    sleeping -> R.string.device_sleeping_title
-                    reading -> R.string.device_reading_title
-                    else -> R.string.device_offline
-                },
-            ),
-            style = MaterialTheme.typography.titleLarge,
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = when {
-                sleeping -> stringResource(R.string.device_sleeping_body)
-                reading -> stringResource(R.string.device_reading_body)
-                else -> device.message ?: stringResource(R.string.device_offline_body)
-            },
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(24.dp))
-        Button(
-            onClick = onReconnect,
-            enabled = !reconnecting,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp),
-        ) {
-            if (reconnecting) {
-                CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                Spacer(Modifier.size(10.dp))
-            }
-            Text(
-                stringResource(
-                    when {
-                        reconnecting -> R.string.settings_device_reconnecting
-                        sleeping -> R.string.wake_and_reconnect
-                        else -> R.string.reconnect_device
-                    },
-                ),
-            )
-        }
-        TextButton(onClick = onDisconnect, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.forget_device))
-        }
-    }
-}
-
-@Composable
 private fun SheetHeader(
     step: DeviceSetupStep,
     onBack: () -> Unit,
@@ -443,6 +248,92 @@ private fun SheetHeader(
             TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
         }
         TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
+    }
+}
+
+@Composable
+private fun ManagedDeviceState(
+    model: String,
+    device: DeviceUiState,
+    presence: DevicePresence,
+    onConnectAnother: () -> Unit,
+) {
+    val status = stringResource(
+        when (presence) {
+            DevicePresence.Connected -> R.string.device_connected
+            DevicePresence.Reconnecting -> R.string.settings_device_reconnecting
+            DevicePresence.Available -> R.string.device_available
+            DevicePresence.None -> R.string.settings_device_value
+        },
+    )
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            shape = MaterialTheme.shapes.large,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                modifier = Modifier.padding(22.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    shape = CircleShape,
+                ) {
+                    DeviceModelIcon(
+                        modifier = Modifier.padding(16.dp).size(42.dp),
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(model, style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        text = status,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (presence == DevicePresence.Connected) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                    device.firmwareVersion?.takeIf { it.isNotBlank() }?.let { version ->
+                        Text(
+                            text = stringResource(R.string.device_firmware_version, version),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    device.batteryPercentage?.let { percentage ->
+                        X3BatteryIndicator(
+                            percentage = percentage,
+                            charging = device.charging,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                }
+            }
+        }
+        device.message?.takeIf { it.isNotBlank() }?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+        }
+        Spacer(Modifier.height(20.dp))
+        FilledTonalButton(
+            onClick = onConnectAnother,
+            modifier = Modifier.fillMaxWidth().height(58.dp),
+        ) {
+            Text(stringResource(R.string.connect_a_device))
+        }
     }
 }
 

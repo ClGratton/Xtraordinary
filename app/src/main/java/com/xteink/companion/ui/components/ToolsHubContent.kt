@@ -29,12 +29,14 @@ private data class ToolSpec(
     val title: String,
     val body: String,
     val available: Boolean = false,
+    val emphasized: Boolean = false,
 )
 
 @Composable
 fun ToolsHubContent(
     passCount: Int,
     onOpenPasses: () -> Unit,
+    onOpenStats: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val tools = listOf(
@@ -70,9 +72,21 @@ fun ToolsHubContent(
                 title = stringResource(R.string.tool_passes),
                 body = stringResource(R.string.tool_passes_body),
                 available = true,
+                emphasized = true,
             ),
             supporting = pluralStringResource(R.plurals.passes_count, passCount, passCount),
             onClick = onOpenPasses,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        ToolCard(
+            spec = ToolSpec(
+                glyph = "↗",
+                title = stringResource(R.string.tool_reading_stats),
+                body = stringResource(R.string.tool_reading_stats_body),
+                available = true,
+            ),
+            supporting = stringResource(R.string.tool_reading_stats_supporting),
+            onClick = onOpenStats,
             modifier = Modifier.fillMaxWidth(),
         )
         tools.chunked(2).forEach { pair ->
@@ -116,12 +130,12 @@ private fun ToolCard(
                     Modifier
                 },
             ),
-        color = if (spec.available) {
+        color = if (spec.emphasized) {
             MaterialTheme.colorScheme.primaryContainer
         } else {
             MaterialTheme.colorScheme.surfaceContainer
         },
-        contentColor = if (spec.available) {
+        contentColor = if (spec.emphasized) {
             MaterialTheme.colorScheme.onPrimaryContainer
         } else {
             MaterialTheme.colorScheme.onSurface

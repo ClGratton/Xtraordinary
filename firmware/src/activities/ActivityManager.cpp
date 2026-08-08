@@ -11,6 +11,7 @@
 #include "browser/OpdsBookBrowserActivity.h"
 #ifdef ENABLE_X3_COMPANION
 #include "companion/CompanionFocusActivity.h"
+#include "companion/CompanionTicketActivity.h"
 #endif
 #include "home/CrashActivity.h"
 #include "home/FileBrowserActivity.h"
@@ -176,12 +177,6 @@ void ActivityManager::goToFileTransfer() {
   replaceActivity(std::make_unique<CrossPointWebServerActivity>(renderer, mappedInput));
 }
 
-#ifdef ENABLE_X3_COMPANION
-void ActivityManager::goToCompanionFileTransfer() {
-  replaceActivity(std::make_unique<CrossPointWebServerActivity>(renderer, mappedInput, true));
-}
-#endif
-
 void ActivityManager::goToSettings() { replaceActivity(std::make_unique<SettingsActivity>(renderer, mappedInput)); }
 
 void ActivityManager::goToFileBrowser(std::string path) {
@@ -224,6 +219,8 @@ void ActivityManager::goHome(HomeMenuItem initialMenuItem) {
       initialMenuItem = HomeMenuItem::FILE_BROWSER;
     } else if (activityName == "RecentBooks") {
       initialMenuItem = HomeMenuItem::RECENTS;
+    } else if (activityName == "CompanionTicket") {
+      initialMenuItem = HomeMenuItem::TICKET;
     } else if (activityName == "OpdsBookBrowser") {
       initialMenuItem = HomeMenuItem::OPDS_BROWSER;
     } else if (activityName == "CrossPointWebServer") {
@@ -239,10 +236,22 @@ void ActivityManager::goToCrashReport() { replaceActivity(std::make_unique<Crash
 void ActivityManager::goToCompanionFocus(companion::SessionEngine& session) {
   replaceActivity(std::make_unique<CompanionFocusActivity>(renderer, mappedInput, session));
 }
+void ActivityManager::goToCompanionTicket(companion::TicketState& ticket) {
+  replaceActivity(std::make_unique<CompanionTicketActivity>(renderer, mappedInput, ticket));
+}
 
 namespace companion {
 void showFocus(SessionEngine& session) { activityManager.goToCompanionFocus(session); }
+void showTicket(TicketState& ticket) { activityManager.goToCompanionTicket(ticket); }
 void showHome() { activityManager.goHome(); }
+void hideTicketIfVisible() {
+  if (activityManager.isCompanionTicketActivity() || activityManager.isHomeActivity()) {
+    // Rebuild Home from the authoritative ticket state. Passing TICKET also
+    // requests a full first refresh; when the ticket was deleted its index
+    // safely falls back to the first remaining menu item.
+    activityManager.goHome(HomeMenuItem::TICKET);
+  }
+}
 void refreshFocus() { activityManager.requestUpdate(); }
 }  // namespace companion
 #endif
@@ -274,15 +283,13 @@ bool ActivityManager::isReaderActivity() const {
          (currentActivity && currentActivity->isReaderActivity());
 }
 
-bool ActivityManager::isCurrentActivity(const char* name) const {
-  return currentActivity && name && currentActivity->name == name;
+#ifdef ENABLE_X3_COMPANION
+bool ActivityManager::isCompanionTicketActivity() const {
+  return currentActivity && currentActivity->name == "CompanionTicket";
 }
 
-bool ActivityManager::showNoPhoneSleepNotice() {
-  if (!isCurrentActivity("Home")) return false;
-  static_cast<HomeActivity*>(currentActivity.get())->showNoPhoneSleepNotice();
-  return true;
-}
+bool ActivityManager::isHomeActivity() const { return currentActivity && currentActivity->name == "Home"; }
+#endif
 
 bool ActivityManager::skipLoopDelay() const { return currentActivity && currentActivity->skipLoopDelay(); }
 

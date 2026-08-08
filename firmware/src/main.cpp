@@ -237,15 +237,21 @@ static bool loadSleepFrameBuffer() {
 }
 
 // Enter deep sleep mode
-void enterDeepSleep(bool fromTimeout = false, bool preserveCurrentFrame = false) {
+void enterDeepSleep(bool fromTimeout = false) {
   HalPowerManager::Lock powerLock;  // Ensure we are at normal CPU frequency for sleep preparation
   APP_STATE.lastSleepFromReader = activityManager.isReaderActivity();
 
+#ifdef ENABLE_X3_COMPANION
+  // A direct sleep from Reading/Static does not pass through Home. Briefly
+  // advertise so a phone already waiting with queued work can connect, receive
+  // status/capabilities, send its commands, and receive their ACKs.
+  companion::companionService.syncBeforeSleep(1200);
+#endif
+
   const bool isQuickResumeSleep =
-      !preserveCurrentFrame &&
-      (SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::QUICK_RESUME ||
-       (fromTimeout &&
-        SETTINGS.quickResumeSleepScreen == CrossPointSettings::QUICK_RESUME_SLEEP_SCREEN::QUICK_RESUME_AFTER_TIMEOUT));
+      SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::QUICK_RESUME ||
+      (fromTimeout &&
+       SETTINGS.quickResumeSleepScreen == CrossPointSettings::QUICK_RESUME_SLEEP_SCREEN::QUICK_RESUME_AFTER_TIMEOUT);
   APP_STATE.showBootScreen = !isQuickResumeSleep;
 
   APP_STATE.saveToFile();
@@ -253,11 +259,7 @@ void enterDeepSleep(bool fromTimeout = false, bool preserveCurrentFrame = false)
   // Commit to sleeping before goToSleep() runs the outgoing activity's onExit():
   // a WiFi activity would otherwise silentRestart() here and reboot instead.
   deepSleepInProgress = true;
-#ifdef ENABLE_X3_COMPANION
-  companion::companionService.prepareForSleep();
-  if (companion::companionService.connected()) delay(120);
-#endif
-  if (!preserveCurrentFrame) activityManager.goToSleep(fromTimeout);
+  activityManager.goToSleep(fromTimeout);
 
   if (isQuickResumeSleep) {
     saveSleepFrameBuffer();
@@ -347,6 +349,12 @@ void setup() {
     LOG_ERR("MAIN", "SD card initialization failed");
     setupDisplayAndFonts(isSilentReboot);
     activityManager.goToFullScreenMessage("SD card error", EpdFontFamily::BOLD);
+#ifdef ENABLE_X3_COMPANION
+    // Keep recovery/control available even when the card is missing or slow.
+    // Ticket persistence degrades to RAM, but pairing and remote diagnostics
+    // must not disappear behind the SD error screen.
+    companion::companionService.begin();
+#endif
     return;
   }
 
@@ -498,6 +506,7 @@ void loop() {
 
   gpio.update();
 #ifdef ENABLE_X3_COMPANION
+  companion::companionService.setReading(activityManager.isReaderActivity());
   // BLE callbacks only stamp activity and enqueue work. Restore full speed on
   // the main loop before decoding a command or rendering its resulting UI.
   if (companion::companionService.requiresFullClock()) powerManager.setPowerSaving(false);
@@ -538,10 +547,13 @@ void loop() {
 
   // Check for any user activity (button press or release) or active background work
   static unsigned long lastActivityTime = millis();
-  if (gpio.wasAnyPressed() || gpio.wasAnyReleased() || halTiltSensor.hadActivity() ||
-      activityManager.preventAutoSleep()) {
+  const bool buttonActivity = gpio.wasAnyPressed() || gpio.wasAnyReleased();
+  if (buttonActivity || halTiltSensor.hadActivity() || activityManager.preventAutoSleep()) {
     lastActivityTime = millis();         // Reset inactivity timer
     powerManager.setPowerSaving(false);  // Restore normal CPU frequency on user activity
+#ifdef ENABLE_X3_COMPANION
+    if (buttonActivity) companion::companionService.wakeFastAdvertising();
+#endif
   }
 
   static bool screenshotButtonsReleased = true;
@@ -568,18 +580,22 @@ void loop() {
     screenshotComboActive = false;
   }
 
-  const unsigned long sleepTimeoutMs = SETTINGS.getSleepTimeoutMs();
+  unsigned long sleepTimeoutMs = SETTINGS.getSleepTimeoutMs();
 #ifdef ENABLE_X3_COMPANION
-  if (companion::companionService.shouldSleepAfterUnpairedBoot(millis() - lastActivityTime)) {
-    LOG_DBG("SLP", "No phone connected during the two-minute wake window; sleeping");
-    if (activityManager.showNoPhoneSleepNotice()) {
-      activityManager.requestUpdateAndWait();
-      enterDeepSleep(true, true);
-      return;
-    }
-  }
+  // The phone-managed companion policy is authoritative for idle Home and
+  // static-ticket sleep. Activities such as Reading, Focus and Live ticket
+  // already reset lastActivityTime while they intentionally remain active.
+  sleepTimeoutMs = companion::companionService.companionSleepAfterMs();
 #endif
-  if (sleepTimeoutMs > 0 && millis() - lastActivityTime >= sleepTimeoutMs) {
+  bool preserveStaticTicket = false;
+#ifdef ENABLE_X3_COMPANION
+  // A static e-ink ticket is already the low-power screen. Keep the rendered
+  // ticket intact with BLE quiet and the CPU power-saved instead of replacing
+  // it with the generic sleep artwork. Back exits the ticket and restores the
+  // fast discovery window.
+  preserveStaticTicket = companion::companionService.staticTicketDisplayed();
+#endif
+  if (!preserveStaticTicket && sleepTimeoutMs > 0 && millis() - lastActivityTime >= sleepTimeoutMs) {
     LOG_DBG("SLP", "Auto-sleep triggered after %lu ms of inactivity", sleepTimeoutMs);
     enterDeepSleep(true);
     // This should never be hit as `enterDeepSleep` calls esp_deep_sleep_start
@@ -608,6 +624,9 @@ void loop() {
   // Refresh the battery icon when USB is plugged or unplugged.
   // Placed after sleep guards so we never queue a render that won't be processed.
   if (gpio.wasUsbStateChanged()) {
+#ifdef ENABLE_X3_COMPANION
+    companion::companionService.notifyPowerChanged();
+#endif
     activityManager.requestUpdate();
   }
 
@@ -644,11 +663,9 @@ void loop() {
       delay(50);
     } else {
       if (companionNeedsFullClock) {
-        // Keep the CPU clock stable while a client is attached. Dropping to
-        // the power-saving clock mid-link causes Android to terminate GATT.
-        // The phone disconnects shortly after backgrounding, so the X3 can
-        // return to the proven 80 MHz advertising floor. True device sleep
-        // still enters ESP32-C3 deep sleep.
+        // Pairing and bursts run at normal speed. Once BLE traffic has been
+        // idle for a measured grace period, the companion-safe 80 MHz floor
+        // is sufficient and avoids holding 160 MHz for the entire link.
         powerManager.setPowerSaving(false);
       }
       // Short delay to prevent tight loop while still being responsive

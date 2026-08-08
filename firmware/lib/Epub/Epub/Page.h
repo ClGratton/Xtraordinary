@@ -92,6 +92,16 @@ class Page {
   bool serialize(HalFile& file) const;
   static std::unique_ptr<Page> deserialize(HalFile& file);
 
+  size_t wordCount() const {
+    size_t count = 0;
+    for (const auto& element : elements) {
+      if (element->getTag() == TAG_PageLine) {
+        count += static_cast<const PageLine&>(*element).getBlock()->wordCount();
+      }
+    }
+    return count;
+  }
+
   // Check if page contains any images (used to force full refresh)
   bool hasImages() const {
     return std::any_of(elements.begin(), elements.end(),

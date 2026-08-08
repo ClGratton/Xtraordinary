@@ -12,6 +12,7 @@
 #ifdef ENABLE_X3_COMPANION
 namespace companion {
 class SessionEngine;
+struct TicketState;
 }
 #endif
 
@@ -22,7 +23,7 @@ class SessionEngine;
 class Activity;    // forward declaration
 class RenderLock;  // forward declaration
 
-enum class HomeMenuItem { NONE, FILE_BROWSER, RECENTS, OPDS_BROWSER, FILE_TRANSFER, SETTINGS_MENU };
+enum class HomeMenuItem { NONE, FILE_BROWSER, RECENTS, TICKET, OPDS_BROWSER, FILE_TRANSFER, SETTINGS_MENU };
 
 /**
  * ActivityManager
@@ -87,9 +88,6 @@ class ActivityManager {
 
   // goTo... functions are convenient wrapper for replaceActivity()
   void goToFileTransfer();
-#ifdef ENABLE_X3_COMPANION
-  void goToCompanionFileTransfer();
-#endif
   void goToSettings();
   void goToFileBrowser(std::string path = {});
   void goToRecentBooks();
@@ -101,6 +99,7 @@ class ActivityManager {
   void goToCrashReport();
 #ifdef ENABLE_X3_COMPANION
   void goToCompanionFocus(companion::SessionEngine& session);
+  void goToCompanionTicket(companion::TicketState& ticket);
 #endif
   void goHome(HomeMenuItem initialMenuItem = HomeMenuItem::NONE);
 
@@ -113,8 +112,10 @@ class ActivityManager {
 
   bool preventAutoSleep() const;
   bool isReaderActivity() const;
-  bool isCurrentActivity(const char* name) const;
-  bool showNoPhoneSleepNotice();
+#ifdef ENABLE_X3_COMPANION
+  bool isCompanionTicketActivity() const;
+  bool isHomeActivity() const;
+#endif
   bool skipLoopDelay() const;
   ScreenshotInfo getScreenshotInfo() const;
 

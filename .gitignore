@@ -5,6 +5,13 @@
 *.iml
 local.properties
 **/build/
-backend/node_modules/
 captures/
 .externalNativeBuild/
+.v023/
+.v023.zip
+idf-driver-esp32-usb-jtag-*.zip
+firmware/.cache-*/
+firmware/.dummy/
+firmware/managed_components/
+firmware/sdkconfig.defaults
+firmware/sdkconfig.*

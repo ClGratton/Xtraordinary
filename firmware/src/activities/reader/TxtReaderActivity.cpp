@@ -13,6 +13,7 @@
 #include "MappedInputManager.h"
 #include "ProgressFile.h"
 #include "ReaderUtils.h"
+#include "ReadingStatsStore.h"
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -41,6 +42,7 @@ void TxtReaderActivity::onEnter() {
   APP_STATE.openEpubPath = filePath;
   APP_STATE.saveToFile();
   RECENT_BOOKS.addBook(filePath, fileName, "", "");
+  READING_STATS.beginSession(fileName);
 
   // Trigger first update
   requestUpdate();
@@ -48,6 +50,8 @@ void TxtReaderActivity::onEnter() {
 
 void TxtReaderActivity::onExit() {
   Activity::onExit();
+
+  READING_STATS.finishSession();
 
   // Reset orientation back to portrait for the rest of the UI
   renderer.setOrientation(GfxRenderer::Orientation::Portrait);
@@ -79,10 +83,12 @@ void TxtReaderActivity::loop() {
   }
 
   if (prevTriggered && currentPage > 0) {
+    READING_STATS.completeDisplayedPage();
     currentPage--;
     requestUpdate();
   } else if (nextTriggered) {
     if (currentPage < totalPages - 1) {
+      READING_STATS.completeDisplayedPage();
       currentPage++;
       requestUpdate();
     } else {
@@ -345,6 +351,18 @@ void TxtReaderActivity::render(RenderLock&&) {
 
   renderer.clearScreen();
   renderPage();
+
+  uint32_t words = 0;
+  for (const auto& line : currentPageLines) {
+    bool inWord = false;
+    for (const unsigned char value : line) {
+      const bool separator = value <= 0x20;
+      if (!separator && !inWord) words++;
+      inWord = !separator;
+    }
+  }
+  READING_STATS.showPage(static_cast<uint32_t>(currentPage), static_cast<uint16_t>(currentPage + 1),
+                         static_cast<uint16_t>(std::min<uint32_t>(words, UINT16_MAX)));
 
   // Save progress
   saveProgress();

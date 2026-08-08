@@ -616,9 +616,6 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
     state.success = false;
     state.error = "";
     uploadStartTime = millis();
-    state.startedAt = uploadStartTime;
-    state.lastActivityAt = uploadStartTime;
-    state.completedAt = 0;
     lastLoggedSize = 0;
     state.bufferPos = 0;
     totalWriteTime = 0;
@@ -668,7 +665,6 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
 
     LOG_DBG("WEB", "[UPLOAD] File created successfully: %s", filePath.c_str());
   } else if (upload.status == UPLOAD_FILE_WRITE) {
-    state.lastActivityAt = millis();
     if (state.file && state.error.isEmpty()) {
       // Buffer incoming data and flush when buffer is full
       // This reduces SD card write operations and improves throughput
@@ -715,8 +711,6 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
 
       if (state.error.isEmpty()) {
         state.success = true;
-        state.lastActivityAt = millis();
-        state.completedAt = state.lastActivityAt;
         const unsigned long elapsed = millis() - uploadStartTime;
         const float avgKbps = (elapsed > 0) ? (state.size / 1024.0) / (elapsed / 1000.0) : 0;
         const float writePercent = (elapsed > 0) ? (totalWriteTime * 100.0 / elapsed) : 0;
@@ -733,7 +727,6 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
       }
     }
   } else if (upload.status == UPLOAD_FILE_ABORTED) {
-    state.lastActivityAt = millis();
     state.bufferPos = 0;  // Discard buffered data
     if (state.file) {
       state.file.close();

@@ -19,6 +19,7 @@
 #include "MappedInputManager.h"
 #include "ProgressFile.h"
 #include "ReaderUtils.h"
+#include "ReadingStatsStore.h"
 #include "RecentBooksStore.h"
 #include "XtcReaderChapterSelectionActivity.h"
 #include "components/UITheme.h"
@@ -40,6 +41,7 @@ void XtcReaderActivity::onEnter() {
   APP_STATE.openEpubPath = xtc->getPath();
   APP_STATE.saveToFile();
   RECENT_BOOKS.addBook(xtc->getPath(), xtc->getTitle(), xtc->getAuthor(), xtc->getThumbBmpPath());
+  READING_STATS.beginSession(xtc->getTitle());
 
   // Trigger first update
   requestUpdate();
@@ -47,6 +49,8 @@ void XtcReaderActivity::onEnter() {
 
 void XtcReaderActivity::onExit() {
   Activity::onExit();
+
+  READING_STATS.finishSession();
 
   APP_STATE.readerActivityLoadCount = 0;
   APP_STATE.saveToFile();
@@ -101,6 +105,7 @@ void XtcReaderActivity::loop() {
   const int skipAmount = skipPages ? 10 : 1;
 
   if (prevTriggered) {
+    READING_STATS.completeDisplayedPage();
     if (currentPage >= static_cast<uint32_t>(skipAmount)) {
       currentPage -= skipAmount;
     } else {
@@ -108,6 +113,7 @@ void XtcReaderActivity::loop() {
     }
     requestUpdate();
   } else if (nextTriggered) {
+    READING_STATS.completeDisplayedPage();
     currentPage += skipAmount;
     if (currentPage >= xtc->getPageCount()) {
       currentPage = xtc->getPageCount();  // Allow showing "End of book"
@@ -131,6 +137,8 @@ void XtcReaderActivity::render(RenderLock&&) {
   }
 
   renderPage();
+  READING_STATS.showPage(currentPage, static_cast<uint16_t>(std::min<uint32_t>(currentPage + 1, UINT16_MAX)), 0,
+                         false);
   saveProgress();
 }
 

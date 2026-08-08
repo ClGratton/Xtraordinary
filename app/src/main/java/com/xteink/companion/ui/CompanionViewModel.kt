@@ -1,23 +1,28 @@
 package com.xteink.companion.ui
 
 import android.app.Application
+import android.util.Base64
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.xteink.companion.data.BluetoothCompanionClient
 import com.xteink.companion.data.BookLibraryRepository
-import com.xteink.companion.data.BookTransferSource
-import com.xteink.companion.data.BookTransferException
 import com.xteink.companion.data.FirmwareRelease
 import com.xteink.companion.data.FirmwareReleaseRepository
 import com.xteink.companion.data.FirmwareSource
+import com.xteink.companion.data.ImportedFlightPass
 import com.xteink.companion.data.LinkPhase
+import com.xteink.companion.data.ReadingStatsRepository
 import com.xteink.companion.data.UsbEspFlasher
 import com.xteink.companion.data.UsbFlashPhase
 import com.xteink.companion.protocol.SessionStart
+import com.xteink.companion.protocol.BoardingPassPayload
 import com.xteink.companion.protocol.DeviceActivity
-import com.xteink.companion.protocol.PowerSyncConfig
+import com.xteink.companion.protocol.PayloadCodec
+import com.xteink.companion.protocol.RadioPolicy
+import com.xteink.companion.protocol.TicketDisplayMode
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,9 +30,52 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class CompanionViewModel(application: Application) : AndroidViewModel(application) {
-    private val _uiState = MutableStateFlow(CompanionUiState())
+    private val readingStatsRepository = ReadingStatsRepository(application)
+    private val radioPreferences =
+        application.getSharedPreferences("xtraordinary_radio_policy", Application.MODE_PRIVATE)
+    private val ticketPreferences =
+        application.getSharedPreferences("xtraordinary_ticket_state", Application.MODE_PRIVATE)
+    private val initialTicketMode = runCatching {
+        TicketMode.valueOf(
+            ticketPreferences.getString("mode", TicketMode.Static.name) ?: TicketMode.Static.name,
+        )
+    }.getOrDefault(TicketMode.Static)
+    private val initialTicketOnX3 = ticketPreferences.getBoolean("is_on_x3", false)
+    private val initialTicketRemovalPending = ticketPreferences.getBoolean("removal_pending", false)
+    private val initialPendingTicketPayload = ticketPreferences.getString("pending_show_payload", null)?.let { encoded ->
+        runCatching { PayloadCodec.decodeBoardingPass(Base64.decode(encoded, Base64.DEFAULT)) }.getOrNull()
+    }
+    private val initialRadioPolicy = RadioPolicyUiState(
+        fastWindowMinutes = radioPreferences.getInt("fast_window_minutes", 5),
+        slowIntervalMs = radioPreferences.getInt("slow_interval_ms", 2_000),
+        sleepAfterMinutes = radioPreferences.getInt("sleep_after_minutes", 10),
+        fullRefreshPages = radioPreferences.getInt("full_refresh_pages", 15),
+    )
+    private val initialRadioPolicySyncPending = radioPreferences.getBoolean("sync_pending", true)
+    private val initialBatteryPercentage = radioPreferences.getInt("last_battery_percentage", -1)
+        .takeIf { it in 0..100 }
+    private val _uiState = MutableStateFlow(
+        CompanionUiState(
+            radioPolicy = initialRadioPolicy,
+            device = DeviceUiState(
+                batteryPercentage = initialBatteryPercentage,
+                settingsSyncPending = initialRadioPolicySyncPending,
+            ),
+            ticket = TicketUiState(
+                mode = initialTicketMode,
+                isOnX3 = initialTicketOnX3,
+                sendPending = initialPendingTicketPayload != null,
+                removalPending = initialTicketRemovalPending,
+            ),
+            readingStats = ReadingStatsUiState(
+                sessions = readingStatsRepository.load(),
+                minimumPageSeconds = readingStatsRepository.minimumPageSeconds(),
+            ),
+        ),
+    )
     val uiState: StateFlow<CompanionUiState> = _uiState.asStateFlow()
     private val companionClient = BluetoothCompanionClient(application)
     private val usbFlasher = UsbEspFlasher(application)
@@ -40,17 +88,27 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     private var reconnectJob: Job? = null
     private var focusSyncJob: Job? = null
     private var deleteSyncJob: Job? = null
-    private var powerConfigSyncJob: Job? = null
+    private var ticketSendJob: Job? = null
+    private var ticketDeleteJob: Job? = null
+    private var radioPolicySyncJob: Job? = null
+    private var readingQuietJob: Job? = null
+    private var radioPolicyRevision = 0L
+    private var radioPolicySyncPending = initialRadioPolicySyncPending
+    private var radioPolicyValidatedForConnection = false
     private var appForeground = false
     private var intentionalTransportIdle = true
     private var reconnectAttempt = 0
     private var pendingFocusSync = false
-    private val pendingDeletePaths = linkedSetOf<String>()
+    private var liveTicketActive = initialTicketOnX3 && initialTicketMode == TicketMode.Live
+    private var pendingTicketPayload: BoardingPassPayload? = initialPendingTicketPayload
+    private val pendingDeletePaths = connectionPreferences
+        .getStringSet(PendingDeletePathsKey, emptySet())
+        .orEmpty()
+        .toCollection(linkedSetOf())
 
     init {
-        _uiState.update { it.copy(powerSyncConfig = loadPowerSyncConfig()) }
         managedDeviceModel()?.let { model ->
-            _uiState.update { it.copy(hasManagedX3 = true, connectedDeviceModel = model) }
+            _uiState.update { it.copy(isX3Connected = true, connectedDeviceModel = model) }
         }
         viewModelScope.launch {
             companionClient.state.collect { link ->
@@ -61,10 +119,36 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 val managedModel = managedDeviceModel()
                 val transportConnected = link.phase == LinkPhase.Connected
                 val unexpectedDisconnect = link.phase == LinkPhase.Error && !intentionalTransportIdle
+                val reconnectRequired = unexpectedDisconnect && requiresPersistentTransport()
+                if (unexpectedDisconnect && !reconnectRequired) {
+                    // Foreground discovery is a one-shot status probe. An idle,
+                    // sleeping, Reading, or Static-ticket X3 is still a managed
+                    // device; failure to open GATT must settle back to Available
+                    // instead of starting an endless reconnect loop.
+                    intentionalTransportIdle = true
+                }
+                if (capabilities != null) {
+                    val removalPending = capabilities.ticketPresent && _uiState.value.ticket.removalPending
+                    persistTicketState(capabilities.ticketPresent, _uiState.value.ticket.mode, removalPending)
+                    if (!capabilities.ticketPresent) liveTicketActive = false
+                }
+                if (transportConnected && capabilities != null && !radioPolicyValidatedForConnection) {
+                    // The phone policy is authoritative. Re-apply it once per
+                    // GATT session as well as after explicit edits, so a local
+                    // device-side change cannot silently leave the two copies
+                    // divergent.
+                    radioPolicyValidatedForConnection = true
+                    radioPolicySyncPending = true
+                    radioPreferences.edit().putBoolean("sync_pending", true).apply()
+                } else if (!transportConnected) {
+                    radioPolicyValidatedForConnection = false
+                }
+                link.deviceStatus?.batteryPercentage?.let { percentage ->
+                    radioPreferences.edit().putInt("last_battery_percentage", percentage).apply()
+                }
                 _uiState.update { state ->
                     state.copy(
-                        hasManagedX3 = managedModel != null || transportConnected,
-                        isX3Connected = transportConnected,
+                        isX3Connected = managedModel != null || transportConnected,
                         isX3TransportConnected = transportConnected,
                         connectedDeviceModel = capabilities?.model ?: managedModel ?: state.connectedDeviceModel,
                         device = state.device.copy(
@@ -73,53 +157,58 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                                 previous = state.device.reconnecting,
                                 phase = link.phase,
                                 intentionalTransportIdle = intentionalTransportIdle,
-                                activity = state.device.activity,
                             ),
-                            message = link.message,
+                            message = if (reconnectRequired) null else link.message,
                             firmwareVersion = capabilities?.firmwareVersion ?: state.device.firmwareVersion,
                             libraryRevision = capabilities?.libraryRevision ?: state.device.libraryRevision,
                             firmwareProgress = link.transferProgress ?: state.device.firmwareProgress,
+                            batteryPercentage = link.deviceStatus?.batteryPercentage
+                                ?: state.device.batteryPercentage,
+                            charging = transportConnected && link.deviceStatus?.charging == true,
+                            settingsSyncPending = radioPolicySyncPending,
+                        ),
+                        ticket = if (capabilities == null) state.ticket else state.ticket.copy(
+                            isOnX3 = capabilities.ticketPresent,
+                            removalPending = capabilities.ticketPresent && state.ticket.removalPending,
                         ),
                     )
                 }
-                if (transportConnected) {
+                if (transportConnected && capabilities != null) {
                     reconnectAttempt = 0
                     reconnectJob?.cancel()
                     reconnectJob = null
-                    syncPowerConfig()
+                    syncRadioPolicy()
                     drainPendingFocusSync()
                     drainPendingDeletes()
-                } else if (unexpectedDisconnect) {
+                    drainPendingTicketSend()
+                    drainPendingTicketRemoval()
+                    if (link.deviceStatus?.activity == DeviceActivity.Reading) scheduleReadingRadioQuiet()
+                } else if (reconnectRequired) {
                     scheduleReconnect()
                 }
             }
         }
         viewModelScope.launch {
-            companionClient.statuses.collect { status ->
-                val now = System.currentTimeMillis()
-                intentionalTransportIdle = status.activity == DeviceActivity.Sleeping
-                _uiState.update { state ->
-                    state.copy(
-                        device = state.device.copy(
-                            activity = status.activity,
-                            syncMode = status.syncMode,
-                            statusRevision = status.revision,
-                            lastStatusAtEpochMs = now,
-                            lowPowerGraceExpired = false,
-                            reconnecting = false,
-                            message = null,
-                        ),
-                    )
-                }
-                runCatching { companionClient.confirmStatus(status.revision) }
-                    .onFailure { error ->
-                        Log.w("XtraordinaryBLE", "Could not confirm device state ${status.revision}", error)
-                    }
+            companionClient.libraries.collect { snapshot ->
+                reconcileDeviceLibrary(snapshot.revision, snapshot.entries.map { it.path to it.sizeBytes })
             }
         }
         viewModelScope.launch {
-            companionClient.libraries.collect { snapshot ->
-                reconcileDeviceLibrary(snapshot.revision, snapshot.entries.map { it.path to it.sizeBytes })
+            companionClient.readingStats.collect { chunk ->
+                _uiState.update { it.copy(readingStats = it.readingStats.copy(syncing = true)) }
+                val completed = withContext(Dispatchers.IO) { readingStatsRepository.accept(chunk) }
+                if (completed != null) {
+                    _uiState.update {
+                        it.copy(
+                            readingStats = it.readingStats.copy(
+                                sessions = readingStatsRepository.load(),
+                                syncing = false,
+                            ),
+                        )
+                    }
+                    runCatching { companionClient.acknowledgeReadingStats(completed.id) }
+                        .onFailure { error -> Log.w("ReadingStats", "Session persisted but ACK failed", error) }
+                }
             }
         }
         viewModelScope.launch {
@@ -154,26 +243,25 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 delay(1_000)
                 usbFlasher.refresh()
                 _uiState.update { state ->
-                    val device = state.device.copy(
-                        lowPowerGraceExpired =
-                            state.device.activity == DeviceActivity.Reading &&
-                                !state.isX3TransportConnected &&
-                                !isWithinExpectedSilence(
-                                    activity = state.device.activity,
-                                    lastStatusAtEpochMs = state.device.lastStatusAtEpochMs,
-                                    nowEpochMs = System.currentTimeMillis(),
-                                    config = state.powerSyncConfig,
-                                ),
-                    )
-                    if (state.focus.phase != FocusPhase.Running) return@update state.copy(device = device)
+                    if (state.focus.phase != FocusPhase.Running) return@update state
                     val nextRemaining = (state.focus.remainingSeconds - 1).coerceAtLeast(0)
                     state.copy(
-                        device = device,
                         focus = state.focus.copy(
                             remainingSeconds = nextRemaining,
                             phase = if (nextRemaining == 0) FocusPhase.Review else FocusPhase.Running,
                         ),
                     )
+                }
+                // A persistent Focus or Live session must recover even if an
+                // Android GATT callback races the one-shot reconnect job. This
+                // watchdog only acts while the app is foregrounded and no scan
+                // or connection attempt is already active.
+                val linkPhase = companionClient.state.value.phase
+                if (canMaintainTransport() && !intentionalTransportIdle && requiresPersistentTransport() &&
+                    !_uiState.value.isX3TransportConnected && reconnectJob?.isActive != true &&
+                    linkPhase != LinkPhase.Scanning && linkPhase != LinkPhase.Connecting
+                ) {
+                    scheduleReconnect()
                 }
             }
         }
@@ -183,16 +271,73 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         _uiState.update { it.copy(visualTheme = theme) }
     }
 
-    fun setNormalPollSeconds(seconds: Int) {
-        updatePowerSyncConfig(_uiState.value.powerSyncConfig.copy(normalPollSeconds = seconds))
+    fun setRadioPolicy(policy: RadioPolicyUiState) {
+        val normalized = policy.copy(
+            fastWindowMinutes = policy.fastWindowMinutes.coerceIn(1, 30),
+            slowIntervalMs = policy.slowIntervalMs.coerceIn(500, 4_000),
+            sleepAfterMinutes = policy.sleepAfterMinutes.coerceIn(
+                policy.fastWindowMinutes.coerceIn(1, 30) + 1,
+                60,
+            ),
+            fullRefreshPages = policy.fullRefreshPages.takeIf { it in setOf(1, 5, 10, 15, 30) } ?: 15,
+        )
+        radioPreferences.edit()
+            .putInt("fast_window_minutes", normalized.fastWindowMinutes)
+            .putInt("slow_interval_ms", normalized.slowIntervalMs)
+            .putInt("sleep_after_minutes", normalized.sleepAfterMinutes)
+            .putInt("full_refresh_pages", normalized.fullRefreshPages)
+            .putBoolean("sync_pending", true)
+            .apply()
+        radioPolicyRevision++
+        radioPolicySyncPending = true
+        _uiState.update {
+            it.copy(
+                radioPolicy = normalized,
+                device = it.device.copy(settingsSyncPending = true, message = null),
+            )
+        }
+        if (managedDeviceModel() != null) {
+            intentionalTransportIdle = false
+            if (_uiState.value.isX3TransportConnected) syncRadioPolicy() else ensureTransportConnected()
+        }
     }
 
-    fun setSlowPollSeconds(seconds: Int) {
-        updatePowerSyncConfig(_uiState.value.powerSyncConfig.copy(slowPollSeconds = seconds))
-    }
-
-    fun setSleepTimeoutMinutes(minutes: Int) {
-        updatePowerSyncConfig(_uiState.value.powerSyncConfig.copy(sleepTimeoutMinutes = minutes))
+    private fun syncRadioPolicy() {
+        if (!radioPolicySyncPending || !_uiState.value.isX3TransportConnected || radioPolicySyncJob?.isActive == true) {
+            return
+        }
+        radioPolicySyncJob = viewModelScope.launch {
+            while (radioPolicySyncPending && _uiState.value.isX3TransportConnected) {
+                val revision = radioPolicyRevision
+                val policy = _uiState.value.radioPolicy
+                val result = runCatching {
+                    companionClient.setRadioPolicy(
+                        RadioPolicy(
+                            fastWindowMinutes = policy.fastWindowMinutes,
+                            slowIntervalMs = policy.slowIntervalMs,
+                            sleepAfterMinutes = policy.sleepAfterMinutes,
+                        ),
+                    )
+                    if (companionClient.state.value.capabilities?.supportsReaderPolicy == true) {
+                        companionClient.setReaderPolicy(policy.fullRefreshPages)
+                    }
+                }
+                if (result.isFailure) {
+                    Log.w("CompanionViewModel", "Could not sync device policy", result.exceptionOrNull())
+                    handleDeferredTransportFailure(result.exceptionOrNull())
+                    break
+                }
+                if (revision == radioPolicyRevision) {
+                    radioPolicySyncPending = false
+                    radioPreferences.edit().putBoolean("sync_pending", false).apply()
+                    _uiState.update {
+                        it.copy(device = it.device.copy(settingsSyncPending = false, message = null))
+                    }
+                }
+            }
+            radioPolicySyncJob = null
+            releaseBackgroundTransportIfIdle()
+        }
     }
 
     fun setTask(task: String) {
@@ -216,14 +361,6 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun startFocus() {
-        startFocus(syncToDevice = true)
-    }
-
-    fun startFocusPhoneOnly() {
-        startFocus(syncToDevice = false)
-    }
-
-    private fun startFocus(syncToDevice: Boolean) {
         _uiState.update { state ->
             state.copy(
                 surface = CompanionSurface.Focus,
@@ -231,10 +368,10 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                     phase = FocusPhase.Running,
                     remainingSeconds = state.focus.selectedMinutes * 60,
                 ),
-                notice = if (state.hasManagedX3) null else UiNotice.FocusStartedWithoutX3,
+                notice = if (state.isX3Connected) null else UiNotice.FocusStartedWithoutX3,
             )
         }
-        if (syncToDevice) requestFocusSync()
+        requestFocusSync()
     }
 
     fun togglePause() {
@@ -300,10 +437,62 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         _uiState.update { it.copy(ticket = it.ticket.copy(mode = mode)) }
     }
 
+    fun openStats() {
+        _uiState.update { it.copy(surface = CompanionSurface.Tools, toolDestination = ToolDestination.Stats) }
+    }
+
+    fun setReadingStatsView(view: ReadingStatsView) {
+        _uiState.update { it.copy(readingStats = it.readingStats.copy(view = view, selectedSessionId = null)) }
+    }
+
+    fun setMinimumReadingPageSeconds(seconds: Int) {
+        readingStatsRepository.setMinimumPageSeconds(seconds)
+        _uiState.update {
+            it.copy(readingStats = it.readingStats.copy(minimumPageSeconds = readingStatsRepository.minimumPageSeconds()))
+        }
+    }
+
+    fun selectReadingSession(sessionId: UInt?) {
+        _uiState.update { it.copy(readingStats = it.readingStats.copy(selectedSessionId = sessionId)) }
+    }
+
     fun selectPass(passId: String) {
         _uiState.update { state ->
             if (state.ticket.passes.none { it.id == passId }) state
             else state.copy(ticket = state.ticket.copy(selectedPassId = passId))
+        }
+    }
+
+    fun importFlightPass(pass: ImportedFlightPass) {
+        val imported = BoardingPassUiState(
+            id = pass.id,
+            origin = pass.origin,
+            destination = pass.destination,
+            flight = pass.flight,
+            status = pass.status,
+            departureTime = pass.departureTime,
+            countdown = "",
+            gate = pass.gate,
+            terminal = pass.terminal,
+            seat = pass.seat,
+            passenger = pass.passenger,
+            boardingGroup = pass.boardingGroup,
+            source = pass.source,
+            barcodePayload = pass.barcodePayload,
+        )
+        _uiState.update { state ->
+            val passes = listOf(imported) + state.ticket.passes.filterNot { it.id == imported.id }
+            state.copy(
+                surface = CompanionSurface.Tools,
+                toolDestination = ToolDestination.Passes,
+                ticket = state.ticket.copy(passes = passes, selectedPassId = imported.id),
+            )
+        }
+    }
+
+    fun reportFlightPassImportFailure(error: Throwable) {
+        _uiState.update {
+            it.copy(notice = UiNotice.DeviceMessage(error.message ?: "The flight pass could not be imported"))
         }
     }
 
@@ -353,91 +542,17 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     fun requestDeleteBooksFromX3(bookIds: Set<String>) {
         if (bookIds.isEmpty()) return
         _uiState.update { state ->
-            if (!state.hasManagedX3) {
+            if (!state.isX3Connected) {
                 state.copy(notice = UiNotice.ConnectX3ToDelete)
             } else state
         }
-        if (!_uiState.value.hasManagedX3) return
+        if (!_uiState.value.isX3Connected) return
         val paths = _uiState.value.read.books.filter { it.id in bookIds }.mapNotNull { it.x3Path }
         if (paths.isEmpty()) return
         pendingDeletePaths += paths
-        if (_uiState.value.isX3TransportConnected) drainPendingDeletes() else ensureTransportConnected()
-    }
-
-    fun booksForTransfer(bookIds: Set<String>): List<BookTransferSource> =
-        _uiState.value.read.books
-            .filter { it.id in bookIds && it.isOnPhone && it.sourceUri.isNotBlank() }
-            .map {
-                BookTransferSource(
-                    fileName = it.fileName,
-                    uri = android.net.Uri.parse(it.sourceUri),
-                    sizeBytes = it.fileSizeBytes,
-                )
-            }
-
-    suspend fun enterLibraryTransfer(): Result<Unit> = runCatching {
-        check(_uiState.value.hasManagedX3) { "Connect the XTEINK before sending books" }
+        persistPendingDeletePaths()
         intentionalTransportIdle = false
-        if (!_uiState.value.isX3TransportConnected) {
-            ensureTransportConnected()
-            companionClient.awaitConnected()
-        }
-        companionClient.startLibraryTransfer()
-    }
-
-    suspend fun leaveLibraryTransfer() {
-        runCatching { companionClient.stopLibraryTransfer() }
-        intentionalTransportIdle = true
-        companionClient.disconnect()
-        _uiState.update {
-            it.copy(
-                isX3TransportConnected = false,
-                read = it.read.copy(transferInProgress = false, transferProgress = null),
-                device = it.device.copy(reconnecting = false),
-            )
-        }
-        delay(2_500)
-        if (appForeground) {
-            intentionalTransportIdle = false
-            ensureTransportConnected()
-        }
-    }
-
-    fun setBookTransferProgress(progress: Float?) {
-        _uiState.update {
-            it.copy(
-                read = it.read.copy(
-                    transferInProgress = progress != null,
-                    transferProgress = progress,
-                ),
-            )
-        }
-    }
-
-    fun reportBooksSent(count: Int) {
-        _uiState.update {
-            it.copy(
-                notice = UiNotice.BooksSentToX3(count),
-                read = it.read.copy(transferInProgress = false, transferProgress = null),
-            )
-        }
-    }
-
-    fun reportBookTransferError(error: Throwable) {
-        val message = when (error) {
-            is BookTransferException -> error.message ?: "Book transfer could not start"
-            is SecurityException -> "Allow Nearby devices so Xtraordinary can connect to the X3"
-            else -> error.message?.takeUnless {
-                it.contains("android.permission", ignoreCase = true) ||
-                    it.contains("SecurityException", ignoreCase = true)
-            } ?: "Book transfer failed. The X3 returned to its previous screen."
-        }
-        _uiState.update {
-            it.copy(
-                notice = UiNotice.DeviceMessage(message),
-                read = it.read.copy(transferInProgress = false, transferProgress = null),
-            )
-        }
+        if (_uiState.value.isX3TransportConnected) drainPendingDeletes() else ensureTransportConnected()
     }
 
     fun hasCompanionPermissions(): Boolean = companionClient.hasPermissions()
@@ -446,7 +561,6 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         intentionalTransportIdle = false
         reconnectJob?.cancel()
         reconnectJob = null
-        _uiState.update { it.copy(device = it.device.copy(reconnecting = true)) }
         companionClient.connect(model)
     }
 
@@ -456,13 +570,13 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         reconnectJob = null
         pendingFocusSync = false
         pendingDeletePaths.clear()
+        persistPendingDeletePaths()
         connectionPreferences.edit().remove(LastConnectedModelKey).apply()
         companionClient.disconnect()
         _uiState.update {
             it.copy(
                 isX3Connected = false,
                 isX3TransportConnected = false,
-                hasManagedX3 = false,
                 connectedDeviceModel = null,
                 device = it.device.copy(reconnecting = false),
             )
@@ -485,7 +599,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             val state = _uiState.value
             val firmwareInProgress = state.device.firmwareCheckPhase == FirmwareCheckPhase.Downloading ||
                 state.device.firmwareCheckPhase == FirmwareCheckPhase.Transferring
-            if (!firmwareInProgress) {
+            if (!firmwareInProgress && !liveTicketActive && !requiresPersistentTransport()) {
                 intentionalTransportIdle = true
                 reconnectJob?.cancel()
                 reconnectJob = null
@@ -542,7 +656,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             }
             return
         }
-        if (!useUsb && !_uiState.value.hasManagedX3) {
+        if (!useUsb && !_uiState.value.isX3Connected) {
             _uiState.update { it.copy(notice = UiNotice.DeviceMessage("Connect the X3 to this phone by USB before flashing")) }
             return
         }
@@ -605,7 +719,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun reportFolderSync(found: Int, added: Int) {
         _uiState.update {
-            it.copy(surface = CompanionSurface.Read, notice = UiNotice.FolderSynced(found, added))
+            it.copy(surface = CompanionSurface.Read)
         }
     }
 
@@ -613,7 +727,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         _uiState.update {
             it.copy(
                 surface = CompanionSurface.Read,
-                notice = UiNotice.BooksImported(added, duplicates, failed),
+                notice = if (failed > 0) UiNotice.BooksImported(added, duplicates, failed) else null,
             )
         }
     }
@@ -623,11 +737,134 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun sendTicket() {
-        _uiState.update { it.copy(notice = UiNotice.PairBeforeSend) }
+        if (!_uiState.value.isX3Connected) {
+            _uiState.update { it.copy(notice = UiNotice.PairBeforeSend) }
+            return
+        }
+        if (pendingTicketPayload != null || ticketSendJob?.isActive == true) return
+        val ticket = _uiState.value.ticket
+        val pass = ticket.selectedPass
+        val displayMode = if (ticket.mode == TicketMode.Static) TicketDisplayMode.Static else TicketDisplayMode.Live
+        pendingTicketPayload = BoardingPassPayload(
+            mode = displayMode,
+            origin = pass.origin,
+            destination = pass.destination,
+            flight = pass.flight,
+            status = pass.status,
+            departureTime = pass.departureTime,
+            gate = pass.gate,
+            terminal = pass.terminal,
+            seat = pass.seat,
+            passenger = pass.passenger,
+            boardingGroup = pass.boardingGroup,
+            barcodePayload = pass.barcodePayload,
+        )
+        persistPendingTicketPayload()
+        _uiState.update { it.copy(ticket = it.ticket.copy(sendPending = true)) }
+        intentionalTransportIdle = false
+        if (companionClient.isReady()) drainPendingTicketSend() else ensureTransportConnected()
+    }
+
+    private fun drainPendingTicketSend() {
+        val payload = pendingTicketPayload ?: return
+        if (!companionClient.isReady() || ticketSendJob?.isActive == true) return
+        ticketSendJob = viewModelScope.launch {
+            val result = runCatching {
+                companionClient.showTicket(payload)
+            }
+            if (result.isSuccess) {
+                pendingTicketPayload = null
+                persistPendingTicketPayload()
+                val mode = if (payload.mode == TicketDisplayMode.Static) TicketMode.Static else TicketMode.Live
+                liveTicketActive = payload.mode == TicketDisplayMode.Live
+                persistTicketState(true, mode, false)
+                _uiState.update {
+                    it.copy(ticket = it.ticket.copy(mode = mode, isOnX3 = true, sendPending = false, removalPending = false))
+                }
+                if (!liveTicketActive) {
+                    // Keep the first bonded GATT session alive long enough for
+                    // Android's own post-bond service discovery to finish. If we
+                    // tear it down immediately, Android can retain a system GATT
+                    // attempt that blocks later app connections until Bluetooth
+                    // is restarted.
+                    delay(5_000)
+                    intentionalTransportIdle = true
+                    companionClient.disconnect()
+                    _uiState.update {
+                        it.copy(
+                            isX3TransportConnected = false,
+                            device = it.device.copy(reconnecting = false, charging = false),
+                        )
+                    }
+                }
+            } else {
+                handleDeferredTransportFailure(result.exceptionOrNull())
+            }
+            ticketSendJob = null
+        }
+    }
+
+    fun removeTicketFromX3() {
+        if (!_uiState.value.isX3Connected) {
+            _uiState.update { it.copy(notice = UiNotice.PairBeforeSend) }
+            return
+        }
+        if (_uiState.value.ticket.removalPending || ticketDeleteJob?.isActive == true) return
+        val ticket = _uiState.value.ticket
+        persistTicketState(true, ticket.mode, true)
+        _uiState.update { it.copy(ticket = it.ticket.copy(removalPending = true)) }
+        intentionalTransportIdle = false
+        if (companionClient.isReady()) drainPendingTicketRemoval() else ensureTransportConnected()
+    }
+
+    private fun drainPendingTicketRemoval() {
+        if (!_uiState.value.ticket.removalPending || !companionClient.isReady() ||
+            ticketDeleteJob?.isActive == true
+        ) {
+            return
+        }
+        ticketDeleteJob = viewModelScope.launch {
+            val result = runCatching {
+                companionClient.clearTicket()
+            }
+            if (result.isSuccess) {
+                liveTicketActive = false
+                persistTicketState(false, _uiState.value.ticket.mode, false)
+                intentionalTransportIdle = true
+                companionClient.disconnect()
+                _uiState.update {
+                    it.copy(
+                        ticket = it.ticket.copy(isOnX3 = false, removalPending = false),
+                        isX3TransportConnected = false,
+                        device = it.device.copy(reconnecting = false),
+                    )
+                }
+            } else {
+                handleDeferredTransportFailure(result.exceptionOrNull())
+            }
+            ticketDeleteJob = null
+        }
     }
 
     fun showSettings(show: Boolean) {
         _uiState.update { it.copy(settingsVisible = show) }
+    }
+
+    private fun persistTicketState(present: Boolean, mode: TicketMode, removalPending: Boolean) {
+        ticketPreferences.edit()
+            .putBoolean("is_on_x3", present)
+            .putString("mode", mode.name)
+            .putBoolean("removal_pending", removalPending)
+            .apply()
+    }
+
+    private fun persistPendingTicketPayload() {
+        val encoded = pendingTicketPayload?.let {
+            Base64.encodeToString(PayloadCodec.encodeBoardingPass(it), Base64.NO_WRAP)
+        }
+        ticketPreferences.edit().apply {
+            if (encoded == null) remove("pending_show_payload") else putString("pending_show_payload", encoded)
+        }.apply()
     }
 
     fun dismissNotice() {
@@ -672,66 +909,87 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     private fun managedDeviceModel(): String? =
         connectionPreferences.getString(LastConnectedModelKey, null)
 
-    private fun loadPowerSyncConfig(): PowerSyncConfig = PowerSyncConfig(
-        normalPollSeconds = connectionPreferences.getInt(NormalPollSecondsKey, 15).coerceIn(10, 120),
-        slowPollSeconds = connectionPreferences.getInt(SlowPollSecondsKey, 10 * 60).coerceIn(60, 30 * 60),
-        sleepTimeoutMinutes = connectionPreferences.getInt(SleepTimeoutMinutesKey, 5).coerceIn(1, 5),
-    )
-
-    private fun updatePowerSyncConfig(config: PowerSyncConfig) {
-        connectionPreferences.edit()
-            .putInt(NormalPollSecondsKey, config.normalPollSeconds)
-            .putInt(SlowPollSecondsKey, config.slowPollSeconds)
-            .putInt(SleepTimeoutMinutesKey, config.sleepTimeoutMinutes)
-            .apply()
-        _uiState.update { it.copy(powerSyncConfig = config) }
-        reconnectAttempt = 0
-        if (_uiState.value.isX3TransportConnected) syncPowerConfig()
-    }
-
-    private fun syncPowerConfig() {
-        if (!_uiState.value.isX3TransportConnected || powerConfigSyncJob?.isActive == true) return
-        val config = _uiState.value.powerSyncConfig
-        powerConfigSyncJob = viewModelScope.launch {
-            runCatching { companionClient.setPowerConfig(config) }
-                .onFailure { error ->
-                    Log.w("XtraordinaryBLE", "Could not sync power settings", error)
-                }
-            powerConfigSyncJob = null
-        }
-    }
-
     private fun ensureTransportConnected() {
-        if (!appForeground || intentionalTransportIdle || !companionClient.hasPermissions()) return
+        if (!canMaintainTransport() || intentionalTransportIdle || !companionClient.hasPermissions()) return
         val model = managedDeviceModel() ?: return
         val phase = _uiState.value.device.linkPhase
         if (phase == LinkPhase.Connected.name || phase == LinkPhase.Connecting.name || phase == LinkPhase.Scanning.name) {
             return
         }
-        _uiState.update { it.copy(device = it.device.copy(reconnecting = true)) }
         companionClient.connect(model)
+    }
+
+    private fun requiresPersistentTransport(): Boolean {
+        val state = _uiState.value
+        val focusNeedsLink = state.focus.phase == FocusPhase.Running || state.focus.phase == FocusPhase.Paused
+        val firmwareNeedsLink = state.device.firmwareCheckPhase == FirmwareCheckPhase.Downloading ||
+            state.device.firmwareCheckPhase == FirmwareCheckPhase.Transferring
+        return radioPolicySyncPending || pendingTicketPayload != null || liveTicketActive || ticketSendJob?.isActive == true || focusNeedsLink || firmwareNeedsLink || pendingFocusSync ||
+            pendingDeletePaths.isNotEmpty() || state.ticket.removalPending
+    }
+
+    private fun canMaintainTransport(): Boolean = appForeground || requiresPersistentTransport()
+
+    private fun scheduleReadingRadioQuiet() {
+        if (readingQuietJob?.isActive == true) return
+        readingQuietJob = viewModelScope.launch {
+            // ACK_STATUS is queued by the transport before this state reaches
+            // the ViewModel. Let it and any desired-state commands complete,
+            // then release GATT so firmware can keep Reading fully radio-quiet.
+            delay(300)
+            while (_uiState.value.isX3TransportConnected &&
+                companionClient.state.value.deviceStatus?.activity == DeviceActivity.Reading &&
+                requiresPersistentTransport()
+            ) {
+                delay(100)
+            }
+            if (_uiState.value.isX3TransportConnected &&
+                companionClient.state.value.deviceStatus?.activity == DeviceActivity.Reading
+            ) {
+                intentionalTransportIdle = true
+                companionClient.disconnect()
+                _uiState.update {
+                    it.copy(
+                        isX3TransportConnected = false,
+                        device = it.device.copy(reconnecting = false, charging = false, message = null),
+                    )
+                }
+            }
+            readingQuietJob = null
+        }
     }
 
     private fun scheduleReconnect() {
         val model = managedDeviceModel() ?: return
-        if (!appForeground || intentionalTransportIdle || reconnectJob?.isActive == true) return
-        val activity = _uiState.value.device.activity
-        if (activity == DeviceActivity.Sleeping) return
-        _uiState.update { it.copy(device = it.device.copy(reconnecting = false)) }
-        val delayMs = reconnectDelayMs(activity, _uiState.value.powerSyncConfig, reconnectAttempt)
+        if (!canMaintainTransport() || intentionalTransportIdle || reconnectJob?.isActive == true) return
+        _uiState.update { it.copy(device = it.device.copy(reconnecting = true)) }
+        val delayMs = ReconnectBackoffMs[reconnectAttempt.coerceAtMost(ReconnectBackoffMs.lastIndex)]
         reconnectAttempt++
         reconnectJob = viewModelScope.launch {
             delay(delayMs)
             reconnectJob = null
-            if (appForeground && !intentionalTransportIdle && !_uiState.value.isX3TransportConnected) {
-                _uiState.update { it.copy(device = it.device.copy(reconnecting = true)) }
+            if (canMaintainTransport() && !intentionalTransportIdle && !_uiState.value.isX3TransportConnected) {
                 companionClient.connect(model)
             }
         }
     }
 
+    private fun releaseBackgroundTransportIfIdle() {
+        if (appForeground || requiresPersistentTransport()) return
+        intentionalTransportIdle = true
+        reconnectJob?.cancel()
+        reconnectJob = null
+        companionClient.disconnect()
+        _uiState.update {
+            it.copy(
+                isX3TransportConnected = false,
+                device = it.device.copy(reconnecting = false, charging = false),
+            )
+        }
+    }
+
     private fun requestFocusSync() {
-        if (!_uiState.value.hasManagedX3) return
+        if (!_uiState.value.isX3Connected) return
         pendingFocusSync = true
         if (_uiState.value.isX3TransportConnected) drainPendingFocusSync() else ensureTransportConnected()
     }
@@ -779,7 +1037,8 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             }
             if (result.isSuccess) {
                 pendingDeletePaths.removeAll(paths.toSet())
-                _uiState.update { it.copy(notice = UiNotice.X3DeleteQueued(paths.size)) }
+                persistPendingDeletePaths()
+                releaseBackgroundTransportIfIdle()
             } else {
                 handleDeferredTransportFailure(result.exceptionOrNull())
             }
@@ -793,12 +1052,16 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             it.copy(
                 isX3TransportConnected = false,
                 device = it.device.copy(
-                    reconnecting = false,
-                    message = error?.message ?: "XTEINK connection interrupted",
+                    reconnecting = true,
+                    message = null,
                 ),
             )
         }
         scheduleReconnect()
+    }
+
+    private fun persistPendingDeletePaths() {
+        connectionPreferences.edit().putStringSet(PendingDeletePathsKey, pendingDeletePaths.toSet()).apply()
     }
 
     private suspend fun runDeviceCommand(block: suspend () -> Unit) {
@@ -818,8 +1081,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     private companion object {
         const val BackgroundDisconnectGraceMs = 1_500L
         const val LastConnectedModelKey = "last_connected_model"
-        const val NormalPollSecondsKey = "normal_poll_seconds"
-        const val SlowPollSecondsKey = "slow_poll_seconds"
-        const val SleepTimeoutMinutesKey = "sleep_timeout_minutes"
+        const val PendingDeletePathsKey = "pending_delete_paths"
+        val ReconnectBackoffMs = longArrayOf(1_000L, 3_000L, 8_000L, 15_000L)
     }
 }

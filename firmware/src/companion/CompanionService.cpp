@@ -8,6 +8,9 @@
 #include <NimBLEDevice.h>
 #include <esp_system.h>
 #include <mbedtls/sha256.h>
+#include <HalGPIO.h>
+#include <HalPowerManager.h>
+#include <HalClock.h>
 
 #include <algorithm>
 #include <cctype>
@@ -15,10 +18,9 @@
 #include <cstring>
 #include <iterator>
 
-#include "CrossPointSettings.h"
 #include "MappedInputManager.h"
-#include "activities/Activity.h"
-#include "activities/ActivityManager.h"
+#include "ReadingStatsStore.h"
+#include "CrossPointSettings.h"
 #include "CompanionUiBridge.h"
 #include "network/FirmwareFlasher.h"
 
@@ -32,17 +34,17 @@ constexpr char DATA_UUID[] = "7e400003-b5a3-f393-e0a9-e50e24dcca9e";
 constexpr char EVENTS_UUID[] = "7e400004-b5a3-f393-e0a9-e50e24dcca9e";
 constexpr char STATUS_UUID[] = "7e400005-b5a3-f393-e0a9-e50e24dcca9e";
 constexpr char FIRMWARE_PATH[] = "/.crosspoint/companion/firmware.bin";
+constexpr char TICKET_PATH[] = "/.crosspoint/companion/ticket.bin";
+constexpr char RADIO_POLICY_PATH[] = "/.crosspoint/companion/radio.bin";
+constexpr uint32_t TICKET_MAGIC = 0x544b5431;  // TKT1
+constexpr uint16_t TICKET_STORAGE_VERSION = 1;
 constexpr uint16_t ADVERTISING_INTERVAL = 800;  // 500 ms in 0.625 ms units
+constexpr uint32_t FULL_CLOCK_AFTER_BLE_ACTIVITY_MS = 5000;
 constexpr uint32_t CONNECTION_PARAMETER_DELAY_MS = 3000;
-constexpr uint16_t IDLE_CONNECTION_INTERVAL_MIN = 48;  // 60 ms in 1.25 ms units
-constexpr uint16_t IDLE_CONNECTION_INTERVAL_MAX = 80;  // 100 ms in 1.25 ms units
-constexpr uint16_t IDLE_CONNECTION_LATENCY = 1;  // At most ~200 ms idle response at the negotiated maximum.
-constexpr uint16_t CONNECTION_SUPERVISION_TIMEOUT = 600;  // 6 s in 10 ms units
-constexpr uint16_t READING_CONNECTION_INTERVAL_MIN = 160;  // 200 ms in 1.25 ms units
-constexpr uint16_t READING_CONNECTION_INTERVAL_MAX = 240;  // 300 ms in 1.25 ms units
-constexpr uint16_t READING_CONNECTION_LATENCY = 3;
-constexpr uint16_t READING_CONNECTION_SUPERVISION_TIMEOUT = 1000;  // 10 s in 10 ms units
-constexpr uint32_t UNPAIRED_BOOT_SLEEP_MS = 2UL * 60UL * 1000UL;
+constexpr uint16_t CONNECTION_SUPERVISION_TIMEOUT = 1000;  // 10 s in 10 ms units.
+constexpr uint8_t HELLO_REVISIONED_STATUS = 0x01;
+constexpr uint32_t RADIO_RESUME_RETRY_MS = 1000;
+constexpr uint32_t POWER_STATUS_INTERVAL_MS = 60u * 1000u;
 
 bool hasBookExtension(const char* path) {
   const char* dot = std::strrchr(path, '.');
@@ -82,6 +84,17 @@ bool isGeneratedDeviceTextFile(const char* name) {
                      [normalized](const char* generated) { return std::strcmp(normalized, generated) == 0; });
 }
 
+bool readBoundedString(const EnvelopeView& envelope, size_t& cursor, char* output, size_t capacity) {
+  if (!output || capacity == 0 || cursor + 2 > envelope.payloadLength) return false;
+  const uint16_t length = readU16(envelope.payload + cursor);
+  cursor += 2;
+  if (length >= capacity || cursor + length > envelope.payloadLength) return false;
+  std::memcpy(output, envelope.payload + cursor, length);
+  output[length] = '\0';
+  cursor += length;
+  return true;
+}
+
 class WriteCallbacks final : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic* characteristic, NimBLEConnInfo&) override {
     const NimBLEAttValue value = characteristic->getValue();
@@ -89,6 +102,21 @@ class WriteCallbacks final : public NimBLECharacteristicCallbacks {
   }
 };
 WriteCallbacks writeCallbacks;
+
+struct TicketStorageRecord {
+  uint32_t magic = TICKET_MAGIC;
+  uint16_t version = TICKET_STORAGE_VERSION;
+  uint16_t size = sizeof(TicketState);
+  TicketState ticket{};
+};
+
+struct RadioPolicyStorageRecord {
+  uint32_t magic = 0x52414431;  // RAD1
+  uint16_t version = 1;
+  uint16_t fastWindowMinutes = 5;
+  uint16_t slowIntervalMs = 2000;
+  uint16_t sleepAfterMinutes = 10;
+};
 
 class ServerCallbacks final : public NimBLEServerCallbacks {
   void onConnect(NimBLEServer*, NimBLEConnInfo& info) override {
@@ -103,12 +131,8 @@ ServerCallbacks serverCallbacks;
 CompanionService companionService;
 
 void CompanionService::begin() {
-  bootStartedAtMs_ = millis();
-  sleepTimeoutMinutes_ = std::clamp<uint8_t>(SETTINGS.sleepTimeoutMinutes, 1, 5);
-  if (SETTINGS.sleepTimeoutMinutes != sleepTimeoutMinutes_) {
-    SETTINGS.sleepTimeoutMinutes = sleepTimeoutMinutes_;
-    SETTINGS.saveToFile();
-  }
+  loadRadioPolicy();
+  loadTicket();
   commandQueue_ = xQueueCreateStatic(COMMAND_QUEUE_DEPTH, sizeof(CommandPacket), commandQueueStorage_.data(),
                                      &commandQueueState_);
   if (!commandQueue_) {
@@ -161,28 +185,36 @@ void CompanionService::begin() {
   const bool uuidAdded = advertising_->addServiceUUID(SERVICE_UUID);
   initialized_ = nameAdded && uuidAdded;
   const bool started = initialized_ && advertising_->start();
+  advertisingWindowStartedAtMs_ = millis();
   LOG_INF("CMP", "BLE advertising name=%d UUID=%d started=%d active=%d free heap=%u", nameAdded, uuidAdded, started,
           advertising_->isAdvertising(), ESP.getFreeHeap());
 }
 
 bool CompanionService::connected() const { return server_ && server_->getConnectedCount() > 0; }
 
-bool CompanionService::requiresFullClock() const { return connected(); }
+bool CompanionService::requiresBleSafeClock() const {
+  return initialized_ && !readingRadioQuiet_ && !ticketRadioQuiet_;
+}
+
+bool CompanionService::requiresFullClock() const {
+  // Starting/reconfiguring the controller and processing traffic stay at full
+  // speed. Once advertising is running, the BLE-safe 80 MHz floor is enough;
+  // keeping 160 MHz for the entire fast-discovery window only wastes battery.
+  return radioResumePending_ ||
+         (connected() && static_cast<uint32_t>(millis() - lastBleActivityMs_) < FULL_CLOCK_AFTER_BLE_ACTIVITY_MS);
+}
 
 void CompanionService::loop() {
-  observeDeviceActivity();
+  if (radioResumePending_ && static_cast<int32_t>(millis() - radioResumeRetryAtMs_) >= 0) resumeFastRadio();
+  updateAdvertisingPolicy();
   if (connectionParamsPending_ && connected() &&
       static_cast<uint32_t>(millis() - connectedAtMs_) >= CONNECTION_PARAMETER_DELAY_MS) {
     connectionParamsPending_ = false;
-    const bool confirmedSlow = syncMode_ == SyncMode::SLOW && confirmedStatusRevision_ == statusRevision_;
-    server_->updateConnParams(
-        connectionHandle_,
-        confirmedSlow ? READING_CONNECTION_INTERVAL_MIN : IDLE_CONNECTION_INTERVAL_MIN,
-        confirmedSlow ? READING_CONNECTION_INTERVAL_MAX : IDLE_CONNECTION_INTERVAL_MAX,
-        confirmedSlow ? READING_CONNECTION_LATENCY : IDLE_CONNECTION_LATENCY,
-        confirmedSlow ? READING_CONNECTION_SUPERVISION_TIMEOUT : CONNECTION_SUPERVISION_TIMEOUT);
-    LOG_INF("CMP", "Requested %s BLE connection parameters for handle %u", confirmedSlow ? "reading" : "normal",
-            connectionHandle_);
+    const uint16_t minimum = std::max<uint16_t>(80, slowConnectionIntervalUnits_ - slowConnectionIntervalUnits_ / 8);
+    server_->updateConnParams(connectionHandle_, minimum, slowConnectionIntervalUnits_, 0,
+                              CONNECTION_SUPERVISION_TIMEOUT);
+    LOG_INF("CMP", "Requested %u ms slow BLE interval for handle %u",
+            static_cast<unsigned>(slowConnectionIntervalUnits_ * 5u / 4u), connectionHandle_);
   }
   bool transportQueueAvailable = true;
   if (pendingResponse_) {
@@ -196,9 +228,27 @@ void CompanionService::loop() {
   if (transportQueueAvailable && commandQueue_ && xQueueReceive(commandQueue_, &command, 0) == pdTRUE) {
     handlePacket(command.bytes, command.length);
   }
-  if (transportQueueAvailable && !pendingResponse_ && statusDirty_ && connected()) sendDeviceStatus();
+  if (transportQueueAvailable && !pendingResponse_ && statusNotifyPending_ && connected()) {
+    if (sendDeviceStatus()) {
+      statusNotifyPending_ = false;
+    } else {
+      transportQueueAvailable = false;
+    }
+  }
+  if (revisionedStatusSupported_ && connected() &&
+      static_cast<uint32_t>(millis() - lastPowerStatusAtMs_) >= POWER_STATUS_INTERVAL_MS) {
+    const uint8_t batteryPercent = static_cast<uint8_t>(std::min<uint16_t>(100, powerManager.getBatteryPercentage()));
+    const bool charging = gpio.isUsbConnected();
+    lastPowerStatusAtMs_ = millis();
+    if (batteryPercent != lastReportedBatteryPercent_ || charging != lastReportedCharging_) {
+      statusNotifyPending_ = true;
+    }
+  }
   session_.update();
   if (transportQueueAvailable && !pendingResponse_ && librarySendPending_ && connected()) sendNextLibraryItem();
+  if (transportQueueAvailable && !pendingResponse_ && !librarySendPending_ && statsSendPending_ && connected()) {
+    sendNextReadingStatsChunk();
+  }
   if (applyPending_ && static_cast<int32_t>(millis() - applyAtMs_) >= 0) {
     applyPending_ = false;
     const auto result = firmware_flash::flashFromSdPath(FIRMWARE_PATH, nullptr, nullptr, true);
@@ -206,6 +256,87 @@ void CompanionService::loop() {
       delay(100);
       ESP.restart();
     }
+  }
+  if (ticketShowPending_ && static_cast<int32_t>(millis() - ticketUiAtMs_) >= 0) {
+    ticketShowPending_ = false;
+    showTicket(ticket_);
+  } else if (ticketHidePending_ && static_cast<int32_t>(millis() - ticketUiAtMs_) >= 0) {
+    ticketHidePending_ = false;
+    hideTicketIfVisible();
+  }
+}
+
+void CompanionService::setReading(bool reading) {
+  if (reading_ == reading) return;
+
+  reading_ = reading;
+  ++statusRevision_;
+  if (statusRevision_ == 0) ++statusRevision_;
+  statusNotifyPending_ = revisionedStatusSupported_ && connected();
+  readingSlowConfirmed_ = false;
+
+  if (reading_ && !connected()) {
+    // There is no phone transaction to finish. Reading needs neither BLE nor
+    // an acknowledgement, so silence the radio immediately instead of burning
+    // the remainder of the Home advertising window.
+    readingRadioQuiet_ = true;
+    server_->advertiseOnDisconnect(false);
+    if (advertising_ && advertising_->isAdvertising()) advertising_->stop();
+  } else if (!reading_ && !staticTicketPinned_) {
+    // Resume the proven awake advertising policy from the main loop at full
+    // clock. Pairing/security configuration and stored bonds are untouched.
+    readingRadioQuiet_ = false;
+    radioResumePending_ = true;
+    radioResumeRetryAtMs_ = 0;
+  }
+}
+
+void CompanionService::leaveTicket() {
+  staticTicketPinned_ = false;
+  ticketRadioQuiet_ = false;
+  radioResumePending_ = true;
+  radioResumeRetryAtMs_ = 0;
+}
+
+void CompanionService::wakeFastAdvertising() {
+  if (!initialized_ || reading_ || staticTicketPinned_) return;
+  // User input is an explicit request to make Home reachable again. Restart
+  // from the main loop at full clock so both a stopped radio and a currently
+  // slow advertiser return to the proven fast discovery path.
+  radioResumePending_ = true;
+  radioResumeRetryAtMs_ = 0;
+}
+
+void CompanionService::notifyPowerChanged() {
+  if (!initialized_ || !revisionedStatusSupported_ || !connected()) return;
+  statusNotifyPending_ = true;
+}
+
+void CompanionService::syncBeforeSleep(uint32_t windowMs) {
+  if (!initialized_ || windowMs == 0) return;
+
+  // Reading and Static intentionally keep their radios silent. A direct power
+  // off would otherwise skip Home and give queued phone work no discovery
+  // window at all. Offer one short fast-advertising window before the power
+  // latch is released; stored bonds and the displayed e-ink frame are unchanged.
+  setReading(false);
+  readingRadioQuiet_ = false;
+  ticketRadioQuiet_ = false;
+  radioResumePending_ = true;
+  radioResumeRetryAtMs_ = 0;
+  resumeFastRadio();
+
+  const uint32_t startedAt = millis();
+  uint32_t connectedAt = 0;
+  while (static_cast<uint32_t>(millis() - startedAt) < windowMs) {
+    loop();
+    if (connected() && connectedAt == 0) connectedAt = millis();
+    if (connectedAt != 0 && static_cast<uint32_t>(millis() - connectedAt) >= 600 &&
+        static_cast<uint32_t>(millis() - lastBleActivityMs_) >= 200 &&
+        uxQueueMessagesWaiting(commandQueue_) == 0 && !pendingResponse_) {
+      break;
+    }
+    delay(10);
   }
 }
 
@@ -223,13 +354,23 @@ void CompanionService::onClientConnected(uint16_t connectionHandle) {
   connectedAtMs_ = millis();
   lastBleActivityMs_ = connectedAtMs_;
   connectionParamsPending_ = true;
-  connectedOnceSinceBoot_ = true;
-  statusDirty_ = true;
+  revisionedStatusSupported_ = false;
+  statusNotifyPending_ = false;
+  readingRadioQuiet_ = false;
+  ticketRadioQuiet_ = false;
+  LOG_INF("CMP", "BLE client connected handle=%u", connectionHandle);
 }
 
 void CompanionService::onClientDisconnected() {
   connectionHandle_ = 0xffff;
   connectionParamsPending_ = false;
+  revisionedStatusSupported_ = false;
+  statusNotifyPending_ = false;
+  // advertiseOnDisconnect is disabled only after Android has acknowledged the
+  // current Reading / Slow revision. No bond data is changed.
+  readingRadioQuiet_ = reading_ && readingSlowConfirmed_;
+  ticketRadioQuiet_ = staticTicketPinned_;
+  LOG_INF("CMP", "BLE client disconnected readingQuiet=%d ticketQuiet=%d", readingRadioQuiet_, ticketRadioQuiet_);
 }
 
 void CompanionService::handlePacket(const uint8_t* bytes, size_t length) {
@@ -238,16 +379,33 @@ void CompanionService::handlePacket(const uint8_t* bytes, size_t length) {
   bool ok = true;
   switch (envelope.type) {
     case MessageType::HELLO:
+      revisionedStatusSupported_ =
+          envelope.payloadLength >= 1 && (envelope.payload[0] & HELLO_REVISIONED_STATUS) != 0;
+      statusNotifyPending_ = revisionedStatusSupported_;
       sendCapabilities();
       return;
     case MessageType::GET_STATUS:
-      sendDeviceStatus();
+      if (revisionedStatusSupported_) {
+        statusNotifyPending_ = true;
+      } else {
+        sendCapabilities();
+      }
       return;
-    case MessageType::SET_POWER_CONFIG:
-      ok = setPowerConfig(envelope);
+    case MessageType::SET_CLOCK:
+      ok = envelope.payloadLength == 8 && halClock.setEpochSeconds(readU64(envelope.payload));
       break;
-    case MessageType::CONFIRM_STATUS:
-      ok = confirmStatus(envelope);
+    case MessageType::ACK_STATUS:
+      if (envelope.payloadLength != 4) {
+        ok = false;
+        break;
+      }
+      if (readU32(envelope.payload) == statusRevision_ && reading_) {
+        readingSlowConfirmed_ = true;
+        // Android has stored the exact Reading / Slow revision. When it
+        // intentionally releases GATT, leave advertising off so the idle
+        // reader can return to the 10 MHz floor without altering the bond.
+        server_->advertiseOnDisconnect(false);
+      }
       break;
     case MessageType::START_SESSION: {
       if (envelope.payloadLength < 14) {
@@ -273,17 +431,67 @@ void CompanionService::handlePacket(const uint8_t* bytes, size_t length) {
       session_.stop();
       showHome();
       break;
+    case MessageType::SHOW_TICKET:
+      ok = decodeTicket(envelope);
+      if (ok) {
+        ok = persistTicket();
+      }
+      if (ok) {
+        ticketPresent_ = true;
+        staticTicketPinned_ = ticket_.mode == TicketMode::STATIC;
+        ticketRadioQuiet_ = false;
+        server_->advertiseOnDisconnect(!staticTicketPinned_);
+        // A full e-ink refresh can keep the main task busy for several seconds.
+        // Queue the acknowledgement first, then defer the activity transition
+        // by at least one configured connection interval so the notification
+        // actually reaches Android before display rendering begins.
+        sendAck(envelope.messageId);
+        ticketHidePending_ = false;
+        ticketShowPending_ = true;
+        ticketUiAtMs_ = millis() + static_cast<uint32_t>(slowConnectionIntervalUnits_) * 5u / 4u + 250u;
+        return;
+      }
+      break;
+    case MessageType::CLEAR_TICKET:
+      ok = envelope.payloadLength == 0 && clearTicket();
+      if (ok) {
+        // As above, let the acknowledgement leave over BLE before a possible
+        // full Home refresh.
+        sendAck(envelope.messageId);
+        ticketShowPending_ = false;
+        ticketHidePending_ = true;
+        ticketUiAtMs_ = millis() + static_cast<uint32_t>(slowConnectionIntervalUnits_) * 5u / 4u + 250u;
+        return;
+      }
+      break;
+    case MessageType::SET_RADIO_POLICY:
+      ok = applyRadioPolicy(envelope);
+      break;
+    case MessageType::SET_READER_POLICY:
+      ok = applyReaderPolicy(envelope);
+      break;
     case MessageType::GET_LIBRARY:
       ok = scanLibrary();
       break;
     case MessageType::DELETE_LIBRARY_ENTRIES:
       ok = deleteLibraryEntries(envelope);
       break;
-    case MessageType::START_LIBRARY_TRANSFER:
-      activityManager.goToCompanionFileTransfer();
+    case MessageType::GET_READING_STATS:
+      statsSessionIndex_ = 0;
+      statsSampleIndex_ = 0;
+      statsSendPending_ = true;
       break;
-    case MessageType::STOP_LIBRARY_TRANSFER:
-      activityManager.goHome();
+    case MessageType::ACK_READING_STATS:
+      if (envelope.payloadLength != 4) {
+        ok = false;
+      } else {
+        ok = READING_STATS.acknowledge(readU32(envelope.payload));
+        if (ok) {
+          statsSessionIndex_ = 0;
+          statsSampleIndex_ = 0;
+          statsSendPending_ = true;
+        }
+      }
       break;
     case MessageType::BEGIN_FIRMWARE:
       ok = beginFirmware(envelope);
@@ -311,85 +519,194 @@ void CompanionService::handlePacket(const uint8_t* bytes, size_t length) {
     sendNack(envelope.messageId, "Command rejected");
 }
 
-void CompanionService::observeDeviceActivity() {
-  DeviceActivity activity = DeviceActivity::AWAKE;
-  SyncMode syncMode = SyncMode::FAST;
-  if (activityManager.isCurrentActivity("Sleep")) {
-    activity = DeviceActivity::SLEEPING;
-    syncMode = SyncMode::OFF;
-  } else if (activityManager.isCurrentActivity("CrossPointWebServer")) {
-    activity = DeviceActivity::TRANSFER;
-  } else if (session_.active() || activityManager.isCurrentActivity("CompanionFocus")) {
-    activity = DeviceActivity::FOCUS;
-  } else if (activityManager.isReaderActivity()) {
-    activity = DeviceActivity::READING;
-    syncMode = SyncMode::SLOW;
-  }
-  setDeviceActivity(activity, syncMode);
+bool CompanionService::decodeTicket(const EnvelopeView& envelope) {
+  if (envelope.payloadLength < 1) return false;
+  const uint8_t mode = envelope.payload[0];
+  if (mode > static_cast<uint8_t>(TicketMode::LIVE)) return false;
+
+  size_t cursor = 1;
+  TicketState decodedTicket{};
+  decodedTicket.mode = static_cast<TicketMode>(mode);
+  const bool decoded =
+      readBoundedString(envelope, cursor, decodedTicket.origin, sizeof(decodedTicket.origin)) &&
+      readBoundedString(envelope, cursor, decodedTicket.destination, sizeof(decodedTicket.destination)) &&
+      readBoundedString(envelope, cursor, decodedTicket.flight, sizeof(decodedTicket.flight)) &&
+      readBoundedString(envelope, cursor, decodedTicket.status, sizeof(decodedTicket.status)) &&
+      readBoundedString(envelope, cursor, decodedTicket.departureTime, sizeof(decodedTicket.departureTime)) &&
+      readBoundedString(envelope, cursor, decodedTicket.gate, sizeof(decodedTicket.gate)) &&
+      readBoundedString(envelope, cursor, decodedTicket.terminal, sizeof(decodedTicket.terminal)) &&
+      readBoundedString(envelope, cursor, decodedTicket.seat, sizeof(decodedTicket.seat)) &&
+      readBoundedString(envelope, cursor, decodedTicket.passenger, sizeof(decodedTicket.passenger)) &&
+      readBoundedString(envelope, cursor, decodedTicket.boardingGroup, sizeof(decodedTicket.boardingGroup)) &&
+      readBoundedString(envelope, cursor, decodedTicket.barcodePayload, sizeof(decodedTicket.barcodePayload));
+  if (!decoded || cursor != envelope.payloadLength || decodedTicket.barcodePayload[0] == '\0') return false;
+  ticket_ = decodedTicket;
+  return true;
 }
 
-void CompanionService::setDeviceActivity(DeviceActivity activity, SyncMode syncMode) {
-  if (deviceActivity_ == activity && syncMode_ == syncMode) return;
-  deviceActivity_ = activity;
-  syncMode_ = syncMode;
-  ++statusRevision_;
-  if (statusRevision_ == 0) ++statusRevision_;
-  confirmedStatusRevision_ = 0;
-  statusDirty_ = true;
-  connectedAtMs_ = millis();
-  connectionParamsPending_ = connected();
-  LOG_INF("CMP", "Device state changed activity=%u sync=%u revision=%lu", static_cast<unsigned>(activity),
-          static_cast<unsigned>(syncMode), static_cast<unsigned long>(statusRevision_));
-}
-
-void CompanionService::sendDeviceStatus(MessageType type) {
-  uint8_t payload[15];
-  writeU32(payload, statusRevision_);
-  payload[4] = static_cast<uint8_t>(deviceActivity_);
-  payload[5] = static_cast<uint8_t>(syncMode_);
-  writeU32(payload + 6, normalPollSeconds_);
-  writeU32(payload + 10, slowPollSeconds_);
-  payload[14] = sleepTimeoutMinutes_;
-  if (notify(type, payload, sizeof(payload))) statusDirty_ = false;
-}
-
-bool CompanionService::setPowerConfig(const EnvelopeView& envelope) {
-  if (envelope.payloadLength != 9) return false;
-  const uint32_t normalSeconds = readU32(envelope.payload);
-  const uint32_t slowSeconds = readU32(envelope.payload + 4);
-  const uint8_t sleepMinutes = envelope.payload[8];
-  if (normalSeconds < 10 || normalSeconds > 120 || slowSeconds < 60 || slowSeconds > 30UL * 60UL ||
-      sleepMinutes < 1 || sleepMinutes > 5) {
+bool CompanionService::loadTicket() {
+  HalFile input = Storage.open(TICKET_PATH, O_RDONLY);
+  if (!input || input.fileSize() != sizeof(TicketStorageRecord)) return false;
+  TicketStorageRecord record{};
+  if (input.read(&record, sizeof(record)) != sizeof(record) || record.magic != TICKET_MAGIC ||
+      record.version != TICKET_STORAGE_VERSION || record.size != sizeof(TicketState) ||
+      record.ticket.barcodePayload[0] == '\0') {
+    input.close();
+    Storage.remove(TICKET_PATH);
     return false;
   }
-  normalPollSeconds_ = normalSeconds;
-  slowPollSeconds_ = slowSeconds;
-  sleepTimeoutMinutes_ = sleepMinutes;
-  if (SETTINGS.sleepTimeoutMinutes != sleepTimeoutMinutes_) {
-    SETTINGS.sleepTimeoutMinutes = sleepTimeoutMinutes_;
-    SETTINGS.saveToFile();
+  ticket_ = record.ticket;
+  ticketPresent_ = true;
+  LOG_INF("CMP", "Restored saved ticket %s", ticket_.flight);
+  return true;
+}
+
+bool CompanionService::persistTicket() {
+  if (!Storage.ready()) {
+    LOG_ERR("CMP", "SD unavailable; ticket retained in RAM only");
+    return true;
   }
-  statusDirty_ = true;
+  if (!Storage.ensureDirectoryExists("/.crosspoint/companion")) {
+    LOG_ERR("CMP", "Could not create ticket storage; retaining in RAM only");
+    return true;
+  }
+  TicketStorageRecord record{};
+  record.ticket = ticket_;
+  HalFile output = Storage.open(TICKET_PATH, O_WRITE | O_CREAT | O_TRUNC);
+  if (!output || output.write(&record, sizeof(record)) != sizeof(record)) {
+    LOG_ERR("CMP", "Could not persist ticket; retaining in RAM only");
+    return true;
+  }
+  output.flush();
+  if (!output.close()) LOG_ERR("CMP", "Ticket file close failed; retaining in RAM only");
   return true;
 }
 
-bool CompanionService::confirmStatus(const EnvelopeView& envelope) {
-  if (envelope.payloadLength != 4 || readU32(envelope.payload) != statusRevision_) return false;
-  confirmedStatusRevision_ = statusRevision_;
-  connectedAtMs_ = millis();
+bool CompanionService::clearTicket() {
+  const bool removed = !Storage.ready() || !Storage.exists(TICKET_PATH) || Storage.remove(TICKET_PATH);
+  if (!removed) return false;
+  ticket_ = TicketState{};
+  ticketPresent_ = false;
+  leaveTicket();
+  return true;
+}
+
+bool CompanionService::applyRadioPolicy(const EnvelopeView& envelope) {
+  if (envelope.payloadLength != 6) return false;
+  const uint16_t fastMinutes = readU16(envelope.payload);
+  const uint16_t slowIntervalMs = readU16(envelope.payload + 2);
+  const uint16_t sleepMinutes = readU16(envelope.payload + 4);
+  if (fastMinutes < 1 || fastMinutes > 30 || slowIntervalMs < 500 || slowIntervalMs > 4000 ||
+      sleepMinutes < 2 || sleepMinutes > 60 || fastMinutes >= sleepMinutes) {
+    return false;
+  }
+  fastAdvertisingWindowMs_ = static_cast<uint32_t>(fastMinutes) * 60u * 1000u;
+  companionSleepAfterMs_ = static_cast<uint32_t>(sleepMinutes) * 60u * 1000u;
+  slowAdvertisingIntervalUnits_ = static_cast<uint16_t>((static_cast<uint32_t>(slowIntervalMs) * 8u) / 5u);
+  slowConnectionIntervalUnits_ = static_cast<uint16_t>((static_cast<uint32_t>(slowIntervalMs) * 4u) / 5u);
   connectionParamsPending_ = connected();
+  connectedAtMs_ = millis();
+  return persistRadioPolicy();
+}
+
+bool CompanionService::applyReaderPolicy(const EnvelopeView& envelope) {
+  if (envelope.payloadLength != 2) return false;
+  switch (readU16(envelope.payload)) {
+    case 1:
+      SETTINGS.refreshFrequency = CrossPointSettings::REFRESH_1;
+      break;
+    case 5:
+      SETTINGS.refreshFrequency = CrossPointSettings::REFRESH_5;
+      break;
+    case 10:
+      SETTINGS.refreshFrequency = CrossPointSettings::REFRESH_10;
+      break;
+    case 15:
+      SETTINGS.refreshFrequency = CrossPointSettings::REFRESH_15;
+      break;
+    case 30:
+      SETTINGS.refreshFrequency = CrossPointSettings::REFRESH_30;
+      break;
+    default:
+      return false;
+  }
+  return SETTINGS.saveToFile();
+}
+
+bool CompanionService::loadRadioPolicy() {
+  if (!Storage.ready()) return false;
+  HalFile input = Storage.open(RADIO_POLICY_PATH, O_RDONLY);
+  if (!input || input.fileSize() != sizeof(RadioPolicyStorageRecord)) return false;
+  RadioPolicyStorageRecord record{};
+  const bool valid = input.read(&record, sizeof(record)) == sizeof(record) && record.magic == 0x52414431 &&
+                     record.version == 1 && record.fastWindowMinutes >= 1 && record.fastWindowMinutes <= 30 &&
+                     record.slowIntervalMs >= 500 && record.slowIntervalMs <= 4000 &&
+                     record.sleepAfterMinutes >= 2 && record.sleepAfterMinutes <= 60 &&
+                     record.fastWindowMinutes < record.sleepAfterMinutes;
+  input.close();
+  if (!valid) return false;
+  fastAdvertisingWindowMs_ = static_cast<uint32_t>(record.fastWindowMinutes) * 60u * 1000u;
+  companionSleepAfterMs_ = static_cast<uint32_t>(record.sleepAfterMinutes) * 60u * 1000u;
+  slowAdvertisingIntervalUnits_ = static_cast<uint16_t>((static_cast<uint32_t>(record.slowIntervalMs) * 8u) / 5u);
+  slowConnectionIntervalUnits_ = static_cast<uint16_t>((static_cast<uint32_t>(record.slowIntervalMs) * 4u) / 5u);
   return true;
 }
 
-bool CompanionService::shouldSleepAfterUnpairedBoot(uint32_t inactiveForMs) const {
-  return initialized_ && !connectedOnceSinceBoot_ && !connected() && !session_.active() &&
-         static_cast<uint32_t>(millis() - bootStartedAtMs_) >= UNPAIRED_BOOT_SLEEP_MS &&
-         inactiveForMs >= UNPAIRED_BOOT_SLEEP_MS && activityManager.isCurrentActivity("Home");
+bool CompanionService::persistRadioPolicy() {
+  if (!Storage.ready() || !Storage.ensureDirectoryExists("/.crosspoint/companion")) return true;
+  RadioPolicyStorageRecord record{};
+  record.fastWindowMinutes = static_cast<uint16_t>(fastAdvertisingWindowMs_ / (60u * 1000u));
+  record.slowIntervalMs = static_cast<uint16_t>(slowConnectionIntervalUnits_ * 5u / 4u);
+  record.sleepAfterMinutes = static_cast<uint16_t>(companionSleepAfterMs_ / (60u * 1000u));
+  HalFile output = Storage.open(RADIO_POLICY_PATH, O_WRITE | O_CREAT | O_TRUNC);
+  if (!output || output.write(&record, sizeof(record)) != sizeof(record)) return false;
+  output.flush();
+  return output.close();
 }
 
-void CompanionService::prepareForSleep() {
-  setDeviceActivity(DeviceActivity::SLEEPING, SyncMode::OFF);
-  if (connected()) sendDeviceStatus();
+void CompanionService::armFastAdvertising() {
+  if (!advertising_) return;
+  advertisingWindowStartedAtMs_ = millis();
+  slowAdvertising_ = false;
+  advertisingWindowExpired_ = false;
+  advertising_->setAdvertisingInterval(ADVERTISING_INTERVAL);
+}
+
+void CompanionService::updateAdvertisingPolicy() {
+  if (!initialized_ || !advertising_ || connected() || readingRadioQuiet_ || ticketRadioQuiet_) {
+    return;
+  }
+  const bool persistentSlowMode = session_.active() || (ticketPresent_ && ticket_.mode == TicketMode::LIVE);
+  if (persistentSlowMode) {
+    server_->advertiseOnDisconnect(true);
+    if (!slowAdvertising_ || advertisingWindowExpired_) {
+      advertising_->stop();
+      advertising_->setAdvertisingInterval(slowAdvertisingIntervalUnits_);
+      advertisingWindowExpired_ = false;
+      slowAdvertising_ = true;
+      advertising_->start();
+      LOG_INF("CMP", "Active Focus / Live advertising at %u ms",
+              static_cast<unsigned>(slowAdvertisingIntervalUnits_ * 5u / 8u));
+    }
+    return;
+  }
+  if (advertisingWindowExpired_) return;
+  const uint32_t elapsed = millis() - advertisingWindowStartedAtMs_;
+  if (elapsed >= companionSleepAfterMs_) {
+    advertising_->stop();
+    server_->advertiseOnDisconnect(false);
+    advertisingWindowExpired_ = true;
+    LOG_INF("CMP", "Companion advertising stopped at sleep deadline");
+    return;
+  }
+  if (!slowAdvertising_ && elapsed >= fastAdvertisingWindowMs_) {
+    advertising_->stop();
+    advertising_->setAdvertisingInterval(slowAdvertisingIntervalUnits_);
+    advertising_->start();
+    slowAdvertising_ = true;
+    LOG_INF("CMP", "Companion advertising slowed to %u ms",
+            static_cast<unsigned>(slowAdvertisingIntervalUnits_ * 5u / 8u));
+  }
 }
 
 bool CompanionService::sendResponse(uint32_t messageId, bool nack) {
@@ -437,7 +754,45 @@ void CompanionService::sendCapabilities(MessageType type) {
   writeU32(payload + cursor, libraryRevision_);
   cursor += 4;
   payload[cursor++] = 1;
+  payload[cursor++] = ticketPresent_ ? 1 : 0;
+  payload[cursor++] = 1;  // Supports SET_READER_POLICY.
   notify(type, payload, cursor);
+}
+
+bool CompanionService::sendDeviceStatus() {
+  uint8_t payload[8];
+  const uint8_t batteryPercent = static_cast<uint8_t>(std::min<uint16_t>(100, powerManager.getBatteryPercentage()));
+  const bool charging = gpio.isUsbConnected();
+  writeU32(payload, statusRevision_);
+  payload[4] = static_cast<uint8_t>(reading_ ? DeviceActivity::READING : DeviceActivity::AWAKE);
+  payload[5] = static_cast<uint8_t>(reading_ ? DeviceSyncMode::SLOW : DeviceSyncMode::FAST);
+  payload[6] = batteryPercent;
+  payload[7] = charging ? 1 : 0;
+  lastReportedBatteryPercent_ = batteryPercent;
+  lastReportedCharging_ = charging;
+  lastPowerStatusAtMs_ = millis();
+  return notify(MessageType::STATUS_CHANGED, payload, sizeof(payload));
+}
+
+void CompanionService::resumeFastRadio() {
+  if (!server_ || !advertising_) {
+    radioResumeRetryAtMs_ = millis() + RADIO_RESUME_RETRY_MS;
+    return;
+  }
+
+  armFastAdvertising();
+  server_->advertiseOnDisconnect(true);
+  if (!connected() && advertising_->isAdvertising()) advertising_->stop();
+  if (connected() || advertising_->start()) {
+    radioResumePending_ = false;
+    readingRadioQuiet_ = false;
+    ticketRadioQuiet_ = false;
+    LOG_INF("CMP", "Awake / Fast radio policy restored");
+    return;
+  }
+
+  LOG_ERR("CMP", "Failed to restore Awake / Fast advertising; retrying");
+  radioResumeRetryAtMs_ = millis() + RADIO_RESUME_RETRY_MS;
 }
 
 bool CompanionService::scanLibrary() {
@@ -548,6 +903,58 @@ void CompanionService::sendNextLibraryItem() {
     LOG_INF("CMP", "Library snapshot sent, free heap: %u", ESP.getFreeHeap());
   } else {
     ++librarySendIndex_;
+  }
+}
+
+void CompanionService::sendNextReadingStatsChunk() {
+  if (!statsSendPending_ || !connected()) return;
+  ReadingSessionInfo info;
+  if (!READING_STATS.sessionAt(statsSessionIndex_, info)) {
+    statsSendPending_ = false;
+    return;
+  }
+
+  constexpr uint16_t MAX_SAMPLES_PER_CHUNK = 32;
+  ReadingPageSample samples[MAX_SAMPLES_PER_CHUNK];
+  uint16_t sampleCount = 0;
+  if (!READING_STATS.readSamples(info.sessionId, statsSampleIndex_, samples, MAX_SAMPLES_PER_CHUNK, sampleCount)) {
+    statsSendPending_ = false;
+    return;
+  }
+  const size_t titleLength = strnlen(info.title, sizeof(info.title));
+  uint8_t payload[MAX_PAYLOAD_BYTES] = {};
+  size_t cursor = 0;
+  writeU32(payload + cursor, info.sessionId);
+  cursor += 4;
+  writeU64(payload + cursor, info.startedEpochSeconds);
+  cursor += 8;
+  writeU64(payload + cursor, info.endedEpochSeconds);
+  cursor += 8;
+  writeU16(payload + cursor, info.pageCount);
+  cursor += 2;
+  writeU16(payload + cursor, statsSampleIndex_);
+  cursor += 2;
+  payload[cursor++] = statsSampleIndex_ + sampleCount >= info.pageCount ? 1 : 0;
+  payload[cursor++] = info.hasWordCounts ? 1 : 0;
+  writeU16(payload + cursor, sampleCount);
+  cursor += 2;
+  writeU16(payload + cursor, static_cast<uint16_t>(titleLength));
+  cursor += 2;
+  memcpy(payload + cursor, info.title, titleLength);
+  cursor += titleLength;
+  for (uint16_t i = 0; i < sampleCount; ++i) {
+    writeU32(payload + cursor, samples[i].elapsedMs);
+    cursor += 4;
+    writeU16(payload + cursor, samples[i].words);
+    cursor += 2;
+    writeU16(payload + cursor, samples[i].pageNumber);
+    cursor += 2;
+  }
+  if (!notify(MessageType::READING_STATS_CHUNK, payload, cursor)) return;
+  statsSampleIndex_ += sampleCount;
+  if (statsSampleIndex_ >= info.pageCount) {
+    // Wait for Android's persisted-session ACK before advancing/deleting.
+    statsSendPending_ = false;
   }
 }
 

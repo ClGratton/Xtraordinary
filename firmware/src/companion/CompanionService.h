@@ -13,6 +13,7 @@
 
 #include "CompanionProtocol.h"
 #include "SessionEngine.h"
+#include "TicketState.h"
 
 class NimBLEAdvertising;
 class NimBLECharacteristic;
@@ -40,22 +41,16 @@ class CompanionService {
   size_t librarySendIndex_ = 0;
   uint32_t libraryRevision_ = 0;
   bool librarySendPending_ = false;
+  uint16_t statsSessionIndex_ = 0;
+  uint16_t statsSampleIndex_ = 0;
+  bool statsSendPending_ = false;
   bool initialized_ = false;
   volatile uint16_t connectionHandle_ = 0xffff;
   volatile uint32_t connectedAtMs_ = 0;
   volatile uint32_t lastBleActivityMs_ = 0;
   volatile bool connectionParamsPending_ = false;
-  volatile bool connectedOnceSinceBoot_ = false;
-  uint32_t bootStartedAtMs_ = 0;
-  DeviceActivity deviceActivity_ = DeviceActivity::BOOTING;
-  SyncMode syncMode_ = SyncMode::FAST;
-  uint32_t statusRevision_ = 1;
-  uint32_t confirmedStatusRevision_ = 0;
-  bool statusDirty_ = true;
-  uint32_t normalPollSeconds_ = 15;
-  uint32_t slowPollSeconds_ = 10 * 60;
-  uint8_t sleepTimeoutMinutes_ = 5;
   SessionEngine session_;
+  TicketState ticket_;
   HalFile firmwareFile_;
   uint64_t firmwareExpectedSize_ = 0;
   uint64_t firmwareReceived_ = 0;
@@ -68,6 +63,30 @@ class CompanionService {
   uint32_t pendingResponseMessageId_ = 0;
   bool pendingResponse_ = false;
   bool pendingResponseIsNack_ = false;
+  bool revisionedStatusSupported_ = false;
+  bool reading_ = false;
+  bool readingSlowConfirmed_ = false;
+  bool readingRadioQuiet_ = false;
+  bool ticketPresent_ = false;
+  bool staticTicketPinned_ = false;
+  bool ticketRadioQuiet_ = false;
+  bool ticketShowPending_ = false;
+  bool ticketHidePending_ = false;
+  bool slowAdvertising_ = false;
+  bool advertisingWindowExpired_ = false;
+  bool statusNotifyPending_ = false;
+  bool radioResumePending_ = false;
+  uint32_t statusRevision_ = 1;
+  uint32_t lastPowerStatusAtMs_ = 0;
+  uint8_t lastReportedBatteryPercent_ = 0xff;
+  bool lastReportedCharging_ = false;
+  uint32_t radioResumeRetryAtMs_ = 0;
+  uint32_t advertisingWindowStartedAtMs_ = 0;
+  uint32_t ticketUiAtMs_ = 0;
+  uint32_t fastAdvertisingWindowMs_ = 5u * 60u * 1000u;
+  uint32_t companionSleepAfterMs_ = 10u * 60u * 1000u;
+  uint16_t slowAdvertisingIntervalUnits_ = 3200;  // 2 s in 0.625 ms units.
+  uint16_t slowConnectionIntervalUnits_ = 1600;  // 2 s in 1.25 ms units.
   StaticQueue_t commandQueueState_{};
   std::array<uint8_t, sizeof(CommandPacket) * COMMAND_QUEUE_DEPTH> commandQueueStorage_{};
   QueueHandle_t commandQueue_ = nullptr;
@@ -77,14 +96,22 @@ class CompanionService {
   void sendAck(uint32_t messageId);
   void sendNack(uint32_t messageId, const char* reason);
   void sendCapabilities(MessageType type = MessageType::CAPABILITIES);
-  void observeDeviceActivity();
-  void setDeviceActivity(DeviceActivity activity, SyncMode syncMode);
-  void sendDeviceStatus(MessageType type = MessageType::STATUS_CHANGED);
-  bool setPowerConfig(const EnvelopeView& envelope);
-  bool confirmStatus(const EnvelopeView& envelope);
+  bool sendDeviceStatus();
+  bool decodeTicket(const EnvelopeView& envelope);
+  bool loadTicket();
+  bool persistTicket();
+  bool clearTicket();
+  bool applyRadioPolicy(const EnvelopeView& envelope);
+  bool applyReaderPolicy(const EnvelopeView& envelope);
+  bool loadRadioPolicy();
+  bool persistRadioPolicy();
+  void updateAdvertisingPolicy();
+  void armFastAdvertising();
+  void resumeFastRadio();
   bool scanLibrary();
   void scanDirectory(const char* path, uint8_t depth);
   void sendNextLibraryItem();
+  void sendNextReadingStatsChunk();
   bool beginFirmware(const EnvelopeView& envelope);
   bool writeFirmwareChunk(const EnvelopeView& envelope);
   bool commitFirmware();
@@ -95,11 +122,22 @@ class CompanionService {
   void begin();
   void loop();
   bool connected() const;
-  bool requiresBleSafeClock() const { return initialized_ && !connected(); }
+  bool requiresBleSafeClock() const;
   bool requiresFullClock() const;
-  bool shouldSleepAfterUnpairedBoot(uint32_t inactiveForMs) const;
-  void prepareForSleep();
+  bool isSlowAdvertising() const {
+    return initialized_ && slowAdvertising_ && !advertisingWindowExpired_ && !connected() && !readingRadioQuiet_ &&
+           !ticketRadioQuiet_;
+  }
+  uint32_t companionSleepAfterMs() const { return companionSleepAfterMs_; }
+  bool staticTicketDisplayed() const { return staticTicketPinned_; }
   SessionEngine& session() { return session_; }
+  bool hasTicket() const { return ticketPresent_; }
+  TicketState& ticket() { return ticket_; }
+  void setReading(bool reading);
+  void leaveTicket();
+  void wakeFastAdvertising();
+  void notifyPowerChanged();
+  void syncBeforeSleep(uint32_t windowMs);
   void onWrite(const uint8_t* bytes, size_t length);
   void onClientConnected(uint16_t connectionHandle);
   void onClientDisconnected();

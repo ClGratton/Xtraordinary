@@ -1,6 +1,7 @@
 package com.xteink.companion.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -19,7 +20,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -42,36 +42,28 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.xteink.companion.R
-import com.xteink.companion.monetization.AccessState
 import com.xteink.companion.ui.CompanionSurface
 import com.xteink.companion.ui.CompanionVisualTheme
-import com.xteink.companion.ui.DeviceConnectionPresentation
-import com.xteink.companion.ui.deviceConnectionPresentation
-import com.xteink.companion.protocol.DeviceActivity
-import com.xteink.companion.protocol.PowerSyncConfig
+import com.xteink.companion.ui.DevicePresence
+import com.xteink.companion.ui.RadioPolicyUiState
+import com.xteink.companion.ui.devicePresence
 
 @Composable
 fun CompanionTopBar(
-    isX3Connected: Boolean,
     hasManagedX3: Boolean,
+    isX3TransportConnected: Boolean,
     isX3Reconnecting: Boolean,
-    deviceActivity: DeviceActivity?,
-    lowPowerGraceExpired: Boolean,
     connectedDeviceModel: String?,
+    batteryPercentage: Int?,
+    charging: Boolean,
     onShowDevices: () -> Unit,
     onShowSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val connectionPresentation = deviceConnectionPresentation(
-        hasManagedDevice = hasManagedX3,
-        transportConnected = isX3Connected,
-        reconnecting = isX3Reconnecting,
-        activity = deviceActivity,
-        lowPowerGraceExpired = lowPowerGraceExpired,
-    )
+    val presence = devicePresence(hasManagedX3, isX3TransportConnected, isX3Reconnecting)
     val settingsDescription = stringResource(R.string.open_settings)
     val devicesDescription = stringResource(
-        if (isX3Connected) R.string.open_connected_device else R.string.open_devices,
+        if (presence == DevicePresence.Connected) R.string.open_connected_device else R.string.open_devices,
     )
     Row(
         modifier = modifier
@@ -97,7 +89,7 @@ fun CompanionTopBar(
                 DeviceOutlineIcon()
                 Column {
                     Text(
-                        text = if (isX3Connected || hasManagedX3) {
+                        text = if (hasManagedX3) {
                             connectedDeviceModel ?: stringResource(R.string.xteink_device_short)
                         } else {
                             stringResource(R.string.devices_title)
@@ -106,18 +98,19 @@ fun CompanionTopBar(
                     )
                     Text(
                         text = stringResource(
-                            when (connectionPresentation) {
-                                DeviceConnectionPresentation.Connected -> R.string.settings_device_connected
-                                DeviceConnectionPresentation.Reading -> R.string.settings_device_reading
-                                DeviceConnectionPresentation.Sleeping -> R.string.settings_device_sleeping
-                                DeviceConnectionPresentation.Reconnecting -> R.string.settings_device_reconnecting
-                                DeviceConnectionPresentation.Offline -> R.string.settings_device_disconnected
-                                DeviceConnectionPresentation.None -> R.string.settings_device_value
+                            when {
+                                presence == DevicePresence.Connected -> R.string.settings_device_connected
+                                presence == DevicePresence.Reconnecting -> R.string.settings_device_reconnecting
+                                presence == DevicePresence.Available -> R.string.settings_device_available
+                                else -> R.string.settings_device_value
                             },
                         ),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+                batteryPercentage?.let {
+                    X3BatteryIndicator(percentage = it, charging = charging)
                 }
             }
         }
@@ -134,6 +127,84 @@ fun CompanionTopBar(
                     style = MaterialTheme.typography.titleLarge,
                 )
             }
+        }
+    }
+}
+
+@Composable
+internal fun X3BatteryIndicator(
+    percentage: Int,
+    charging: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val bounded = percentage.coerceIn(0, 100)
+    val outline = MaterialTheme.colorScheme.onSurfaceVariant
+    val fill = MaterialTheme.colorScheme.primary
+    val description = stringResource(
+        if (charging) R.string.device_battery_charging_description else R.string.device_battery_description,
+        bounded,
+    )
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        shape = CircleShape,
+        modifier = modifier.semantics { contentDescription = description },
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Canvas(Modifier.size(width = if (charging) 30.dp else 23.dp, height = 14.dp)) {
+                val stroke = 1.5.dp.toPx()
+                val batteryWidth = 19.dp.toPx()
+                val batteryHeight = 11.dp.toPx()
+                val top = (size.height - batteryHeight) / 2f
+                drawRoundRect(
+                    color = outline,
+                    topLeft = Offset(stroke / 2f, top),
+                    size = androidx.compose.ui.geometry.Size(batteryWidth, batteryHeight),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx()),
+                    style = Stroke(width = stroke),
+                )
+                drawRect(
+                    color = outline,
+                    topLeft = Offset(batteryWidth + stroke, top + 3.dp.toPx()),
+                    size = androidx.compose.ui.geometry.Size(2.dp.toPx(), 5.dp.toPx()),
+                )
+                val innerWidth = (batteryWidth - 4.dp.toPx()) * bounded / 100f
+                if (innerWidth > 0f) {
+                    drawRect(
+                        color = fill,
+                        topLeft = Offset(2.dp.toPx(), top + 2.dp.toPx()),
+                        size = androidx.compose.ui.geometry.Size(innerWidth, batteryHeight - 4.dp.toPx()),
+                    )
+                }
+                if (charging) {
+                    val boltX = 25.dp.toPx()
+                    drawLine(
+                        outline,
+                        Offset(boltX + 2.dp.toPx(), 1.dp.toPx()),
+                        Offset(boltX - 1.dp.toPx(), 7.dp.toPx()),
+                        strokeWidth = stroke,
+                        cap = StrokeCap.Round,
+                    )
+                    drawLine(
+                        outline,
+                        Offset(boltX - 1.dp.toPx(), 7.dp.toPx()),
+                        Offset(boltX + 2.dp.toPx(), 7.dp.toPx()),
+                        strokeWidth = stroke,
+                        cap = StrokeCap.Round,
+                    )
+                    drawLine(
+                        outline,
+                        Offset(boltX + 2.dp.toPx(), 7.dp.toPx()),
+                        Offset(boltX - 1.dp.toPx(), 13.dp.toPx()),
+                        strokeWidth = stroke,
+                        cap = StrokeCap.Round,
+                    )
+                }
+            }
+            Text("$bounded%", style = MaterialTheme.typography.labelMedium)
         }
     }
 }
@@ -319,28 +390,24 @@ fun SendToX3Icon(
 @Composable
 fun SettingsSheet(
     visualTheme: CompanionVisualTheme,
-    powerSyncConfig: PowerSyncConfig,
-    access: AccessState,
+    radioPolicy: RadioPolicyUiState,
+    minimumReadingPageSeconds: Int,
+    settingsSyncPending: Boolean,
     onSetVisualTheme: (CompanionVisualTheme) -> Unit,
-    onSetNormalPollSeconds: (Int) -> Unit,
-    onSetSlowPollSeconds: (Int) -> Unit,
-    onSetSleepTimeoutMinutes: (Int) -> Unit,
-    onGetPro: () -> Unit,
-    onShowPrivacyOptions: () -> Unit,
+    onSetRadioPolicy: (RadioPolicyUiState) -> Unit,
+    onSetMinimumReadingPageSeconds: (Int) -> Unit,
     onOpenSetup: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         SettingsSheetContent(
             visualTheme = visualTheme,
-            powerSyncConfig = powerSyncConfig,
-            access = access,
+            radioPolicy = radioPolicy,
+            minimumReadingPageSeconds = minimumReadingPageSeconds,
+            settingsSyncPending = settingsSyncPending,
             onSetVisualTheme = onSetVisualTheme,
-            onSetNormalPollSeconds = onSetNormalPollSeconds,
-            onSetSlowPollSeconds = onSetSlowPollSeconds,
-            onSetSleepTimeoutMinutes = onSetSleepTimeoutMinutes,
-            onGetPro = onGetPro,
-            onShowPrivacyOptions = onShowPrivacyOptions,
+            onSetRadioPolicy = onSetRadioPolicy,
+            onSetMinimumReadingPageSeconds = onSetMinimumReadingPageSeconds,
             onOpenSetup = onOpenSetup,
             onDismiss = onDismiss,
         )
@@ -350,14 +417,12 @@ fun SettingsSheet(
 @Composable
 fun SettingsSheetContent(
     visualTheme: CompanionVisualTheme,
-    powerSyncConfig: PowerSyncConfig,
-    access: AccessState,
+    radioPolicy: RadioPolicyUiState,
+    minimumReadingPageSeconds: Int,
+    settingsSyncPending: Boolean,
     onSetVisualTheme: (CompanionVisualTheme) -> Unit,
-    onSetNormalPollSeconds: (Int) -> Unit,
-    onSetSlowPollSeconds: (Int) -> Unit,
-    onSetSleepTimeoutMinutes: (Int) -> Unit,
-    onGetPro: () -> Unit,
-    onShowPrivacyOptions: () -> Unit,
+    onSetRadioPolicy: (RadioPolicyUiState) -> Unit,
+    onSetMinimumReadingPageSeconds: (Int) -> Unit,
     onOpenSetup: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
@@ -378,27 +443,6 @@ fun SettingsSheetContent(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.close_settings)) }
         }
         Spacer(Modifier.height(12.dp))
-        ProUpgradeSurface(
-            access = access,
-            onGetPro = onGetPro,
-        )
-        if (access.isPlayDistribution) {
-            val welcomeDays = access.welcomeDaysRemaining()
-            if (!access.isPro && welcomeDays != null && welcomeDays > 0) {
-                Text(
-                    text = stringResource(R.string.welcome_access, welcomeDays),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 4.dp, top = 6.dp),
-                )
-            }
-            if (access.privacyOptionsRequired) {
-                TextButton(onClick = onShowPrivacyOptions) {
-                    Text(stringResource(R.string.privacy_and_ads))
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-        }
         Text(
             text = stringResource(R.string.settings_appearance),
             style = MaterialTheme.typography.titleMedium,
@@ -409,45 +453,117 @@ fun SettingsSheetContent(
         ) {
             ThemeChip(
                 label = stringResource(R.string.expressive_theme),
+                description = stringResource(R.string.expressive_theme_body),
+                expressive = true,
                 selected = visualTheme == CompanionVisualTheme.Expressive,
                 onClick = { onSetVisualTheme(CompanionVisualTheme.Expressive) },
                 modifier = Modifier.weight(1f),
             )
             ThemeChip(
                 label = stringResource(R.string.quiet_theme),
+                description = stringResource(R.string.quiet_theme_body),
+                expressive = false,
                 selected = visualTheme == CompanionVisualTheme.Quiet,
                 onClick = { onSetVisualTheme(CompanionVisualTheme.Quiet) },
                 modifier = Modifier.weight(1f),
             )
         }
-        Spacer(Modifier.height(22.dp))
-        Text(
-            text = stringResource(R.string.settings_power_sync),
-            style = MaterialTheme.typography.titleMedium,
+        Spacer(Modifier.height(12.dp))
+        Text(stringResource(R.string.settings_radio_policy), style = MaterialTheme.typography.titleMedium)
+        Surface(
+            color = if (settingsSyncPending) {
+                MaterialTheme.colorScheme.tertiaryContainer
+            } else {
+                MaterialTheme.colorScheme.secondaryContainer
+            },
+            contentColor = if (settingsSyncPending) {
+                MaterialTheme.colorScheme.onTertiaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSecondaryContainer
+            },
+            shape = CircleShape,
+            modifier = Modifier.padding(vertical = 8.dp),
+        ) {
+            Text(
+                text = stringResource(
+                    if (settingsSyncPending) R.string.settings_waiting_for_x3 else R.string.settings_synced_to_x3,
+                ),
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+            )
+        }
+        PolicyChoiceRow(
+            label = stringResource(R.string.settings_fast_discovery),
+            values = listOf(1, 5, 10),
+            selected = radioPolicy.fastWindowMinutes,
+            suffix = " min",
+            onSelect = { minutes ->
+                val compatibleSleep = when {
+                    radioPolicy.sleepAfterMinutes > minutes -> radioPolicy.sleepAfterMinutes
+                    minutes < 5 -> 5
+                    minutes < 10 -> 10
+                    else -> 20
+                }
+                onSetRadioPolicy(
+                    radioPolicy.copy(
+                        fastWindowMinutes = minutes,
+                        sleepAfterMinutes = compatibleSleep,
+                    ),
+                )
+            },
+        )
+        PolicyChoiceRow(
+            label = stringResource(R.string.settings_slow_poll),
+            values = listOf(1, 2, 4),
+            selected = radioPolicy.slowIntervalMs / 1_000,
+            suffix = " s",
+            onSelect = { onSetRadioPolicy(radioPolicy.copy(slowIntervalMs = it * 1_000)) },
+        )
+        PolicyChoiceRow(
+            label = stringResource(R.string.settings_sleep_after),
+            values = listOf(5, 10, 20),
+            selected = radioPolicy.sleepAfterMinutes,
+            suffix = " min",
+            onSelect = { minutes ->
+                if (minutes > radioPolicy.fastWindowMinutes) {
+                    onSetRadioPolicy(radioPolicy.copy(sleepAfterMinutes = minutes))
+                }
+            },
         )
         Text(
-            text = stringResource(R.string.settings_power_sync_body),
-            style = MaterialTheme.typography.bodyMedium,
+            stringResource(R.string.settings_radio_policy_body),
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(12.dp))
-        SettingsChoiceRow(
-            label = stringResource(R.string.settings_normal_sync),
-            choices = listOf(15 to "15s", 30 to "30s", 60 to "1m"),
-            selected = powerSyncConfig.normalPollSeconds,
-            onSelect = onSetNormalPollSeconds,
+        Text(stringResource(R.string.settings_reader_refresh), style = MaterialTheme.typography.titleMedium)
+        PolicyChoiceRow(
+            label = stringResource(R.string.settings_full_refresh_pages),
+            values = listOf(1, 5, 10, 15, 30),
+            selected = radioPolicy.fullRefreshPages,
+            suffix = "",
+            onSelect = { onSetRadioPolicy(radioPolicy.copy(fullRefreshPages = it)) },
         )
-        SettingsChoiceRow(
-            label = stringResource(R.string.settings_reading_sync),
-            choices = listOf(5 * 60 to "5m", 10 * 60 to "10m", 15 * 60 to "15m"),
-            selected = powerSyncConfig.slowPollSeconds,
-            onSelect = onSetSlowPollSeconds,
+        Text(
+            stringResource(R.string.settings_full_refresh_pages_body),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        SettingsChoiceRow(
-            label = stringResource(R.string.settings_sleep_after),
-            choices = listOf(1 to "1m", 2 to "2m", 3 to "3m", 5 to "5m"),
-            selected = powerSyncConfig.sleepTimeoutMinutes,
-            onSelect = onSetSleepTimeoutMinutes,
+        Spacer(Modifier.height(12.dp))
+        Text(stringResource(R.string.settings_reading_stats), style = MaterialTheme.typography.titleMedium)
+        val offLabel = stringResource(R.string.off)
+        PolicyChoiceRow(
+            label = stringResource(R.string.settings_minimum_page_time),
+            values = listOf(0, 5, 10, 15),
+            selected = minimumReadingPageSeconds,
+            suffix = " s",
+            valueLabel = { value -> if (value == 0) offLabel else "$value s" },
+            onSelect = onSetMinimumReadingPageSeconds,
+        )
+        Text(
+            stringResource(R.string.settings_minimum_page_time_body),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(12.dp))
         Surface(
@@ -484,40 +600,52 @@ fun SettingsSheetContent(
         )
         SettingsValue(stringResource(R.string.settings_gemini), stringResource(R.string.settings_gemini_value))
         SettingsValue(stringResource(R.string.settings_flights), stringResource(R.string.settings_flights_value))
-        Spacer(Modifier.height(18.dp))
-        Text(
-            text = stringResource(R.string.compatibility_disclaimer),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
 @Composable
-private fun SettingsChoiceRow(
+private fun PolicyChoiceRow(
     label: String,
-    choices: List<Pair<Int, String>>,
+    values: List<Int>,
     selected: Int,
+    suffix: String,
+    valueLabel: (Int) -> String = { "$it$suffix" },
     onSelect: (Int) -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    Column(modifier = Modifier.padding(vertical = 6.dp)) {
+        Text(label, style = MaterialTheme.typography.labelLarge)
         Spacer(Modifier.height(6.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            choices.forEach { (value, text) ->
-                ThemeChip(
-                    label = text,
-                    selected = value == selected,
+            values.forEach { value ->
+                val isSelected = selected == value
+                Surface(
+                    selected = isSelected,
                     onClick = { onSelect(value) },
-                    modifier = Modifier.weight(1f),
-                )
+                    shape = MaterialTheme.shapes.medium,
+                    color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer
+                    else MaterialTheme.colorScheme.surfaceContainerLow,
+                    contentColor = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    border = BorderStroke(
+                        if (isSelected) 2.dp else 1.dp,
+                        if (isSelected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.outlineVariant,
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            valueLabel(value),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        )
+                    }
+                }
             }
         }
     }
@@ -526,20 +654,70 @@ private fun SettingsChoiceRow(
 @Composable
 private fun ThemeChip(
     label: String,
+    description: String,
+    expressive: Boolean,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHapticFeedback.current
-    FilterChip(
+    Surface(
         selected = selected,
         onClick = {
             if (!selected) haptics.performHapticFeedback(HapticFeedbackType.ToggleOn)
             onClick()
         },
-        label = { Text(label) },
+        shape = MaterialTheme.shapes.large,
+        color = if (selected) MaterialTheme.colorScheme.secondaryContainer
+        else MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = if (selected) MaterialTheme.colorScheme.onSecondaryContainer
+        else MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(
+            if (selected) 2.dp else 1.dp,
+            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+        ),
         modifier = modifier,
-    )
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            ThemePreview(expressive = expressive, selected = selected)
+            Spacer(Modifier.height(12.dp))
+            Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(
+                description,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ThemePreview(expressive: Boolean, selected: Boolean) {
+    val ink = if (selected) MaterialTheme.colorScheme.onSecondaryContainer
+    else MaterialTheme.colorScheme.onSurfaceVariant
+    val accent = MaterialTheme.colorScheme.primary
+    Canvas(modifier = Modifier.fillMaxWidth().height(32.dp)) {
+        if (expressive) {
+            drawCircle(accent, radius = 11.dp.toPx(), center = Offset(13.dp.toPx(), center.y))
+            drawRoundRect(
+                color = ink,
+                topLeft = Offset(32.dp.toPx(), 5.dp.toPx()),
+                size = androidx.compose.ui.geometry.Size(size.width - 38.dp.toPx(), 9.dp.toPx()),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(5.dp.toPx()),
+            )
+            drawRoundRect(
+                color = ink.copy(alpha = 0.45f),
+                topLeft = Offset(32.dp.toPx(), 20.dp.toPx()),
+                size = androidx.compose.ui.geometry.Size((size.width - 38.dp.toPx()) * 0.68f, 6.dp.toPx()),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(3.dp.toPx()),
+            )
+        } else {
+            drawLine(ink, Offset(0f, 7.dp.toPx()), Offset(size.width, 7.dp.toPx()), 2.dp.toPx())
+            drawLine(ink.copy(alpha = 0.65f), Offset(0f, 17.dp.toPx()), Offset(size.width * 0.78f, 17.dp.toPx()), 2.dp.toPx())
+            drawLine(ink.copy(alpha = 0.4f), Offset(0f, 27.dp.toPx()), Offset(size.width * 0.55f, 27.dp.toPx()), 2.dp.toPx())
+        }
+    }
 }
 
 @Composable

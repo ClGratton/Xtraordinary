@@ -66,7 +66,7 @@ fun SetupScreen(
     modifier: Modifier = Modifier,
     initialPage: Int = 0,
     device: DeviceUiState = DeviceUiState(),
-    isDeviceConnected: Boolean = false,
+    isDeviceTransportConnected: Boolean = false,
     onConnectDevice: (String) -> Unit = {},
     onCheckFirmware: (String, FirmwareSource) -> Unit = { _, _ -> },
     onFlashFirmware: () -> Unit = {},
@@ -152,7 +152,7 @@ fun SetupScreen(
         DeviceConnectionSheet(
             onDismiss = { devicesVisible = false },
             device = device,
-            isConnected = isDeviceConnected,
+            isTransportConnected = isDeviceTransportConnected,
             onConnect = onConnectDevice,
             onCheckFirmware = onCheckFirmware,
             onFlashFirmware = onFlashFirmware,

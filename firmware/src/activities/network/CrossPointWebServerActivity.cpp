@@ -72,14 +72,7 @@ void CrossPointWebServerActivity::onEnter() {
   connectedIP.clear();
   connectedSSID.clear();
   lastHandleClientTime = 0;
-  companionTransferStartedAt = millis();
   requestUpdate();
-
-  if (autoStartHotspot) {
-    LOG_DBG("WEBACT", "Companion transfer requested; starting hotspot directly");
-    onNetworkModeSelected(NetworkMode::CREATE_HOTSPOT);
-    return;
-  }
 
   // Launch network mode selection subactivity
   LOG_DBG("WEBACT", "Launching NetworkModeSelectionActivity...");
@@ -275,24 +268,6 @@ void CrossPointWebServerActivity::startWebServer() {
 void CrossPointWebServerActivity::loop() {
   // Handle different states
   if (state == WebServerActivityState::SERVER_RUNNING) {
-    if (autoStartHotspot && webServer) {
-      const auto& transfer = webServer->upload;
-      const unsigned long now = millis();
-      const bool neverStarted =
-          transfer.startedAt == 0 && now - companionTransferStartedAt >= COMPANION_WAIT_FOR_UPLOAD_MS;
-      const bool stalled =
-          transfer.startedAt != 0 && transfer.completedAt == 0 &&
-          now - transfer.lastActivityAt >= COMPANION_UPLOAD_STALL_MS;
-      const bool complete =
-          transfer.completedAt != 0 && now - transfer.completedAt >= COMPANION_COMPLETE_GRACE_MS;
-      if (neverStarted || stalled || complete) {
-        LOG_INF("WEBACT", "Companion transfer ended automatically (never=%d stalled=%d complete=%d)", neverStarted,
-                stalled, complete);
-        onGoHome();
-        return;
-      }
-    }
-
     // Handle DNS requests for captive portal (AP mode only)
     if (isApMode && dnsServer) {
       dnsServer->processNextRequest();

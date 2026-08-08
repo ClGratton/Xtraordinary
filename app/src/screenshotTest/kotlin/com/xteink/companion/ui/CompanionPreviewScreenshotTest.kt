@@ -11,7 +11,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.android.tools.screenshot.PreviewTest
-import com.xteink.companion.monetization.AccessState
 import com.xteink.companion.ui.components.SettingsSheetContent
 import com.xteink.companion.ui.components.DeviceConnectionSheetContent
 import com.xteink.companion.ui.components.DeviceSetupStep
@@ -123,7 +122,6 @@ fun readContentSelectedScreenshot() {
                 onOpenEpub = {},
                 onOpenSettings = {},
                 onDeleteBooksFromX3 = {},
-                onSendBooksToX3 = {},
                 initialSelectedBookIds = setOf("sample-book"),
             )
         }
@@ -208,14 +206,10 @@ fun settingsThemesScreenshot() {
             ) {
                 SettingsSheetContent(
                     visualTheme = CompanionVisualTheme.Expressive,
-                    powerSyncConfig = com.xteink.companion.protocol.PowerSyncConfig(),
-                    access = screenshotAccessState,
+                    radioPolicy = RadioPolicyUiState(),
+                    settingsSyncPending = true,
                     onSetVisualTheme = {},
-                    onSetNormalPollSeconds = {},
-                    onSetSlowPollSeconds = {},
-                    onSetSleepTimeoutMinutes = {},
-                    onGetPro = {},
-                    onShowPrivacyOptions = {},
+                    onSetRadioPolicy = {},
                     onOpenSetup = {},
                     onDismiss = {},
                     modifier = Modifier.padding(top = 20.dp),
@@ -265,14 +259,10 @@ private fun ScreenshotApp(state: CompanionUiState) {
     X3CompanionTheme(visualTheme = state.visualTheme, useDynamicColor = false) {
         X3CompanionApp(
             state = state,
-            access = screenshotAccessState,
             onSetVisualTheme = {},
-            onSetNormalPollSeconds = {},
-            onSetSlowPollSeconds = {},
-            onSetSleepTimeoutMinutes = {},
+            onSetRadioPolicy = {},
             onSetDuration = {},
             onStartFocus = {},
-            onStartFocusPhoneOnly = {},
             onTogglePause = {},
             onEndFocus = {},
             onResetFocus = {},
@@ -286,8 +276,11 @@ private fun ScreenshotApp(state: CompanionUiState) {
             onChooseBookFolder = {},
             onOpenEpub = {},
             onDeleteBooksFromX3 = {},
-            onSendBooksToX3 = {},
             onOpenPasses = {},
+            onOpenStats = {},
+            onSetReadingStatsView = {},
+            onSelectReadingSession = {},
+            onSetMinimumReadingPageSeconds = {},
             onShowToolHub = {},
             onSelectPass = {},
             onSetTicketMode = {},
@@ -298,13 +291,3 @@ private fun ScreenshotApp(state: CompanionUiState) {
         )
     }
 }
-
-private val screenshotAccessState = AccessState(
-    isPlayDistribution = false,
-    isPro = true,
-    welcomeEndsAtEpochMs = null,
-    rewardedAccessEndsAtEpochMs = null,
-    localizedProPrice = null,
-    billingAvailable = false,
-    rewardedAdReady = false,
-)

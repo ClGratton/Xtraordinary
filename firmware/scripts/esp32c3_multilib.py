@@ -1,6 +1,6 @@
 Import("env")
 
-from os.path import join
+from os.path import isdir, join
 
 
 def verify_esp32c3_multilib(source, target, env):
@@ -29,11 +29,18 @@ def verify_esp32c3_multilib(source, target, env):
 if env.BoardConfig().get("build.mcu") == "esp32c3":
     env.AppendUnique(LINKFLAGS=["-march=rv32imc_zicsr_zifencei", "-mabi=ilp32"])
     toolchain_dir = env.PioPlatform().get_package_dir("toolchain-riscv32-esp")
+    # pioarduino's Windows package may contain an extra riscv32-esp-elf
+    # directory (package/riscv32-esp-elf/riscv32-esp-elf/lib). Resolve the
+    # actual sysroot instead of silently falling back to the default RV32IMAC
+    # libstdc++, whose AMO instructions crash the ESP32-C3.
+    sysroot = join(toolchain_dir, "riscv32-esp-elf")
+    nested_sysroot = join(sysroot, "riscv32-esp-elf")
+    if isdir(join(nested_sysroot, "lib")):
+        sysroot = nested_sysroot
     env.PrependUnique(
         LIBPATH=[
             join(
-                toolchain_dir,
-                "riscv32-esp-elf",
+                sysroot,
                 "lib",
                 "rv32imc_zicsr_zifencei",
                 "ilp32",

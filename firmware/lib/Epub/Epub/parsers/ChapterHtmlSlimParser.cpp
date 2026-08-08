@@ -22,6 +22,13 @@
 constexpr size_t MIN_SIZE_FOR_POPUP = 10 * 1024;  // 10KB
 constexpr size_t PARSE_BUFFER_SIZE = 1024;
 
+// Keep token storage below the 512-entry vector growth boundary. A single Expat
+// character-data callback can contain hundreds of short words, so checking only
+// after the callback allowed ParsedText's parallel vectors to grow to 2048 entries.
+// On the ESP32-C3 that requests a ~49KB contiguous block for the string vector and
+// aborts when the heap is fragmented, even while total free heap is still >50KB.
+constexpr size_t MAX_BUFFERED_TEXT_TOKENS = 256;
+
 // Hard cap on the number of anchor IDs recorded per chapter. Legitimate navigation
 // anchors (TOC entries, footnotes, cross-references) rarely exceed a few hundred per
 // chapter. A runaway count usually means a converter injected machine-generated IDs on
@@ -188,6 +195,22 @@ void ChapterHtmlSlimParser::flushPartWordBuffer() {
   currentTextBlock->addWord(partWordBuffer, fontStyle, false, nextWordContinues);
   partWordBufferIndex = 0;
   nextWordContinues = false;
+  drainOversizedTextBlock();
+}
+
+void ChapterHtmlSlimParser::drainOversizedTextBlock() {
+  if (!currentTextBlock || currentTextBlock->size() <= MAX_BUFFERED_TEXT_TOKENS) {
+    return;
+  }
+
+  LOG_DBG("EHP", "Text block reached %u tokens, draining completed lines",
+          static_cast<unsigned>(currentTextBlock->size()));
+  const int horizontalInset = currentTextBlock->getBlockStyle().totalHorizontalInset();
+  const uint16_t effectiveWidth =
+      (horizontalInset < viewportWidth) ? static_cast<uint16_t>(viewportWidth - horizontalInset) : viewportWidth;
+  currentTextBlock->layoutAndExtractLines(
+      renderer, fontId, effectiveWidth,
+      [this](const std::shared_ptr<TextBlock>& textBlock) { addLineToPage(textBlock); }, false);
 }
 
 // start a new text block if needed
@@ -829,6 +852,7 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
 
       if (strcmp(name, "li") == 0) {
         self->currentTextBlock->addWord("\xe2\x80\xa2", EpdFontFamily::REGULAR);
+        self->drainOversizedTextBlock();
       }
     }
   } else if (matches(name, UNDERLINE_TAGS, std::size(UNDERLINE_TAGS))) {
@@ -1108,20 +1132,8 @@ void XMLCALL ChapterHtmlSlimParser::characterData(void* userData, const XML_Char
     self->partWordBuffer[self->partWordBufferIndex++] = s[i];
   }
 
-  // If we have > 750 words buffered up, perform the layout and consume out all but the last line
-  // There should be enough here to build out 1-2 full pages and doing this will free up a lot of
-  // memory.
-  // Spotted when reading Intermezzo, there are some really long text blocks in there.
-  if (self->currentTextBlock->size() > 750) {
-    LOG_DBG("EHP", "Text block too long, splitting into multiple pages");
-    const int horizontalInset = self->currentTextBlock->getBlockStyle().totalHorizontalInset();
-    const uint16_t effectiveWidth = (horizontalInset < self->viewportWidth)
-                                        ? static_cast<uint16_t>(self->viewportWidth - horizontalInset)
-                                        : self->viewportWidth;
-    self->currentTextBlock->layoutAndExtractLines(
-        self->renderer, self->fontId, effectiveWidth,
-        [self](const std::shared_ptr<TextBlock>& textBlock) { self->addLineToPage(textBlock); }, false);
-  }
+  // Also check at callback boundaries for text ending without a delimiter.
+  self->drainOversizedTextBlock();
 }
 
 void XMLCALL ChapterHtmlSlimParser::defaultHandlerExpand(void* userData, const XML_Char* s, const int len) {

@@ -1,9 +1,7 @@
 package com.xteink.companion.ui
 
 import com.xteink.companion.data.FirmwareSource
-import com.xteink.companion.protocol.DeviceActivity
-import com.xteink.companion.protocol.DeviceSyncMode
-import com.xteink.companion.protocol.PowerSyncConfig
+import com.xteink.companion.data.ReadingSessionStat
 
 enum class CompanionVisualTheme {
     Expressive,
@@ -19,7 +17,18 @@ enum class CompanionSurface {
 enum class ToolDestination {
     Hub,
     Passes,
+    Stats,
 }
+
+enum class ReadingStatsView { Cumulative, Sessions }
+
+data class ReadingStatsUiState(
+    val sessions: List<ReadingSessionStat> = emptyList(),
+    val minimumPageSeconds: Int = 5,
+    val view: ReadingStatsView = ReadingStatsView.Cumulative,
+    val selectedSessionId: UInt? = null,
+    val syncing: Boolean = false,
+)
 
 enum class FocusPhase {
     Setup,
@@ -61,6 +70,8 @@ data class BoardingPassUiState(
     val passenger: String,
     val boardingGroup: String,
     val source: String,
+    val barcodePayload: String,
+    val isSample: Boolean = false,
 )
 
 private val SamplePasses = listOf(
@@ -77,6 +88,8 @@ private val SamplePasses = listOf(
         seat = "22B",
         passenger = "CLAUDIO A.",
         boardingGroup = "Main 2",
+        barcodePayload = "SAMPLE-DL2048-NOT-SCANNABLE",
+        isSample = true,
         source = "Sample Wallet pass · updated 2 min ago",
     ),
     BoardingPassUiState(
@@ -92,6 +105,8 @@ private val SamplePasses = listOf(
         seat = "14A",
         passenger = "CLAUDIO A.",
         boardingGroup = "Group 3",
+        barcodePayload = "SAMPLE-AZ610-NOT-SCANNABLE",
+        isSample = true,
         source = "Sample airline notification · updated now",
     ),
 )
@@ -100,6 +115,9 @@ data class TicketUiState(
     val mode: TicketMode = TicketMode.Static,
     val passes: List<BoardingPassUiState> = SamplePasses,
     val selectedPassId: String = SamplePasses.first().id,
+    val isOnX3: Boolean = false,
+    val sendPending: Boolean = false,
+    val removalPending: Boolean = false,
 ) {
     val selectedPass: BoardingPassUiState
         get() = passes.firstOrNull { it.id == selectedPassId } ?: passes.first()
@@ -148,8 +166,6 @@ data class ReadUiState(
     val importing: Boolean = false,
     val syncing: Boolean = false,
     val folderLinked: Boolean = false,
-    val transferInProgress: Boolean = false,
-    val transferProgress: Float? = null,
 )
 
 enum class FirmwareCheckPhase { Idle, Checking, Available, UpToDate, Downloading, Transferring, Complete, Error }
@@ -163,15 +179,20 @@ data class DeviceUiState(
     val usbMessage: String? = null,
     val firmwareVersion: String? = null,
     val libraryRevision: UInt = 0u,
-    val activity: DeviceActivity? = null,
-    val syncMode: DeviceSyncMode? = null,
-    val statusRevision: UInt = 0u,
-    val lastStatusAtEpochMs: Long? = null,
-    val lowPowerGraceExpired: Boolean = false,
     val firmwareCheckPhase: FirmwareCheckPhase = FirmwareCheckPhase.Idle,
     val firmwareSource: FirmwareSource = FirmwareSource.Xtraordinary,
     val latestFirmwareVersion: String? = null,
     val firmwareProgress: Float? = null,
+    val batteryPercentage: Int? = null,
+    val charging: Boolean = false,
+    val settingsSyncPending: Boolean = false,
+)
+
+data class RadioPolicyUiState(
+    val fastWindowMinutes: Int = 5,
+    val slowIntervalMs: Int = 2_000,
+    val sleepAfterMinutes: Int = 10,
+    val fullRefreshPages: Int = 15,
 )
 
 data class CompanionUiState(
@@ -181,12 +202,11 @@ data class CompanionUiState(
     val focus: FocusUiState = FocusUiState(),
     val read: ReadUiState = ReadUiState(),
     val ticket: TicketUiState = TicketUiState(),
+    val readingStats: ReadingStatsUiState = ReadingStatsUiState(),
     val device: DeviceUiState = DeviceUiState(),
-    val powerSyncConfig: PowerSyncConfig = PowerSyncConfig(),
-    // A managed device is remembered and eligible for reconnect/queued work.
-    // Connected always means the BLE transport is live; UI must never present
-    // a remembered device as connected.
-    val hasManagedX3: Boolean = false,
+    val radioPolicy: RadioPolicyUiState = RadioPolicyUiState(),
+    // This is the logical, user-visible relationship: a managed device remains
+    // connected while its short-lived BLE transport is intentionally idle.
     val isX3Connected: Boolean = false,
     val isX3TransportConnected: Boolean = false,
     val connectedDeviceModel: String? = null,
@@ -200,7 +220,6 @@ sealed interface UiNotice {
     data object EpubImportFailed : UiNotice
     data object ConnectX3ToDelete : UiNotice
     data class X3DeleteQueued(val count: Int) : UiNotice
-    data class BooksSentToX3(val count: Int) : UiNotice
     data class BooksImported(
         val added: Int,
         val duplicates: Int,

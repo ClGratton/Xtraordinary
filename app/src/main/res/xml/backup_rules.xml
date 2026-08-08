@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<full-backup-content>
-    <include domain="sharedpref" path="xtraordinary_access.xml" />
-    <include domain="sharedpref" path="xtraordinary_setup.xml" />
-    <include domain="sharedpref" path="xtraordinary_connection.xml" />
-</full-backup-content>
