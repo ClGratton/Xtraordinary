@@ -157,7 +157,7 @@ The following survives Android activity recreation and process restart:
 - the fact that an already-ACKed Live ticket should maintain its link.
 - the ordered remaining book-upload queue and its Bluetooth/USB transport choice.
 
-Reading-session deletions also survive process restart and cloud merge. Android stores bounded content-fingerprint tombstones so an older Google Drive copy or an X3 resend cannot resurrect a deleted session. The stats screen supports an end-to-start Gmail-style swipe, threshold/commit haptics, a dynamic-color bin target, and snackbar Undo.
+Reading-session deletions also survive process restart and cloud merge. Android stores bounded content-fingerprint tombstones so an older Google Drive copy or an X3 resend cannot resurrect a deleted session. The stats screen supports an end-to-start Gmail-style swipe using the app's shared magnetic resistance, threshold detector, Pixel primitive snap haptic, and spring return. The dynamic-color delete target starts at the session row's full height, expands with the reveal, remains centered inside that action surface, and collapses with the row after commit. Snackbar Undo restores the row through the same expand/fade entrance used whenever a session enters the list; rows never appear or disappear without a transition.
 
 Active Focus timing and an in-progress firmware byte transfer are process/session work rather than resumable transactions. X3 continues its local Focus countdown if the phone process dies, but the current phone timer state is not reconstructed from X3. An interrupted firmware transfer must be restarted rather than resumed at an arbitrary byte.
 

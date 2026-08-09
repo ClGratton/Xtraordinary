@@ -425,7 +425,7 @@ class BluetoothCompanionClient(private val context: Context) {
                 Log.w(LogTag, "presence probe still sees X3 rssi=${result.rssi}; Android GATT reset required")
                 stopScan()
                 failLink(
-                    "Android's Bluetooth connection is stuck. Tap Fix Bluetooth to recover it.",
+                    "Android's Bluetooth connection is stuck. Restart Bluetooth from the system controls, then return to reconnect.",
                     requiresBluetoothReset = true,
                 )
             }

@@ -225,13 +225,13 @@ private fun PagerResistanceFeedback(
 }
 
 @Suppress("DEPRECATION")
-private fun Context.touchVibrator(): Vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+internal fun Context.touchVibrator(): Vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
     getSystemService(VibratorManager::class.java).defaultVibrator
 } else {
     getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
 }
 
-private fun Vibrator.playPrimitive(context: Context, primitive: Int, scale: Float): Boolean {
+internal fun Vibrator.playPrimitive(context: Context, primitive: Int, scale: Float): Boolean {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || !hasVibrator()) return false
     val touchEnabled = Settings.System.getInt(
         context.contentResolver,
@@ -247,7 +247,7 @@ private fun Vibrator.playPrimitive(context: Context, primitive: Int, scale: Floa
     return true
 }
 
-private fun Vibrator.playSnapThreshold(context: Context): Boolean {
+internal fun Vibrator.playSnapThreshold(context: Context): Boolean {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || !hasVibrator()) return false
     val touchEnabled = Settings.System.getInt(
         context.contentResolver,

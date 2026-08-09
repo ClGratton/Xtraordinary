@@ -128,8 +128,8 @@
     <string name="settings_device_reconnecting">Reconnecting…</string>
     <string name="settings_device_connecting">Connecting&#8230;</string>
     <string name="settings_device_bluetooth_reset">Bluetooth reset needed</string>
-    <string name="bluetooth_reset_body">Open Bluetooth, turn it off and back on, then return here. Xtraordinary reconnects automatically.</string>
-    <string name="fix_bluetooth">Fix Bluetooth</string>
+    <string name="bluetooth_reset_body">Android does not let Xtraordinary restart Bluetooth itself. Turn Bluetooth off, turn it back on, then return here; the app reconnects automatically.</string>
+    <string name="fix_bluetooth">Open Bluetooth controls</string>
     <string name="settings_notifications">Notification rules</string>
     <string name="settings_notifications_value">Rules not configured</string>
     <string name="settings_gemini">Gemini &amp; privacy</string>

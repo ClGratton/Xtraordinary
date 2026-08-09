@@ -1,35 +1,49 @@
 package com.xteink.companion.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -40,6 +54,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -48,6 +66,9 @@ import com.xteink.companion.R
 import com.xteink.companion.data.ReadingSessionStat
 import com.xteink.companion.ui.ReadingStatsUiState
 import com.xteink.companion.ui.ReadingStatsView
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -165,18 +186,9 @@ private fun SessionStats(
     val selected = sessions.firstOrNull { it.id == selectedId } ?: sessions.first()
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = MaterialTheme.shapes.extraLarge) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(selected.title, style = MaterialTheme.typography.titleLarge)
-                    Text(formatDate(selected.endedAtEpochMs), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                TextButton(onClick = { onDeleteSession(selected.id) }) {
-                    Text(stringResource(R.string.delete_session))
-                }
+            Column(Modifier.fillMaxWidth()) {
+                Text(selected.title, style = MaterialTheme.typography.titleLarge)
+                Text(formatDate(selected.endedAtEpochMs), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             MetricStrip(
                 listOf(
@@ -198,16 +210,17 @@ private fun SessionStats(
     )
     Text(stringResource(R.string.reading_stats_recent), style = MaterialTheme.typography.titleMedium)
     sessions.forEach { session ->
-        SwipeSessionRow(
-            session = session,
-            selected = session.id == selected.id,
-            onSelect = { onSelectSession(session.id) },
-            onDelete = { onDeleteSession(session.id) },
-        )
+        androidx.compose.runtime.key(session.id) {
+            SwipeSessionRow(
+                session = session,
+                selected = session.id == selected.id,
+                onSelect = { onSelectSession(session.id) },
+                onDelete = { onDeleteSession(session.id) },
+            )
+        }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SwipeSessionRow(
     session: ReadingSessionStat,
@@ -215,49 +228,121 @@ private fun SwipeSessionRow(
     onSelect: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val density = LocalDensity.current
     val haptics = LocalHapticFeedback.current
-    val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = { value ->
-            if (value == SwipeToDismissBoxValue.EndToStart) {
-                haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-                onDelete()
-                true
-            } else {
-                false
-            }
-        },
-        positionalThreshold = { distance -> distance * 0.42f },
-    )
-    val armed = dismissState.targetValue == SwipeToDismissBoxValue.EndToStart
+    val vibrator = remember(context) { context.touchVibrator() }
+    val scope = rememberCoroutineScope()
+    var rowWidthPx by remember(session.id) { mutableFloatStateOf(1f) }
+    var rowHeightPx by remember(session.id) { mutableFloatStateOf(1f) }
+    var rawProgress by remember(session.id) { mutableFloatStateOf(0f) }
+    var settlingOffsetPx by remember(session.id) { mutableStateOf<Float?>(null) }
+    var armed by remember(session.id) { mutableStateOf(false) }
+    var removing by remember(session.id) { mutableStateOf(false) }
+    var resistanceJob by remember(session.id) { mutableStateOf<Job?>(null) }
+    var settleJob by remember(session.id) { mutableStateOf<Job?>(null) }
+    val resistanceBlend = remember(session.id) { Animatable(1f) }
+    val visibleState = remember(session.id) {
+        MutableTransitionState(false).apply { targetState = true }
+    }
+    val magneticState = remember(session.id) { MagneticSwipeState(DefaultMagneticSwipe) }
+    val directOffsetPx = DefaultMagneticSwipe.displayedProgress(
+        signedProgress = rawProgress,
+        resistance = resistanceBlend.value,
+    ) * rowWidthPx
+    val offsetPx = settlingOffsetPx ?: directOffsetPx
+    val revealFraction = (-offsetPx / rowWidthPx).coerceIn(0f, 1f)
+    val actionWidthPx = -offsetPx.coerceAtMost(0f)
+    val actionWidth = with(density) { actionWidthPx.toDp() }
+    val iconCenterFromEndPx = maxOf(actionWidthPx / 2f, rowHeightPx / 2f)
+    val iconHalfSizePx = with(density) { 28.dp.toPx() }
+    val iconOffset = with(density) { -(iconCenterFromEndPx - iconHalfSizePx).toDp() }
     val morph by animateFloatAsState(
-        targetValue = if (armed) 1f else 0f,
-        animationSpec = tween(durationMillis = 180),
+        targetValue = (revealFraction / DefaultMagneticSwipe.threshold).coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 80),
         label = "session delete morph",
     )
-    LaunchedEffect(armed) {
-        if (armed) haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
+
+    suspend fun settle(target: Float, durationMillis: Int) {
+        resistanceJob?.cancel()
+        settlingOffsetPx = offsetPx
+        animate(
+            initialValue = offsetPx,
+            targetValue = target,
+            animationSpec = if (target == 0f) {
+                spring(dampingRatio = 0.78f, stiffness = 560f)
+            } else {
+                tween(durationMillis)
+            },
+        ) { value, _ -> settlingOffsetPx = value }
+        if (target == 0f) {
+            rawProgress = 0f
+            magneticState.update(0f)
+            armed = false
+            resistanceBlend.snapTo(1f)
+            settlingOffsetPx = null
+        }
     }
 
-    SwipeToDismissBox(
-        state = dismissState,
-        enableDismissFromStartToEnd = false,
-        enableDismissFromEndToStart = true,
-        backgroundContent = {
+    fun updateDrag(dragAmountPx: Float) {
+        rawProgress = (rawProgress + (dragAmountPx / rowWidthPx)).coerceIn(-1f, 0f)
+        val thresholdEvent = magneticState.update(rawProgress)
+        if (thresholdEvent != null) {
+            if (!vibrator.playSnapThreshold(context)) {
+                haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
+            }
+            armed = magneticState.isBeyondThreshold
+            resistanceJob?.cancel()
+            resistanceJob = scope.launch {
+                resistanceBlend.animateTo(
+                    targetValue = if (magneticState.isBeyondThreshold) 0f else 1f,
+                    animationSpec = tween(durationMillis = 90),
+                )
+            }
+        }
+    }
+
+    LaunchedEffect(removing) {
+        if (removing) {
+            delay(230)
+            onDelete()
+        }
+    }
+
+    AnimatedVisibility(
+        visibleState = visibleState,
+        enter = expandVertically(animationSpec = spring(dampingRatio = 0.82f, stiffness = 520f)) + fadeIn(tween(120)),
+        exit = shrinkVertically(animationSpec = tween(220), shrinkTowards = Alignment.Top) + fadeOut(tween(160)),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .onSizeChanged {
+                    rowWidthPx = it.width.toFloat().coerceAtLeast(1f)
+                    rowHeightPx = it.height.toFloat().coerceAtLeast(1f)
+                },
+        ) {
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .clip(MaterialTheme.shapes.extraLarge)
-                    .background(MaterialTheme.colorScheme.errorContainer),
+                    .matchParentSize(),
                 contentAlignment = Alignment.CenterEnd,
             ) {
                 Box(
                     modifier = Modifier
-                        .padding(end = 24.dp)
-                        .size(48.dp)
+                        .width(actionWidth)
+                        .fillMaxHeight()
+                        .clip(MaterialTheme.shapes.extraLarge)
+                        .background(MaterialTheme.colorScheme.errorContainer),
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .offset(x = iconOffset)
+                        .size(56.dp)
                         .graphicsLayer {
-                            scaleX = 0.72f + (0.28f * morph)
-                            scaleY = 0.72f + (0.28f * morph)
-                            rotationZ = -12f + (12f * morph)
+                            scaleX = 0.82f + (0.18f * morph)
+                            scaleY = 0.82f + (0.18f * morph)
+                            rotationZ = -10f + (10f * morph)
                             transformOrigin = TransformOrigin.Center
                         },
                     contentAlignment = Alignment.Center,
@@ -265,39 +350,75 @@ private fun SwipeSessionRow(
                     DeleteSessionIcon()
                 }
             }
-        },
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth().clickable(onClick = onSelect),
-            color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
-            shape = MaterialTheme.shapes.extraLarge,
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
-                ) {
-                    Box(Modifier.padding(horizontal = 11.dp, vertical = 7.dp), contentAlignment = Alignment.Center) {
-                        Text(
-                            session.pages.size.toString(),
-                            color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.Bold,
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer { translationX = offsetPx }
+                    .pointerInput(session.id, rowWidthPx, removing) {
+                        detectHorizontalDragGestures(
+                            onDragStart = {
+                                settleJob?.cancel()
+                                settlingOffsetPx = null
+                            },
+                            onHorizontalDrag = { change, dragAmount ->
+                                if (!removing) {
+                                    change.consume()
+                                    updateDrag(dragAmount)
+                                }
+                            },
+                            onDragEnd = {
+                                if (!removing) {
+                                    settleJob = scope.launch {
+                                        if (armed) {
+                                            haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                                            settle(-rowWidthPx, 220)
+                                            removing = true
+                                            visibleState.targetState = false
+                                        } else {
+                                            settle(0f, 0)
+                                        }
+                                    }
+                                }
+                            },
+                            onDragCancel = {
+                                settleJob = scope.launch {
+                                    settle(0f, 0)
+                                }
+                            },
                         )
                     }
+                    .clickable(enabled = offsetPx == 0f && !removing, onClick = onSelect),
+                color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = MaterialTheme.shapes.extraLarge,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
+                    ) {
+                        Box(Modifier.padding(horizontal = 11.dp, vertical = 7.dp), contentAlignment = Alignment.Center) {
+                            Text(
+                                session.pages.size.toString(),
+                                color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text(session.title, maxLines = 1, style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            "${formatDate(session.endedAtEpochMs)} · ${formatDuration(session.durationMs)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(session.averageWordsPerMinute?.let { "$it wpm" } ?: "—", style = MaterialTheme.typography.labelLarge)
                 }
-                Column(Modifier.weight(1f)) {
-                    Text(session.title, maxLines = 1, style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        "${formatDate(session.endedAtEpochMs)} · ${formatDuration(session.durationMs)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Text(session.averageWordsPerMinute?.let { "$it wpm" } ?: "—", style = MaterialTheme.typography.labelLarge)
             }
         }
     }
