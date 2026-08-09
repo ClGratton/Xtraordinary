@@ -163,6 +163,11 @@ enum class ReadLocation {
     X3,
 }
 
+enum class BookTransferMethod {
+    Bluetooth,
+    Usb,
+}
+
 data class ReadUiState(
     val books: List<ImportedBookUiState> = emptyList(),
     val query: String = "",
@@ -172,6 +177,7 @@ data class ReadUiState(
     val importing: Boolean = false,
     val uploadingToX3: Boolean = false,
     val uploadProgress: Float? = null,
+    val uploadMethod: BookTransferMethod? = null,
     val syncing: Boolean = false,
     val folderLinked: Boolean = false,
 )
@@ -236,4 +242,5 @@ sealed interface UiNotice {
     ) : UiNotice
     data class FolderSynced(val found: Int, val added: Int) : UiNotice
     data class DeviceMessage(val text: String) : UiNotice
+    data class SessionDeleted(val title: String) : UiNotice
 }

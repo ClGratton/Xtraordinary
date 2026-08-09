@@ -1,6 +1,6 @@
 # X3 power, Bluetooth, synchronization, and app-state flow
 
-**Canonical behavior for:** Android `0.2.0-dev10` and X3 firmware `xtraordinary-v0.2.6-dev9-local`
+**Canonical behavior for:** Android `0.2.0-dev11` and X3 firmware `xtraordinary-v0.2.6-dev10-local`
 **Defaults:** 5-minute fast discovery, 2-second slow BLE interval, 10-minute inactivity sleep, full reader cleanup every 15 pages.
 
 ## Terms and sources of truth
@@ -68,6 +68,7 @@ Configurable app choices:
 ## Home
 
 - Boot, leaving Reading, leaving a static ticket, and Home button activity arm a fresh fast-discovery window.
+- A saved Live ticket is content, not an active runtime mode. Boot and Home always receive the complete fast-discovery window unless Focus is active or the Live ticket is actually open on the X3. This prevents a persisted ticket from showing the low-power chip immediately after boot.
 - Fast advertising transitions to the visible low-power 2-second advertising state at the configured fast-window deadline.
 - At the inactivity deadline, Home sleeps.
 - A phone connection does not alter pairing. After the app goes to the background, idle Home GATT is released after a 1.5-second grace period unless durable work, Focus, Live, or firmware transfer still needs it.
@@ -111,11 +112,15 @@ Reader cleanup now has a dedicated `displayReaderCleanup()` path. It uses the X3
 ## Book upload
 
 - Android uploads only selected books that still have a readable phone URI and are not already present on X3.
-- The BLE transaction is `BeginBookUpload`, ordered 216-byte chunks, `CommitBookUpload`, or `AbortBookUpload`. Every step is individually ACKed.
+- The library supports multi-selection. Selected books are queued and transferred sequentially so one book can be verified and committed before the next begins.
+- Upload opens a transport chooser. **Bluetooth** is always available for a paired, reachable X3. **USB** is offered when the Pixel detects the X3's USB data interface and Android grants access. Wi-Fi is deliberately not exposed: Android's local-only hotspot API can replace or disrupt the phone's active network and does not meet the no-manual-switching requirement yet.
+- The BLE transaction is `BeginBookUpload`, ordered chunks, `CommitBookUpload`, or `AbortBookUpload`. Android negotiates the largest supported ATT MTU, uses up to 488-byte data chunks (a complete 512-byte companion envelope), pipelines four ACK-backed writes within X3's eight-entry receive queue, and requests high connection priority only for the transfer. It restores balanced priority afterward.
+- USB reuses the exact same verified transaction over the ESP32-C3 CDC bulk endpoints. Android does not assert DTR/RTS, because opening the desktop serial port with those control lines can reset this X3. Firmware accepts `CMD:USB_BOOK:<hex envelope>` and returns a message-id-specific ACK/NACK.
 - Begin carries a basename, exact size, and SHA-256. X3 accepts supported book extensions only, refuses traversal/separators and existing destinations, and writes to `/.crosspoint/companion/book-upload.tmp`.
 - X3 temporarily requests a fast BLE connection interval and holds full CPU clock only for the active transfer. Commit closes the file, recomputes SHA-256 from SD, atomically renames it into `/Books`, rescans the library, then returns to the configured slow connection policy.
-- A disconnect, explicit abort, size mismatch, hash mismatch, or write failure removes the temporary file. It never exposes a partial book in the library.
-- This path uses BLE and Android's existing document URI permission. It does not require Wi-Fi, `CHANGE_NETWORK_STATE`, or `WRITE_SETTINGS`.
+- The phone persists the ordered book-id queue and chosen transport before the first byte. After each successful commit it marks that book on X3 and removes only that id from the queue. If the app process ends, BLE disconnect cleanup or X3's 15-second inactive-upload timeout removes the temporary file; reopening the app retries the remaining book from byte zero. Arbitrary byte-offset resume is intentionally avoided because it cannot prove the old temporary file still matches.
+- **Stop upload** cancels the active Android job and sends `AbortBookUpload` in a non-cancellable cleanup context. A disconnect, explicit abort, inactivity timeout, size mismatch, hash mismatch, or write failure removes the temporary file. A partial book is never exposed in the library.
+- The BLE path uses Android's existing document URI permission. It does not require Wi-Fi, `CHANGE_NETWORK_STATE`, or `WRITE_SETTINGS`.
 
 ## Static ticket
 
@@ -150,6 +155,9 @@ The following survives Android activity recreation and process restart:
 - static/live ticket removal state;
 - queued X3 library-deletion paths;
 - the fact that an already-ACKed Live ticket should maintain its link.
+- the ordered remaining book-upload queue and its Bluetooth/USB transport choice.
+
+Reading-session deletions also survive process restart and cloud merge. Android stores bounded content-fingerprint tombstones so an older Google Drive copy or an X3 resend cannot resurrect a deleted session. The stats screen supports an end-to-start Gmail-style swipe, threshold/commit haptics, a dynamic-color bin target, and snackbar Undo.
 
 Active Focus timing and an in-progress firmware byte transfer are process/session work rather than resumable transactions. X3 continues its local Focus countdown if the phone process dies, but the current phone timer state is not reconstructed from X3. An interrupted firmware transfer must be restarted rather than resumed at an arbitrary byte.
 
@@ -185,3 +193,11 @@ Artifact under test: Android `0.2.0-dev10`; X3 `xtraordinary-v0.2.6-dev9-local`;
 - The real Focus control was exercised from the Pixel UI. Start queued `StartSession` and received ACK, the UI changed to Pause/Stop, and Stop queued `StopSession`, received ACK, and restored Start.
 
 This matrix is the release regression test. A single connection after a radio restart is not sufficient evidence.
+
+## 2026-08-09 transfer and boot-policy acceptance
+
+- Android `0.2.0-dev11` (`versionCode=12`) protocol tests, app unit tests, lint, screenshot validation, and debug assembly pass. The Pixel 10 Package Manager readback confirms dev11 after a data-preserving install. APK SHA-256: `EC1BF0B7D71DB90254B8BEAA9C2275FFA5E12DA90EC74AF225B24103F4BF4D67`.
+- Firmware `xtraordinary-v0.2.6-dev10-local` builds with a zero exit, verifies the ESP32-C3 RV32IMC multilib, and uses 34.8% RAM / 82.8% of the application partition. Firmware SHA-256: `E04A67FAEEAE5D9E84BBF46848F86939FD0A85C783C33B37B344C96E465065DF`.
+- The first raw dev11 APK replacement reproduced the known callback-less Android state: the presence probe saw X3 slow advertising at `-40 dBm` in 181 ms after a 12-second GATT attempt produced no callback, while Android retained `bta_dm_disc_gatt` without an X3 ACL. `scripts/install-xtraordinary-app.ps1` now reuses the explicit GATT-release contract before package replacement; a complete data-preserving reinstall passed through that workflow.
+- The Pixel renders the updated library and stats screens without a crash. Five existing reading sessions remain present after a below-threshold end-to-start swipe returns to rest.
+- Hardware firmware acceptance remains pending because COM7 was not present during deployment. Do not claim the boot fast-window fix, USB book transfer, BLE throughput improvement, or repeated reconnect matrix as physically verified until dev10 is safely flashed and those paths run on the X3.

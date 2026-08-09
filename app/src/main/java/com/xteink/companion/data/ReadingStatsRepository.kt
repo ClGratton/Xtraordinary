@@ -70,6 +70,31 @@ class ReadingStatsRepository(context: Context) {
     }
 
     @Synchronized
+    fun deleteSession(sessionId: UInt): ReadingSessionStat? {
+        val sessions = load()
+        val session = sessions.firstOrNull { it.id == sessionId } ?: return null
+        val tombstones = loadTombstones().apply {
+            put(session.contentFingerprint(), System.currentTimeMillis())
+        }
+        val deletedKey = session.contentFingerprint()
+        check(saveState(sessions.filterNot { it.contentFingerprint() == deletedKey }, tombstones)) {
+            "Could not persist the reading-session deletion"
+        }
+        return session
+    }
+
+    @Synchronized
+    fun restoreSession(session: ReadingSessionStat) {
+        val sessions = load()
+        val key = session.contentFingerprint()
+        val tombstones = loadTombstones().apply { remove(key) }
+        val restored = (sessions.filterNot { it.contentFingerprint() == key } + session)
+            .sortedByDescending { it.endedAtEpochMs }
+            .take(MaxSessions)
+        check(saveState(restored, tombstones)) { "Could not restore the reading session" }
+    }
+
+    @Synchronized
     fun accept(chunk: ReadingStatsChunkPayload): ReadingSessionStat? {
         val existing = load()
         existing.firstOrNull {
@@ -106,6 +131,10 @@ class ReadingStatsRepository(context: Context) {
             hasWordCounts = assembly.hasWordCounts,
             pages = assembly.pages.toList(),
         )
+        if (session.contentFingerprint() in loadTombstones()) {
+            pending.remove(chunk.sessionId)
+            return session
+        }
         val sessions = (existing.filterNot { it.contentFingerprint() == session.contentFingerprint() } + session)
             .sortedByDescending { it.endedAtEpochMs }
             .take(MaxSessions)
@@ -127,38 +156,81 @@ class ReadingStatsRepository(context: Context) {
                 put(session.toJson().put("key", session.contentFingerprint()))
             }
         })
+        put("deleted", JSONArray().apply {
+            loadTombstones().forEach { (key, deletedAt) ->
+                put(JSONObject().put("key", key).put("deletedAt", deletedAt))
+            }
+        })
     }
 
     /** Merges immutable sessions and returns how many remote sessions were new. */
     @Synchronized
     fun mergeCloudJson(root: JSONObject): Int {
-        require(root.optInt("schema", -1) == CloudSchema) { "Unsupported reading backup schema" }
+        val schema = root.optInt("schema", -1)
+        require(schema in 1..CloudSchema) { "Unsupported reading backup schema" }
         val local = load()
         val byKey = local.associateByTo(linkedMapOf()) { it.contentFingerprint() }
+        val tombstones = loadTombstones()
+        if (schema >= 2) {
+            val remoteDeleted = root.optJSONArray("deleted") ?: JSONArray()
+            repeat(remoteDeleted.length()) { index ->
+                val deletion = remoteDeleted.getJSONObject(index)
+                val key = deletion.optString("key")
+                if (key.isNotBlank()) {
+                    tombstones[key] = maxOf(tombstones[key] ?: 0L, deletion.optLong("deletedAt", 0L))
+                }
+            }
+        }
         val remote = root.optJSONArray("sessions") ?: JSONArray()
         var added = 0
         repeat(remote.length()) { index ->
             val session = remote.getJSONObject(index).toSession()
             val key = session.contentFingerprint()
-            if (key !in byKey) {
+            if (key !in byKey && key !in tombstones) {
                 byKey[key] = session
                 added += 1
             }
         }
+        tombstones.keys.forEach(byKey::remove)
         val merged = byKey.values.sortedByDescending { it.endedAtEpochMs }.take(MaxSessions)
-        check(save(merged)) { "Could not persist merged reading history" }
+        check(saveState(merged, tombstones)) { "Could not persist merged reading history" }
         val remoteMinimum = root.optInt("minimumPageSeconds", minimumPageSeconds())
         if (remoteMinimum in MinimumPageSecondsOptions) setMinimumPageSeconds(remoteMinimum)
         return added
     }
 
     private fun save(sessions: List<ReadingSessionStat>): Boolean {
+        return saveState(sessions, loadTombstones())
+    }
+
+    private fun saveState(sessions: List<ReadingSessionStat>, tombstones: Map<String, Long>): Boolean {
         val array = JSONArray()
         sessions.forEach { array.put(it.toJson()) }
         // X3 deletes a queued session as soon as Android ACKs it. commit() is
         // intentionally synchronous so accept() cannot authorize that ACK
         // until the complete JSON is durably written.
-        return preferences.edit().putString(SessionsKey, array.toString()).commit()
+        val deleted = JSONArray()
+        tombstones.entries.sortedByDescending { it.value }.take(MaxTombstones).forEach { (key, deletedAt) ->
+            deleted.put(JSONObject().put("key", key).put("deletedAt", deletedAt))
+        }
+        return preferences.edit()
+            .putString(SessionsKey, array.toString())
+            .putString(DeletedKeysKey, deleted.toString())
+            .commit()
+    }
+
+    private fun loadTombstones(): MutableMap<String, Long> {
+        val raw = preferences.getString(DeletedKeysKey, null) ?: return linkedMapOf()
+        return runCatching {
+            val array = JSONArray(raw)
+            linkedMapOf<String, Long>().apply {
+                repeat(array.length()) { index ->
+                    val item = array.getJSONObject(index)
+                    val key = item.optString("key")
+                    if (key.isNotBlank()) put(key, item.optLong("deletedAt", 0L))
+                }
+            }
+        }.getOrDefault(linkedMapOf())
     }
 
     private fun ReadingSessionStat.toJson() = JSONObject().apply {
@@ -224,9 +296,11 @@ class ReadingStatsRepository(context: Context) {
 
     private companion object {
         const val SessionsKey = "sessions"
-        const val CloudSchema = 1
+        const val DeletedKeysKey = "deleted_session_keys"
+        const val CloudSchema = 2
         const val MinimumPageSecondsKey = "minimum_page_seconds"
         const val MaxSessions = 500
+        const val MaxTombstones = 2_000
         const val DefaultMinimumPageSeconds = 5
         val MinimumPageSecondsOptions = setOf(0, 5, 10, 15)
         const val ValidEpochMs = 1_577_836_800_000L // 2020-01-01

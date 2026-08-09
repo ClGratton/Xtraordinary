@@ -236,6 +236,7 @@ class MainActivity : ComponentActivity() {
                         onSetReadService = viewModel::setReadService,
                         onSetReadLocation = viewModel::setReadLocation,
                         onUploadBooksToX3 = viewModel::requestUploadBooksToX3,
+                        onCancelBookUpload = viewModel::cancelBookUpload,
                         onDeleteBooksFromX3 = viewModel::requestDeleteBooksFromX3,
                         onChooseBookFolder = { folderPicker.launch(null) },
                         onOpenEpub = {
@@ -251,6 +252,8 @@ class MainActivity : ComponentActivity() {
                         onOpenStats = viewModel::openStats,
                         onSetReadingStatsView = viewModel::setReadingStatsView,
                         onSelectReadingSession = viewModel::selectReadingSession,
+                        onDeleteReadingSession = viewModel::deleteReadingSession,
+                        onUndoReadingSessionDeletion = viewModel::undoReadingSessionDeletion,
                         onSetMinimumReadingPageSeconds = viewModel::setMinimumReadingPageSeconds,
                         onShowToolHub = viewModel::showToolHub,
                         onSelectPass = viewModel::selectPass,

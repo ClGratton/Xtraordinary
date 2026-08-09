@@ -15,6 +15,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -56,12 +57,15 @@ fun X3CompanionApp(
     onSetReadLocation: (ReadLocation) -> Unit,
     onChooseBookFolder: () -> Unit,
     onOpenEpub: () -> Unit,
-    onUploadBooksToX3: (Set<String>) -> Unit,
+    onUploadBooksToX3: (Set<String>, BookTransferMethod) -> Unit,
+    onCancelBookUpload: () -> Unit,
     onDeleteBooksFromX3: (Set<String>) -> Unit,
     onOpenPasses: () -> Unit,
     onOpenStats: () -> Unit,
     onSetReadingStatsView: (ReadingStatsView) -> Unit,
     onSelectReadingSession: (UInt?) -> Unit,
+    onDeleteReadingSession: (UInt) -> Unit,
+    onUndoReadingSessionDeletion: () -> Unit,
     onSetMinimumReadingPageSeconds: (Int) -> Unit,
     onShowToolHub: () -> Unit,
     onSelectPass: (String) -> Unit,
@@ -101,12 +105,21 @@ fun X3CompanionApp(
             notice.added,
         )
         is UiNotice.DeviceMessage -> notice.text
+        is UiNotice.SessionDeleted -> stringResource(R.string.reading_session_deleted, notice.title)
         null -> null
     }
+    val undoText = stringResource(R.string.undo)
 
     LaunchedEffect(noticeText) {
         if (noticeText != null) {
-            snackbarHostState.showSnackbar(noticeText)
+            val result = snackbarHostState.showSnackbar(
+                message = noticeText,
+                actionLabel = if (state.notice is UiNotice.SessionDeleted) undoText else null,
+                withDismissAction = state.notice is UiNotice.SessionDeleted,
+            )
+            if (result == SnackbarResult.ActionPerformed && state.notice is UiNotice.SessionDeleted) {
+                onUndoReadingSessionDeletion()
+            }
             onDismissNotice()
         }
     }
@@ -179,6 +192,7 @@ fun X3CompanionApp(
                         CompanionSurface.Read -> ReadContent(
                             state = state.read,
                             isX3Connected = state.isX3Connected,
+                            usbConnected = state.device.usbConnected,
                             connectedDeviceModel = state.connectedDeviceModel,
                             onSetQuery = onSetReadQuery,
                             onSetSort = onSetReadSort,
@@ -188,6 +202,7 @@ fun X3CompanionApp(
                             onOpenEpub = onOpenEpub,
                             onOpenSettings = { onShowSettings(true) },
                             onUploadBooksToX3 = onUploadBooksToX3,
+                            onCancelBookUpload = onCancelBookUpload,
                             onDeleteBooksFromX3 = onDeleteBooksFromX3,
                         )
                         CompanionSurface.Tools -> when (toolDestination) {
@@ -211,6 +226,7 @@ fun X3CompanionApp(
                                 state = state.readingStats,
                                 onSetView = onSetReadingStatsView,
                                 onSelectSession = onSelectReadingSession,
+                                onDeleteSession = onDeleteReadingSession,
                                 onBack = onShowToolHub,
                             )
                         }

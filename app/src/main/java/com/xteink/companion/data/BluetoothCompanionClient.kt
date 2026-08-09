@@ -49,6 +49,8 @@ import com.xteink.companion.protocol.XTEINK_EVENTS_UUID
 import com.xteink.companion.protocol.XTEINK_SERVICE_UUID
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -99,6 +101,7 @@ class BluetoothCompanionClient(private val context: Context) {
     private var preferAutoConnect = false
     private var gracefulDisconnectGatt: BluetoothGatt? = null
     private var gracefulDisconnectCompletion: CompletableDeferred<Unit>? = null
+    private var negotiatedMtu = DefaultAttMtu
 
     private val _state = MutableStateFlow(CompanionLinkState())
     val state: StateFlow<CompanionLinkState> = _state.asStateFlow()
@@ -503,6 +506,7 @@ class BluetoothCompanionClient(private val context: Context) {
         onProgress: (Float) -> Unit = {},
     ) = withContext(Dispatchers.IO) {
         var begun = false
+        requestTransferConnectionPriority(high = true)
         try {
             sendAwaitingAck(
                 MessageType.BeginBookUpload,
@@ -510,29 +514,48 @@ class BluetoothCompanionClient(private val context: Context) {
                 timeoutMillis = 20_000,
             )
             begun = true
-            val buffer = ByteArray(BOOK_UPLOAD_CHUNK_BYTES)
+            val chunkBytes = (negotiatedMtu - AttWriteOverheadBytes)
+                .coerceIn(MinimumBookChunkBytes, BOOK_UPLOAD_CHUNK_BYTES)
+            val buffer = ByteArray(chunkBytes)
             var offset = 0L
+            val acknowledgements = ArrayList<CompletableDeferred<Unit>>(BookUploadWindowSize)
             while (true) {
                 val count = input.read(buffer)
                 if (count < 0) break
                 if (count == 0) continue
                 check(offset + count <= sizeBytes) { "Book source grew while it was uploading" }
-                sendAwaitingAck(
+                acknowledgements += enqueueAwaitingAck(
                     MessageType.BookUploadChunk,
                     PayloadCodec.encodeBookUploadChunk(offset.toInt(), buffer.copyOf(count)),
-                    timeoutMillis = 20_000,
                 )
                 offset += count
                 onProgress((offset.toFloat() / sizeBytes).coerceIn(0f, 1f))
+                if (acknowledgements.size == BookUploadWindowSize) {
+                    withTimeout(BookUploadAckTimeoutMs) { acknowledgements.awaitAll() }
+                    acknowledgements.clear()
+                }
+            }
+            if (acknowledgements.isNotEmpty()) {
+                withTimeout(BookUploadAckTimeoutMs) { acknowledgements.awaitAll() }
             }
             check(offset == sizeBytes) { "Book source changed before upload completed" }
             sendAwaitingAck(MessageType.CommitBookUpload, timeoutMillis = 60_000)
             onProgress(1f)
             refreshLibrary()
         } catch (error: Throwable) {
-            if (begun && isReady()) runCatching { sendAwaitingAck(MessageType.AbortBookUpload) }
+            if (begun && isReady()) {
+                withContext(NonCancellable) {
+                    runCatching { sendAwaitingAck(MessageType.AbortBookUpload) }
+                }
+            }
             throw error
+        } finally {
+            requestTransferConnectionPriority(high = false)
         }
+    }
+
+    suspend fun abortBookUpload() {
+        if (isReady()) sendAwaitingAck(MessageType.AbortBookUpload)
     }
 
     suspend fun flashFirmware(release: FirmwareRelease, file: File) = withContext(Dispatchers.IO) {
@@ -569,8 +592,23 @@ class BluetoothCompanionClient(private val context: Context) {
         payload: ByteArray = byteArrayOf(),
         timeoutMillis: Long = 10_000,
     ) {
-        val deferred = send(type, payload, awaitAck = true) ?: return
+        val deferred = enqueueAwaitingAck(type, payload)
         withTimeout(timeoutMillis) { deferred.await() }
+    }
+
+    private fun enqueueAwaitingAck(type: MessageType, payload: ByteArray): CompletableDeferred<Unit> =
+        checkNotNull(send(type, payload, awaitAck = true))
+
+    @SuppressLint("MissingPermission")
+    private fun requestTransferConnectionPriority(high: Boolean) {
+        val currentGatt = gatt ?: return
+        val priority = if (high) {
+            BluetoothGatt.CONNECTION_PRIORITY_HIGH
+        } else {
+            BluetoothGatt.CONNECTION_PRIORITY_BALANCED
+        }
+        Log.i(LogTag, "request connection priority=${if (high) "high" else "balanced"}")
+        currentGatt.requestConnectionPriority(priority)
     }
 
     private fun send(type: MessageType, payload: ByteArray, awaitAck: Boolean): CompletableDeferred<Unit>? {
@@ -649,6 +687,7 @@ class BluetoothCompanionClient(private val context: Context) {
             }
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 preferAutoConnect = false
+                negotiatedMtu = DefaultAttMtu
                 gatt.discoverServices()
             }
         }
@@ -661,12 +700,13 @@ class BluetoothCompanionClient(private val context: Context) {
                 failLink("This firmware has no companion service")
                 return
             }
-            gatt.requestMtu(247)
+            gatt.requestMtu(RequestedAttMtu)
         }
 
         @SuppressLint("MissingPermission")
         override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
             Log.i(LogTag, "MTU changed mtu=$mtu status=$status")
+            negotiatedMtu = if (status == BluetoothGatt.GATT_SUCCESS) mtu else DefaultAttMtu
             val events = service?.getCharacteristic(UUID.fromString(XTEINK_EVENTS_UUID)) ?: return
             gatt.setCharacteristicNotification(events, true)
             val descriptor = events.getDescriptor(CLIENT_CONFIG_UUID) ?: return
@@ -790,6 +830,12 @@ class BluetoothCompanionClient(private val context: Context) {
         private val CLIENT_CONFIG_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
         private const val CompanionDeviceName = "XTEINK Companion"
         private const val LogTag = "XteinkBle"
+        private const val DefaultAttMtu = 23
+        private const val RequestedAttMtu = 517
+        private const val AttWriteOverheadBytes = 3 + 20 + 4
+        private const val MinimumBookChunkBytes = 20
+        private const val BookUploadWindowSize = 4
+        private const val BookUploadAckTimeoutMs = 20_000L
         private const val GattConnectTimeoutMs = 12_000L
         private const val GattRecoverySettleMs = 500L
         private const val GattRecoveryTimeoutMs = 25_000L

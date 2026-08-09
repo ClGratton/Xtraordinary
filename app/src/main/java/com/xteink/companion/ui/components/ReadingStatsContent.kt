@@ -1,6 +1,9 @@
 package com.xteink.companion.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,21 +14,33 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -42,6 +57,7 @@ fun ReadingStatsContent(
     state: ReadingStatsUiState,
     onSetView: (ReadingStatsView) -> Unit,
     onSelectSession: (UInt?) -> Unit,
+    onDeleteSession: (UInt) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -85,7 +101,7 @@ fun ReadingStatsContent(
             } else if (state.view == ReadingStatsView.Cumulative) {
                 CumulativeStats(visibleSessions)
             } else {
-                SessionStats(visibleSessions, state.selectedSessionId, onSelectSession)
+                SessionStats(visibleSessions, state.selectedSessionId, onSelectSession, onDeleteSession)
             }
         }
     }
@@ -144,12 +160,24 @@ private fun SessionStats(
     sessions: List<ReadingSessionStat>,
     selectedId: UInt?,
     onSelectSession: (UInt?) -> Unit,
+    onDeleteSession: (UInt) -> Unit,
 ) {
     val selected = sessions.firstOrNull { it.id == selectedId } ?: sessions.first()
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = MaterialTheme.shapes.extraLarge) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(selected.title, style = MaterialTheme.typography.titleLarge)
-            Text(formatDate(selected.endedAtEpochMs), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(selected.title, style = MaterialTheme.typography.titleLarge)
+                    Text(formatDate(selected.endedAtEpochMs), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                TextButton(onClick = { onDeleteSession(selected.id) }) {
+                    Text(stringResource(R.string.delete_session))
+                }
+            }
             MetricStrip(
                 listOf(
                     stringResource(R.string.reading_stats_pages) to selected.pages.size.toString(),
@@ -170,26 +198,127 @@ private fun SessionStats(
     )
     Text(stringResource(R.string.reading_stats_recent), style = MaterialTheme.typography.titleMedium)
     sessions.forEach { session ->
-        Row(
-            modifier = Modifier.fillMaxWidth().clickable { onSelectSession(session.id) }.padding(vertical = 9.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Surface(shape = CircleShape, color = if (session.id == selected.id) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh) {
-                Box(Modifier.padding(horizontal = 11.dp, vertical = 7.dp), contentAlignment = Alignment.Center) {
-                    Text(session.pages.size.toString(), fontWeight = FontWeight.Bold)
+        SwipeSessionRow(
+            session = session,
+            selected = session.id == selected.id,
+            onSelect = { onSelectSession(session.id) },
+            onDelete = { onDeleteSession(session.id) },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeSessionRow(
+    session: ReadingSessionStat,
+    selected: Boolean,
+    onSelect: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val haptics = LocalHapticFeedback.current
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart) {
+                haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                onDelete()
+                true
+            } else {
+                false
+            }
+        },
+        positionalThreshold = { distance -> distance * 0.42f },
+    )
+    val armed = dismissState.targetValue == SwipeToDismissBoxValue.EndToStart
+    val morph by animateFloatAsState(
+        targetValue = if (armed) 1f else 0f,
+        animationSpec = tween(durationMillis = 180),
+        label = "session delete morph",
+    )
+    LaunchedEffect(armed) {
+        if (armed) haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
+    }
+
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = false,
+        enableDismissFromEndToStart = true,
+        backgroundContent = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(MaterialTheme.shapes.extraLarge)
+                    .background(MaterialTheme.colorScheme.errorContainer),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(end = 24.dp)
+                        .size(48.dp)
+                        .graphicsLayer {
+                            scaleX = 0.72f + (0.28f * morph)
+                            scaleY = 0.72f + (0.28f * morph)
+                            rotationZ = -12f + (12f * morph)
+                            transformOrigin = TransformOrigin.Center
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    DeleteSessionIcon()
                 }
             }
-            Column(Modifier.weight(1f)) {
-                Text(session.title, maxLines = 1, style = MaterialTheme.typography.titleSmall)
-                Text(
-                    "${formatDate(session.endedAtEpochMs)} · ${formatDuration(session.durationMs)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+        },
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onSelect),
+            color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
+            shape = MaterialTheme.shapes.extraLarge,
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
+                ) {
+                    Box(Modifier.padding(horizontal = 11.dp, vertical = 7.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            session.pages.size.toString(),
+                            color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(session.title, maxLines = 1, style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "${formatDate(session.endedAtEpochMs)} · ${formatDuration(session.durationMs)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(session.averageWordsPerMinute?.let { "$it wpm" } ?: "—", style = MaterialTheme.typography.labelLarge)
             }
-            Text(session.averageWordsPerMinute?.let { "$it wpm" } ?: "—", style = MaterialTheme.typography.labelLarge)
         }
+    }
+}
+
+@Composable
+private fun DeleteSessionIcon() {
+    val color = MaterialTheme.colorScheme.onErrorContainer
+    Canvas(Modifier.size(26.dp)) {
+        val stroke = 2.2.dp.toPx()
+        drawLine(color, Offset(size.width * 0.26f, size.height * 0.29f), Offset(size.width * 0.74f, size.height * 0.29f), stroke, StrokeCap.Round)
+        drawLine(color, Offset(size.width * 0.40f, size.height * 0.20f), Offset(size.width * 0.60f, size.height * 0.20f), stroke, StrokeCap.Round)
+        val body = Path().apply {
+            moveTo(size.width * 0.31f, size.height * 0.36f)
+            lineTo(size.width * 0.36f, size.height * 0.82f)
+            lineTo(size.width * 0.64f, size.height * 0.82f)
+            lineTo(size.width * 0.69f, size.height * 0.36f)
+        }
+        drawPath(body, color, style = Stroke(width = stroke, cap = StrokeCap.Round))
+        drawLine(color, Offset(size.width * 0.44f, size.height * 0.45f), Offset(size.width * 0.45f, size.height * 0.72f), stroke, StrokeCap.Round)
+        drawLine(color, Offset(size.width * 0.56f, size.height * 0.45f), Offset(size.width * 0.55f, size.height * 0.72f), stroke, StrokeCap.Round)
     }
 }
 

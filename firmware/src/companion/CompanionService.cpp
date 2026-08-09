@@ -1,6 +1,7 @@
 #ifdef ENABLE_X3_COMPANION
 
 #include "CompanionService.h"
+#include "RadioPolicy.h"
 
 #include <Arduino.h>
 #include <Logging.h>
@@ -37,6 +38,7 @@ constexpr char FIRMWARE_PATH[] = "/.crosspoint/companion/firmware.bin";
 constexpr char TICKET_PATH[] = "/.crosspoint/companion/ticket.bin";
 constexpr char RADIO_POLICY_PATH[] = "/.crosspoint/companion/radio.bin";
 constexpr char BOOK_UPLOAD_TEMP_PATH[] = "/.crosspoint/companion/book-upload.tmp";
+constexpr uint32_t BOOK_UPLOAD_IDLE_TIMEOUT_MS = 15000;
 constexpr uint32_t TICKET_MAGIC = 0x544b5431;  // TKT1
 constexpr uint16_t TICKET_STORAGE_VERSION = 1;
 constexpr uint16_t ADVERTISING_INTERVAL = 800;  // 500 ms in 0.625 ms units
@@ -208,6 +210,11 @@ bool CompanionService::requiresFullClock() const {
 void CompanionService::loop() {
   if (radioResumePending_ && static_cast<int32_t>(millis() - radioResumeRetryAtMs_) >= 0) resumeFastRadio();
   updateAdvertisingPolicy();
+  if (bookUploadActive_ &&
+      static_cast<uint32_t>(millis() - bookUploadLastActivityMs_) >= BOOK_UPLOAD_IDLE_TIMEOUT_MS) {
+    LOG_ERR("CMP", "Aborting stalled book upload");
+    abortBookUpload();
+  }
   if (connectionParamsPending_ && connected() &&
       static_cast<uint32_t>(millis() - connectedAtMs_) >= CONNECTION_PARAMETER_DELAY_MS) {
     connectionParamsPending_ = false;
@@ -292,8 +299,19 @@ void CompanionService::setReading(bool reading) {
   }
 }
 
+void CompanionService::enterTicket() {
+  if (!ticketPresent_) return;
+
+  staticTicketPinned_ = ticket_.mode == TicketMode::STATIC;
+  liveTicketDisplayed_ = ticket_.mode == TicketMode::LIVE;
+  ticketRadioQuiet_ = staticTicketPinned_ && !connected();
+  server_->advertiseOnDisconnect(!staticTicketPinned_);
+  if (ticketRadioQuiet_ && advertising_ && advertising_->isAdvertising()) advertising_->stop();
+}
+
 void CompanionService::leaveTicket() {
   staticTicketPinned_ = false;
+  liveTicketDisplayed_ = false;
   ticketRadioQuiet_ = false;
   radioResumePending_ = true;
   radioResumeRetryAtMs_ = 0;
@@ -348,6 +366,29 @@ void CompanionService::onWrite(const uint8_t* bytes, size_t length) {
   command.length = static_cast<uint16_t>(length);
   std::memcpy(command.bytes, bytes, length);
   xQueueSend(commandQueue_, &command, 0);
+}
+
+bool CompanionService::handleUsbBookPacket(const uint8_t* bytes, size_t length, uint32_t& messageId) {
+  EnvelopeView envelope{};
+  if (!decodeEnvelope(bytes, length, envelope)) return false;
+  messageId = envelope.messageId;
+  switch (envelope.type) {
+    case MessageType::BEGIN_BOOK_UPLOAD:
+      // A prior USB host may have vanished without a transport callback. A new
+      // explicit Begin owns the temporary path and safely restarts from zero.
+      if (bookUploadActive_) abortBookUpload(false);
+      return beginBookUpload(envelope);
+    case MessageType::BOOK_UPLOAD_CHUNK:
+      return writeBookUploadChunk(envelope);
+    case MessageType::COMMIT_BOOK_UPLOAD:
+      return envelope.payloadLength == 0 && commitBookUpload();
+    case MessageType::ABORT_BOOK_UPLOAD:
+      if (envelope.payloadLength != 0 || !bookUploadActive_) return false;
+      abortBookUpload();
+      return true;
+    default:
+      return false;
+  }
 }
 
 void CompanionService::onClientConnected(uint16_t connectionHandle) {
@@ -440,9 +481,7 @@ void CompanionService::handlePacket(const uint8_t* bytes, size_t length) {
       }
       if (ok) {
         ticketPresent_ = true;
-        staticTicketPinned_ = ticket_.mode == TicketMode::STATIC;
-        ticketRadioQuiet_ = false;
-        server_->advertiseOnDisconnect(!staticTicketPinned_);
+        enterTicket();
         // A full e-ink refresh can keep the main task busy for several seconds.
         // Queue the acknowledgement first, then defer the activity transition
         // by at least one configured connection interval so the notification
@@ -695,7 +734,11 @@ void CompanionService::updateAdvertisingPolicy() {
   if (!initialized_ || !advertising_ || connected() || readingRadioQuiet_ || ticketRadioQuiet_) {
     return;
   }
-  const bool persistentSlowMode = session_.active() || (ticketPresent_ && ticket_.mode == TicketMode::LIVE);
+  // A saved Live ticket is not an active radio mode. Boot and Home activity
+  // must retain their complete fast-discovery window until the ticket screen
+  // is actually opened.
+  const bool persistentSlowMode =
+      requiresPersistentSlowAdvertising(session_.active(), liveTicketDisplayed_);
   if (persistentSlowMode) {
     server_->advertiseOnDisconnect(true);
     if (!slowAdvertising_ || advertisingWindowExpired_) {
@@ -1025,6 +1068,7 @@ bool CompanionService::beginBookUpload(const EnvelopeView& envelope) {
 
   bookUploadReceived_ = 0;
   bookUploadActive_ = true;
+  bookUploadLastActivityMs_ = millis();
   connectionParamsPending_ = false;
   if (connected()) {
     server_->updateConnParams(connectionHandle_, 12, 24, 0, CONNECTION_SUPERVISION_TIMEOUT);
@@ -1040,6 +1084,7 @@ bool CompanionService::writeBookUploadChunk(const EnvelopeView& envelope) {
   if (offset != bookUploadReceived_ || bookUploadReceived_ + count > bookUploadExpectedSize_) return false;
   if (bookUploadFile_.write(envelope.payload + 4, count) != count) return false;
   bookUploadReceived_ += count;
+  bookUploadLastActivityMs_ = millis();
   return true;
 }
 
@@ -1088,6 +1133,7 @@ void CompanionService::abortBookUpload(bool restoreSlowConnection) {
   bookUploadActive_ = false;
   bookUploadReceived_ = 0;
   bookUploadExpectedSize_ = 0;
+  bookUploadLastActivityMs_ = 0;
   bookUploadFinalPath_[0] = '\0';
   if (restoreSlowConnection) {
     connectedAtMs_ = millis();

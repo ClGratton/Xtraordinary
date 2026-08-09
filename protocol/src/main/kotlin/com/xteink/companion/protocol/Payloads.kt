@@ -9,10 +9,11 @@ const val XTEINK_DATA_UUID = "7e400003-b5a3-f393-e0a9-e50e24dcca9e"
 const val XTEINK_EVENTS_UUID = "7e400004-b5a3-f393-e0a9-e50e24dcca9e"
 const val XTEINK_STATUS_UUID = "7e400005-b5a3-f393-e0a9-e50e24dcca9e"
 const val MAX_WIRE_PATH_BYTES = 512
-// 20-byte envelope + 4-byte offset + 216 bytes = 240, safely inside a
-// negotiated 247-byte ATT MTU (244-byte value).
+// 20-byte envelope + 4-byte offset + 488 bytes = the firmware's 512-byte packet limit. Android 14 and newer
+// request a 517-byte ATT MTU, while the client selects a smaller chunk when a
+// peer negotiates less. The firmware packet limit remains 512 bytes.
 const val FIRMWARE_CHUNK_BYTES = 216
-const val BOOK_UPLOAD_CHUNK_BYTES = FIRMWARE_CHUNK_BYTES
+const val BOOK_UPLOAD_CHUNK_BYTES = 488
 
 data class DeviceCapabilities(
     val model: String,

@@ -541,6 +541,31 @@ void loop() {
           logSerial.printf("No crash report is available.\n");
         }
         logSerial.printf("\nCRASH_REPORT_END\n");
+#ifdef ENABLE_X3_COMPANION
+      } else if (cmd.startsWith("USB_BOOK:")) {
+        const String encoded = cmd.substring(9);
+        uint8_t packet[companion::MAX_PACKET_BYTES];
+        size_t packetLength = 0;
+        bool valid = encoded.length() > 0 && (encoded.length() % 2) == 0 &&
+                     encoded.length() <= companion::MAX_PACKET_BYTES * 2;
+        auto nibble = [](const char value) -> int {
+          if (value >= '0' && value <= '9') return value - '0';
+          if (value >= 'a' && value <= 'f') return value - 'a' + 10;
+          if (value >= 'A' && value <= 'F') return value - 'A' + 10;
+          return -1;
+        };
+        for (size_t i = 0; valid && i < encoded.length(); i += 2) {
+          const int high = nibble(encoded[i]);
+          const int low = nibble(encoded[i + 1]);
+          valid = high >= 0 && low >= 0;
+          if (valid) packet[packetLength++] = static_cast<uint8_t>((high << 4) | low);
+        }
+        uint32_t messageId = 0;
+        const bool accepted = valid &&
+                              companion::companionService.handleUsbBookPacket(packet, packetLength, messageId);
+        logSerial.printf("USB_BOOK_%s:%lu\n", accepted ? "ACK" : "NACK",
+                         static_cast<unsigned long>(messageId));
+#endif
       }
     }
   }

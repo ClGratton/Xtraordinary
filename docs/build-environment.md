@@ -60,12 +60,22 @@ gradle --no-daemon :protocol:test :app:lintDebug :app:validateDebugScreenshotTes
 
 The resulting APK is `app/build/outputs/apk/debug/app-debug.apk`. Compose reference images are updated only after visual review with `gradle :app:updateDebugScreenshotTest`.
 
+Install replacement APKs through the repository workflow:
+
+```powershell
+& .\scripts\install-xtraordinary-app.ps1
+```
+
+Do not use a raw `adb install -r` while the current app may own an X3 GATT session. Package replacement kills the old process; without an explicit disconnect/close/settle handshake, Android can retain a callback-less `bta_dm_disc_gatt` direct connection and falsely make the next process look unable to reach a strongly advertising X3. The install script requires `PERIPHERAL_RESET_READY`, force-stops only after that confirmation, retains app data, verifies Package Manager's installed version, and relaunches the app.
+
 Firmware release builds are intentionally single-job. This avoids Windows path/compiler races and is the canonical command:
 
 ```powershell
 $env:XTRAORDINARY_VERSION = "xtraordinary-v0.2.6-dev9-local"
 pio run --project-dir .\firmware --environment x3_companion_release -j 1
 ```
+
+The Espressif 14.2 assembler resolves its own executable path at startup. In a restricted Codex filesystem sandbox it can panic with `Failed to get path name. Error code: 5` before compiling the first object. Confirm with the project assembler's `--version`; if it succeeds only outside the sandbox, run the same canonical PlatformIO command with filesystem permission. Do not clean caches, relink libraries, patch firmware, or start parallel builds for this access-denied signature.
 
 ## Safe X3 application flash
 

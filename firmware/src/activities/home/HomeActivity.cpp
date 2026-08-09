@@ -326,6 +326,7 @@ void HomeActivity::onOpdsBrowserOpen() { activityManager.goToBrowser(); }
 void HomeActivity::onTicketOpen() {
 #ifdef ENABLE_X3_COMPANION
   if (companion::companionService.hasTicket()) {
+    companion::companionService.enterTicket();
     activityManager.goToCompanionTicket(companion::companionService.ticket());
   }
 #endif

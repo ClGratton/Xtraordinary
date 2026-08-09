@@ -175,6 +175,9 @@
     <string name="reading_stats_pace_by_page">Reading pace by page</string>
     <string name="reading_stats_longest">Longest session</string>
     <string name="reading_stats_recent">Recent sessions</string>
+    <string name="reading_session_deleted">Deleted “%1$s”</string>
+    <string name="delete_session">Delete</string>
+    <string name="undo">Undo</string>
     <string name="reading_stats_xtc_note">This XTC file is bitmap-only, so page time is recorded but word pace is unavailable.</string>
     <string name="reading_stats_chart_waiting">More pace samples will draw the graph.</string>
     <string name="settings_reading_stats">Reading statistics</string>
@@ -259,6 +262,17 @@
     <string name="all_selected">All selected</string>
     <string name="delete_selected_from_device">Delete selected books from %1$s</string>
     <string name="upload_selected_to_device">Upload selected books to %1$s</string>
+    <string name="stop_book_upload">Stop book upload</string>
+    <string name="transfer_usb_title">USB cable</string>
+    <string name="transfer_usb_ready">Fastest · cable connected</string>
+    <string name="transfer_usb_unavailable">Connect X3 with a USB-C data cable</string>
+    <string name="transfer_bluetooth_title">Bluetooth</string>
+    <string name="transfer_bluetooth_ready">Wireless · optimized for bulk transfer</string>
+    <string name="transfer_bluetooth_unavailable">Connect X3 over Bluetooth first</string>
+    <plurals name="choose_transfer_method">
+        <item quantity="one">Send %1$d selected book</item>
+        <item quantity="other">Send %1$d selected books</item>
+    </plurals>
     <string name="delete_books_from_device_title">Delete from %1$s?</string>
     <plurals name="delete_books_from_device_body">
         <item quantity="one">This permanently deletes %1$d book from the %2$s SD card.</item>

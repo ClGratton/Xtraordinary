@@ -63,6 +63,7 @@ class CompanionService {
   uint8_t bookUploadExpectedSha_[32] = {};
   char bookUploadFinalPath_[181] = {};
   bool bookUploadActive_ = false;
+  uint32_t bookUploadLastActivityMs_ = 0;
   bool applyPending_ = false;
   uint32_t applyAtMs_ = 0;
   uint32_t outgoingMessageId_ = 1;
@@ -75,6 +76,7 @@ class CompanionService {
   bool readingRadioQuiet_ = false;
   bool ticketPresent_ = false;
   bool staticTicketPinned_ = false;
+  bool liveTicketDisplayed_ = false;
   bool ticketRadioQuiet_ = false;
   bool ticketShowPending_ = false;
   bool ticketHidePending_ = false;
@@ -144,11 +146,13 @@ class CompanionService {
   bool hasTicket() const { return ticketPresent_; }
   TicketState& ticket() { return ticket_; }
   void setReading(bool reading);
+  void enterTicket();
   void leaveTicket();
   void wakeFastAdvertising();
   void notifyPowerChanged();
   void syncBeforeSleep(uint32_t windowMs);
   void onWrite(const uint8_t* bytes, size_t length);
+  bool handleUsbBookPacket(const uint8_t* bytes, size_t length, uint32_t& messageId);
   void onClientConnected(uint16_t connectionHandle);
   void onClientDisconnected();
 };

@@ -139,4 +139,18 @@ class PayloadCodecTest {
         assertEquals(432, decoded.first)
         assertTrue(byteArrayOf(1, 2, 3, 4).contentEquals(decoded.second))
     }
+
+    @Test
+    fun maximumBookChunkFitsFirmwarePacketQueue() {
+        val payload = PayloadCodec.encodeBookUploadChunk(0, ByteArray(BOOK_UPLOAD_CHUNK_BYTES))
+        val envelope = EnvelopeCodec.encode(
+            Envelope(
+                messageType = MessageType.BookUploadChunk,
+                messageId = 1u,
+                payload = payload,
+            ),
+        )
+
+        assertEquals(512, envelope.size)
+    }
 }

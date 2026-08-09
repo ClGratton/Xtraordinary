@@ -37,11 +37,13 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -76,6 +78,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.xteink.companion.R
+import com.xteink.companion.ui.BookTransferMethod
 import com.xteink.companion.ui.ImportedBookUiState
 import com.xteink.companion.ui.ReadSort
 import com.xteink.companion.ui.ReadService
@@ -83,11 +86,12 @@ import com.xteink.companion.ui.ReadLocation
 import com.xteink.companion.ui.ReadUiState
 import java.util.Locale
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ReadContent(
     state: ReadUiState,
     isX3Connected: Boolean,
+    usbConnected: Boolean,
     connectedDeviceModel: String?,
     onSetQuery: (String) -> Unit,
     onSetSort: (ReadSort) -> Unit,
@@ -96,7 +100,8 @@ fun ReadContent(
     onChooseBookFolder: () -> Unit,
     onOpenEpub: () -> Unit,
     onOpenSettings: () -> Unit,
-    onUploadBooksToX3: (Set<String>) -> Unit,
+    onUploadBooksToX3: (Set<String>, BookTransferMethod) -> Unit,
+    onCancelBookUpload: () -> Unit,
     onDeleteBooksFromX3: (Set<String>) -> Unit,
     modifier: Modifier = Modifier,
     initialSelectedBookIds: Set<String> = emptySet(),
@@ -105,6 +110,7 @@ fun ReadContent(
     val deviceLabel = connectedDeviceModel ?: stringResource(R.string.xteink_device_short)
     var selectedBookIds by remember(initialSelectedBookIds) { mutableStateOf(initialSelectedBookIds) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
+    var showTransferChoices by remember { mutableStateOf(false) }
     var showServiceReminder by rememberSaveable { mutableStateOf(true) }
     val visibleBooks = remember(state.books, state.query, state.sort, state.service, state.location) {
         val terms = state.query.trim().lowercase().split(Regex("\\s+")).filter { it.isNotBlank() }
@@ -276,6 +282,7 @@ fun ReadContent(
             canDelete = canDelete,
             importDescription = stringResource(R.string.import_epubs),
             uploadDescription = stringResource(R.string.upload_selected_to_device, deviceLabel),
+            stopUploadDescription = stringResource(R.string.stop_book_upload),
             deleteDescription = stringResource(R.string.delete_selected_from_device, deviceLabel),
             onClearSelection = { selectedBookIds = emptySet() },
             onImport = {
@@ -284,7 +291,11 @@ fun ReadContent(
             },
             onUpload = {
                 haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-                onUploadBooksToX3(selectedPhoneOnlyIds)
+                showTransferChoices = true
+            },
+            onCancelUpload = {
+                haptics.performHapticFeedback(HapticFeedbackType.Reject)
+                onCancelBookUpload()
             },
             onDelete = {
                 haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
@@ -326,6 +337,87 @@ fun ReadContent(
             },
         )
     }
+
+    if (showTransferChoices) {
+        ModalBottomSheet(onDismissRequest = { showTransferChoices = false }) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    pluralStringResource(
+                        R.plurals.choose_transfer_method,
+                        selectedPhoneOnlyIds.size,
+                        selectedPhoneOnlyIds.size,
+                    ),
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+                TransferMethodRow(
+                    badge = "USB",
+                    title = stringResource(R.string.transfer_usb_title),
+                    description = if (usbConnected) stringResource(R.string.transfer_usb_ready)
+                    else stringResource(R.string.transfer_usb_unavailable),
+                    enabled = usbConnected,
+                    onClick = {
+                        showTransferChoices = false
+                        onUploadBooksToX3(selectedPhoneOnlyIds, BookTransferMethod.Usb)
+                    },
+                )
+                TransferMethodRow(
+                    badge = "BT",
+                    title = stringResource(R.string.transfer_bluetooth_title),
+                    description = if (isX3Connected) stringResource(R.string.transfer_bluetooth_ready)
+                    else stringResource(R.string.transfer_bluetooth_unavailable),
+                    enabled = isX3Connected,
+                    onClick = {
+                        showTransferChoices = false
+                        onUploadBooksToX3(selectedPhoneOnlyIds, BookTransferMethod.Bluetooth)
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TransferMethodRow(
+    badge: String,
+    title: String,
+    description: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = if (enabled) MaterialTheme.colorScheme.primaryContainer
+                else MaterialTheme.colorScheme.surfaceContainerHighest,
+            ) {
+                Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                    Text(badge, style = MaterialTheme.typography.labelLarge)
+                }
+            }
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -338,10 +430,12 @@ private fun LibraryBottomActions(
     canDelete: Boolean,
     importDescription: String,
     uploadDescription: String,
+    stopUploadDescription: String,
     deleteDescription: String,
     onClearSelection: () -> Unit,
     onImport: () -> Unit,
     onUpload: () -> Unit,
+    onCancelUpload: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -407,11 +501,11 @@ private fun LibraryBottomActions(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Surface(
-                    onClick = onUpload,
-                    enabled = canUpload && actionEnabled,
+                    onClick = if (uploading) onCancelUpload else onUpload,
+                    enabled = uploading || (canUpload && actionEnabled),
                     modifier = Modifier.size(68.dp).semantics {
-                        contentDescription = uploadDescription
-                        if (!canUpload || !actionEnabled) disabled()
+                        contentDescription = if (uploading) stopUploadDescription else uploadDescription
+                        if (!uploading && (!canUpload || !actionEnabled)) disabled()
                     },
                     shape = RoundedCornerShape(24.dp),
                     color = MaterialTheme.colorScheme.primaryContainer,
@@ -422,9 +516,10 @@ private fun LibraryBottomActions(
                         if (uploading) {
                             CircularProgressIndicator(
                                 progress = { uploadProgress ?: 0f },
-                                modifier = Modifier.size(30.dp),
+                                modifier = Modifier.size(34.dp),
                                 strokeWidth = 3.dp,
                             )
+                            StopUploadIcon()
                         } else {
                             UploadToDeviceIcon()
                         }
@@ -468,6 +563,16 @@ private fun LibraryBottomActions(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun StopUploadIcon(color: Color = MaterialTheme.colorScheme.onPrimaryContainer) {
+    Canvas(Modifier.size(14.dp)) {
+        drawRoundRect(
+            color = color,
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx()),
+        )
     }
 }
 
