@@ -1,5 +1,6 @@
 #include "HalSystem.h"
 
+#include <BuildVersion.h>
 #include <string>
 
 #include "Arduino.h"
@@ -115,7 +116,8 @@ std::string getPanicInfo(bool full) {
   } else {
     std::string info;
 
-    info += "CrossPoint version: " CROSSPOINT_VERSION;
+    info += "CrossPoint version: ";
+    info += CROSSPOINT_VERSION;
     info += "\n\nPanic reason: " + std::string(panicMessage);
     info += "\n\nLast logs:\n" + getLastLogs();
     info += "\n\nStack memory:\n";

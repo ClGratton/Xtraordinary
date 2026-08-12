@@ -1,6 +1,7 @@
 package com.xteink.companion.data
 
 import android.content.Context
+import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -11,6 +12,8 @@ import java.security.MessageDigest
 
 enum class FirmwareSource {
     Xtraordinary,
+    LocalFile,
+    XteinkStock,
     CrossPoint,
     CrossInk,
 }
@@ -30,8 +33,11 @@ class FirmwareReleaseRepository(private val context: Context) {
         model: String,
         source: FirmwareSource = FirmwareSource.Xtraordinary,
     ): FirmwareRelease = withContext(Dispatchers.IO) {
+        fixedRelease(model, source)?.let { return@withContext it }
         when (source) {
             FirmwareSource.Xtraordinary -> latestXtraordinary(model)
+            FirmwareSource.LocalFile -> error("Choose a local firmware file first")
+            FirmwareSource.XteinkStock -> error("Missing fixed XTEINK stock release")
             FirmwareSource.CrossPoint -> latestGitHubAsset(
                 model = model,
                 source = source,
@@ -43,6 +49,44 @@ class FirmwareReleaseRepository(private val context: Context) {
                 releaseUrl = CROSSINK_RELEASE_URL,
             ) { name -> name.startsWith("firmware-tiny-") && name.endsWith(".bin") }
         }
+    }
+
+    suspend fun localFor(model: String, uri: Uri): FirmwareRelease = withContext(Dispatchers.IO) {
+        require(model.equals("X3", ignoreCase = true)) {
+            "Local firmware installation is currently available for X3 only"
+        }
+        val selectedFile = File(context.cacheDir, "selected-local-x3.bin")
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            selectedFile.outputStream().use(input::copyTo)
+        } ?: error("The selected firmware file could not be opened")
+        val image = selectedFile.readBytes()
+        val version = inspectLocalX3Firmware(image)
+        val digest = MessageDigest.getInstance("SHA-256").digest(image).toHex()
+        FirmwareRelease(
+            model = "X3",
+            source = FirmwareSource.LocalFile,
+            version = version,
+            assetName = "local-xtraordinary-x3.bin",
+            downloadUrl = selectedFile.toURI().toString(),
+            sizeBytes = image.size.toLong(),
+            sha256 = digest,
+        )
+    }
+
+    private fun fixedRelease(model: String, source: FirmwareSource): FirmwareRelease? {
+        val spec = FIXED_RELEASES[source] ?: return null
+        require(model.equals(spec.model, ignoreCase = true)) {
+            "$source firmware is currently available for ${spec.model} only"
+        }
+        return FirmwareRelease(
+            model = spec.model,
+            source = source,
+            version = spec.version,
+            assetName = spec.assetName,
+            downloadUrl = spec.downloadUrl,
+            sizeBytes = spec.sizeBytes,
+            sha256 = spec.sha256,
+        )
     }
 
     private fun latestXtraordinary(model: String): FirmwareRelease {
@@ -104,12 +148,28 @@ class FirmwareReleaseRepository(private val context: Context) {
     }
 
     suspend fun downloadVerified(release: FirmwareRelease): File = withContext(Dispatchers.IO) {
-        val target = File(context.cacheDir, release.assetName)
-        val connection = open(release.downloadUrl)
-        try {
-            connection.inputStream.use { input -> target.outputStream().use(input::copyTo) }
-        } finally {
-            connection.disconnect()
+        val targetName = if (release.source == FirmwareSource.LocalFile) {
+            "verified-${release.assetName}"
+        } else {
+            release.assetName
+        }
+        val target = File(context.cacheDir, targetName)
+        val sourceUri = Uri.parse(release.downloadUrl)
+        when (sourceUri.scheme) {
+            "file" -> File(requireNotNull(sourceUri.path)).inputStream().use { input ->
+                target.outputStream().use(input::copyTo)
+            }
+            "content" -> context.contentResolver.openInputStream(sourceUri)?.use { input ->
+                target.outputStream().use(input::copyTo)
+            } ?: error("The selected firmware file could not be reopened")
+            else -> {
+                val connection = open(release.downloadUrl)
+                try {
+                    connection.inputStream.use { input -> target.outputStream().use(input::copyTo) }
+                } finally {
+                    connection.disconnect()
+                }
+            }
         }
         require(target.length() == release.sizeBytes) { "Firmware download size does not match the manifest" }
         val digest = MessageDigest.getInstance("SHA-256").digest(target.readBytes()).toHex()
@@ -137,6 +197,28 @@ class FirmwareReleaseRepository(private val context: Context) {
     private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
 
     companion object {
+        private data class FixedReleaseSpec(
+            val model: String,
+            val version: String,
+            val assetName: String,
+            val downloadUrl: String,
+            val sizeBytes: Long,
+            val sha256: String,
+        )
+
+        private val FIXED_RELEASES = mapOf(
+            FirmwareSource.XteinkStock to FixedReleaseSpec(
+                model = "X3",
+                version = "XT V5.1.6 EN",
+                assetName = "V5.1.6-X3-EN-PROD-0304_.bin",
+                downloadUrl = "https://overseas-upload-file-api.oss-ap-southeast-1.aliyuncs.com/" +
+                    "uploads/b9dced8c-45d7-4a2b-a13a-aed22e9e0bc0/2026/03/19/" +
+                    "V5.1.6-X3-EN-PROD-0304_.bin",
+                sizeBytes = 6_412_240L,
+                sha256 = "49926e09526a0201688ea6ac1936a8e62588f66dcd06297f2a011114ede42525",
+            ),
+        )
+
         private const val XTRAORDINARY_RELEASE_URL =
             "https://api.github.com/repos/ClGratton/Xtraordinary/releases/latest"
         private const val CROSSPOINT_RELEASE_URL =
@@ -145,4 +227,18 @@ class FirmwareReleaseRepository(private val context: Context) {
             "https://api.github.com/repos/uxjulia/CrossInk/releases/latest"
         private const val MANIFEST_NAME = "firmware-manifest.json"
     }
+}
+
+internal fun inspectLocalX3Firmware(image: ByteArray): String {
+    require(image.isNotEmpty() && image[0].toInt() and 0xFF == 0xE9) {
+        "The selected file is not an ESP32-C3 application image"
+    }
+    require(image.size <= EspRomProtocol.MaxAppSize) {
+        "Firmware image does not fit the X3 app partition"
+    }
+    val searchable = image.toString(Charsets.ISO_8859_1)
+    return Regex("xtraordinary-v[0-9A-Za-z][0-9A-Za-z.-]*")
+        .find(searchable)
+        ?.value
+        ?: error("The selected file is not Xtraordinary X3 firmware")
 }

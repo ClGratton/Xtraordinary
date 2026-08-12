@@ -48,9 +48,17 @@ class CompanionService {
   volatile uint16_t connectionHandle_ = 0xffff;
   volatile uint32_t connectedAtMs_ = 0;
   volatile uint32_t lastBleActivityMs_ = 0;
+  volatile uint32_t interactiveLeaseUntilMs_ = 0;
   volatile bool connectionParamsPending_ = false;
+  volatile bool deepSleepShutdownFinished_ = false;
+  volatile bool deepSleepShutdownStopped_ = false;
   SessionEngine session_;
   TicketState ticket_;
+  HalFile ticketBarcodeFile_;
+  uint32_t ticketBarcodeExpectedSize_ = 0;
+  uint32_t ticketBarcodeReceived_ = 0;
+  bool ticketBarcodeUploadActive_ = false;
+  bool ticketBarcodeCommitted_ = false;
   HalFile firmwareFile_;
   uint64_t firmwareExpectedSize_ = 0;
   uint64_t firmwareReceived_ = 0;
@@ -82,6 +90,7 @@ class CompanionService {
   bool ticketHidePending_ = false;
   bool slowAdvertising_ = false;
   bool advertisingWindowExpired_ = false;
+  bool standbyPulseActive_ = false;
   bool statusNotifyPending_ = false;
   bool radioResumePending_ = false;
   uint32_t statusRevision_ = 1;
@@ -90,10 +99,11 @@ class CompanionService {
   bool lastReportedCharging_ = false;
   uint32_t radioResumeRetryAtMs_ = 0;
   uint32_t advertisingWindowStartedAtMs_ = 0;
+  uint32_t standbyPulseStartedAtMs_ = 0;
   uint32_t ticketUiAtMs_ = 0;
   uint32_t fastAdvertisingWindowMs_ = 5u * 60u * 1000u;
   uint32_t companionSleepAfterMs_ = 10u * 60u * 1000u;
-  uint16_t slowAdvertisingIntervalUnits_ = 3200;  // 2 s in 0.625 ms units.
+  uint32_t standbyAdvertisingIntervalMs_ = 30u * 1000u;
   uint16_t slowConnectionIntervalUnits_ = 1600;  // 2 s in 1.25 ms units.
   StaticQueue_t commandQueueState_{};
   std::array<uint8_t, sizeof(CommandPacket) * COMMAND_QUEUE_DEPTH> commandQueueStorage_{};
@@ -105,16 +115,29 @@ class CompanionService {
   void sendNack(uint32_t messageId, const char* reason);
   void sendCapabilities(MessageType type = MessageType::CAPABILITIES);
   bool sendDeviceStatus();
+  bool shouldUseSlowConnection() const;
+  bool interactiveLeaseActive() const;
+  void acquireInteractiveLease(uint16_t seconds);
+  void requestFastConnection();
+  void scheduleSlowConnection();
   bool decodeTicket(const EnvelopeView& envelope);
   bool loadTicket();
   bool persistTicket();
   bool clearTicket();
+  bool beginTicketBarcode(const EnvelopeView& envelope);
+  bool writeTicketBarcodeChunk(const EnvelopeView& envelope);
+  bool commitTicketBarcode();
+  bool promoteTicketBarcode();
+  void abortTicketBarcode();
   bool applyRadioPolicy(const EnvelopeView& envelope);
   bool applyReaderPolicy(const EnvelopeView& envelope);
   bool loadRadioPolicy();
   bool persistRadioPolicy();
   void updateAdvertisingPolicy();
   void armFastAdvertising();
+  void enterStandbyAdvertising();
+  void updateStandbyAdvertising();
+  bool standbyPulseStartDue() const;
   void resumeFastRadio();
   bool scanLibrary();
   void scanDirectory(const char* path, uint8_t depth);
@@ -140,6 +163,7 @@ class CompanionService {
     return initialized_ && slowAdvertising_ && !advertisingWindowExpired_ && !connected() && !readingRadioQuiet_ &&
            !ticketRadioQuiet_;
   }
+  uint32_t standbyAdvertisingIntervalMs() const { return standbyAdvertisingIntervalMs_; }
   uint32_t companionSleepAfterMs() const { return companionSleepAfterMs_; }
   bool staticTicketDisplayed() const { return staticTicketPinned_; }
   SessionEngine& session() { return session_; }
@@ -150,7 +174,7 @@ class CompanionService {
   void leaveTicket();
   void wakeFastAdvertising();
   void notifyPowerChanged();
-  void syncBeforeSleep(uint32_t windowMs);
+  bool shutdownForDeepSleep(uint32_t timeoutMs);
   void onWrite(const uint8_t* bytes, size_t length);
   bool handleUsbBookPacket(const uint8_t* bytes, size_t length, uint32_t& messageId);
   void onClientConnected(uint16_t connectionHandle);

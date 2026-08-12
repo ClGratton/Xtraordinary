@@ -1,9 +1,9 @@
 """
-PlatformIO pre-build script: inject git branch and short SHA into
-CROSSPOINT_VERSION for the default (dev) environment.
+PlatformIO pre-build script: generate the version string in one C++ source.
 
 Results in a version string like:  1.1.0-dev-feat-kosync-xpath-05c6cf8
-Release environments are unaffected; they set CROSSPOINT_VERSION in the ini.
+Keeping the value out of CPPDEFINES prevents a version-only change from
+invalidating every object in the PlatformIO environment.
 """
 
 import configparser
@@ -76,19 +76,55 @@ def get_base_version(project_dir):
     return config.get('crosspoint', 'version')
 
 
-def inject_version(env):
-    # Only applies to the dev (default) environment; release envs set the
-    # version via build_flags in platformio.ini and are unaffected.
-    if env['PIOENV'] != 'default':
-        return
-
+def resolve_version(env):
     project_dir = env['PROJECT_DIR']
     base_version = get_base_version(project_dir)
+    environment = env['PIOENV']
+    if environment == 'x3_companion':
+        return 'xtraordinary-dev'
+    if environment == 'x3_companion_release':
+        version = os.environ.get('XTRAORDINARY_VERSION', '').strip()
+        if not version:
+            raise RuntimeError('XTRAORDINARY_VERSION is required for x3_companion_release')
+        return version
+    if environment == 'gh_release':
+        return base_version
+    if environment == 'gh_release_rc':
+        rc_hash = os.environ.get('CROSSPOINT_RC_HASH', '').strip()
+        if not rc_hash:
+            raise RuntimeError('CROSSPOINT_RC_HASH is required for gh_release_rc')
+        return f'{base_version}-rc+{rc_hash}'
+    if environment == 'slim':
+        return f'{base_version}-slim'
+
     branch = get_git_branch(project_dir)
     short_sha = get_git_short_sha(project_dir)
-    version_string = f'{base_version}-dev-{branch}-{short_sha}'
+    return f'{base_version}-dev-{branch}-{short_sha}'
 
-    env.Append(CPPDEFINES=[('CROSSPOINT_VERSION', f'\\"{version_string}\\"')])
+
+def cpp_string(value):
+    return value.replace('\\', '\\\\').replace('"', '\\"')
+
+
+def generate_version_source(env):
+    version_string = resolve_version(env)
+    output_path = os.path.join(
+        env['PROJECT_DIR'], 'lib', 'BuildVersion', 'BuildVersion.cpp'
+    )
+    content = (
+        '#include "BuildVersion.h"\n\n'
+        f'const char CROSSPOINT_VERSION[] = "{cpp_string(version_string)}";\n'
+    )
+    existing = None
+    try:
+        with open(output_path, 'r', encoding='utf-8') as source:
+            existing = source.read()
+    except FileNotFoundError:
+        pass
+    if existing != content:
+        with open(output_path, 'w', encoding='utf-8', newline='\n') as source:
+            source.write(content)
+
     print(f'CrossPoint build version: {version_string}')
 
 
@@ -97,10 +133,10 @@ def inject_version(env):
 # so the git/version logic can be exercised without a full build.
 try:
     Import('env')           # noqa: F821  # type: ignore[name-defined]
-    inject_version(env)     # noqa: F821  # type: ignore[name-defined]
+    generate_version_source(env)  # noqa: F821  # type: ignore[name-defined]
 except NameError:
     class _Env(dict):
-        def Append(self, **_): pass
+        pass
 
     _project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    inject_version(_Env({'PIOENV': 'default', 'PROJECT_DIR': _project_dir}))
+    generate_version_source(_Env({'PIOENV': 'default', 'PROJECT_DIR': _project_dir}))

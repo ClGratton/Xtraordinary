@@ -30,11 +30,13 @@ enum class UsbFlashPhase {
     PermissionRequired,
     Ready,
     EnteringBootloader,
+    ResettingSetup,
     Erasing,
     Writing,
     Verifying,
     Restarting,
     Complete,
+    ReconnectRequired,
     Error,
 }
 
@@ -84,8 +86,17 @@ class UsbEspFlasher(context: Context) : Closeable {
     fun refresh() {
         val device = findDevice()
         if (device == null) {
-            if (_state.value.phase !in ActivePhases) {
-                _state.value = UsbFlashState()
+            when (_state.value.phase) {
+                in ActivePhases -> Unit
+                UsbFlashPhase.Complete, UsbFlashPhase.ReconnectRequired -> {
+                    _state.value = _state.value.copy(
+                        phase = UsbFlashPhase.ReconnectRequired,
+                        deviceDetected = false,
+                        progress = 1f,
+                        message = ReconnectUsbMessage,
+                    )
+                }
+                else -> _state.value = UsbFlashState()
             }
             return
         }
@@ -127,7 +138,7 @@ class UsbEspFlasher(context: Context) : Closeable {
                     phase = UsbFlashPhase.Erasing,
                     message = "Preparing the X3 flash…",
                 )
-                connection.flashBegin(image.size)
+                connection.flashBegin(image.size, EspRomProtocol.FlashOffset)
                 _state.value = _state.value.copy(
                     phase = UsbFlashPhase.Writing,
                     message = "Installing firmware from this phone…",
@@ -140,7 +151,7 @@ class UsbEspFlasher(context: Context) : Closeable {
                     progress = 1f,
                     message = "Verifying firmware on the X3…",
                 )
-                connection.verifyMd5(image)
+                connection.verifyMd5(image, EspRomProtocol.FlashOffset)
                 _state.value = _state.value.copy(
                     phase = UsbFlashPhase.Restarting,
                     message = "Firmware verified · restarting X3…",
@@ -148,17 +159,50 @@ class UsbEspFlasher(context: Context) : Closeable {
                 connection.hardReset()
             }
         }.onSuccess {
-            _state.value = UsbFlashState(
-                phase = UsbFlashPhase.Complete,
-                deviceDetected = findDevice() != null,
-                progress = 1f,
-                message = "Firmware installed · X3 is restarting",
-            )
+            _state.value = completedState("Firmware installed · X3 is restarting")
         }.onFailure { error ->
             _state.value = UsbFlashState(
                 phase = UsbFlashPhase.Error,
                 deviceDetected = findDevice() != null,
                 message = error.message ?: "USB firmware installation failed",
+            )
+            throw error
+        }.getOrThrow()
+    }
+
+    suspend fun resetSetupData() = withContext(Dispatchers.IO) {
+        val blankNvs = ByteArray(NvsSize) { 0xFF.toByte() }
+        val device = awaitPermission(findDevice() ?: error("Connect the X3 to this phone with a USB data cable"))
+        _state.value = UsbFlashState(
+            phase = UsbFlashPhase.EnteringBootloader,
+            deviceDetected = true,
+            progress = 0f,
+            message = "Entering X3 bootloaderâ€¦",
+        )
+        runCatching {
+            RomConnection.open(usbManager, device).use { connection ->
+                connection.resetToBootloader()
+                connection.syncAndPrepare()
+                connection.disableUsbWatchdogs()
+                connection.attachAndConfigureFlash()
+                _state.value = _state.value.copy(
+                    phase = UsbFlashPhase.ResettingSetup,
+                    message = "Resetting X3 setup and pairingâ€¦",
+                )
+                connection.flashBegin(blankNvs.size, NvsOffset)
+                connection.writeImage(blankNvs) { progress ->
+                    _state.value = _state.value.copy(progress = progress)
+                }
+                connection.verifyMd5(blankNvs, NvsOffset)
+                connection.hardReset()
+            }
+        }.onSuccess {
+            _state.value = completedState("X3 setup reset · SD card preserved")
+        }.onFailure { error ->
+            _state.value = UsbFlashState(
+                phase = UsbFlashPhase.Error,
+                deviceDetected = findDevice() != null,
+                message = error.message ?: "X3 setup reset failed",
             )
             throw error
         }.getOrThrow()
@@ -204,6 +248,16 @@ class UsbEspFlasher(context: Context) : Closeable {
 
     private fun findDevice(): UsbDevice? = usbManager.deviceList.values.firstOrNull {
         it.vendorId == EspressifVendorId && it.productId == EspUsbJtagSerialProductId
+    }
+
+    private fun completedState(message: String): UsbFlashState {
+        val connected = findDevice() != null
+        return UsbFlashState(
+            phase = if (connected) UsbFlashPhase.Complete else UsbFlashPhase.ReconnectRequired,
+            deviceDetected = connected,
+            progress = 1f,
+            message = if (connected) message else ReconnectUsbMessage,
+        )
     }
 
     override fun close() {
@@ -270,10 +324,10 @@ class UsbEspFlasher(context: Context) : Closeable {
             )
         }
 
-        fun flashBegin(size: Int) {
+        fun flashBegin(size: Int, offset: Int) {
             command(
                 EspRomProtocol.FlashBegin,
-                EspRomProtocol.flashBeginPayload(size),
+                EspRomProtocol.flashBeginPayload(size, offset),
                 timeoutMs = EraseTimeoutMs,
             )
         }
@@ -323,11 +377,11 @@ class UsbEspFlasher(context: Context) : Closeable {
             }
         }
 
-        fun verifyMd5(image: ByteArray) {
+        fun verifyMd5(image: ByteArray, offset: Int) {
             val expected = MessageDigest.getInstance("MD5").digest(image).toHex()
             val response = command(
                 EspRomProtocol.FlashMd5,
-                EspRomProtocol.flashMd5Payload(image.size),
+                EspRomProtocol.flashMd5Payload(image.size, offset),
                 responseDataBytes = 32,
                 timeoutMs = 60_000,
             )
@@ -553,8 +607,12 @@ class UsbEspFlasher(context: Context) : Closeable {
         private const val CdcSetControlLineState = 0x22
         private const val UsbRecipientInterface = 0x01
         private const val SlipEnd = 0xC0
+        private const val NvsOffset = 0x9000
+        private const val NvsSize = 0x5000
+        private const val ReconnectUsbMessage = "Disconnect and reconnect X3 USB to continue"
         private val ActivePhases = setOf(
             UsbFlashPhase.EnteringBootloader,
+            UsbFlashPhase.ResettingSetup,
             UsbFlashPhase.Erasing,
             UsbFlashPhase.Writing,
             UsbFlashPhase.Verifying,

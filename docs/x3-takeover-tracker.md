@@ -25,6 +25,18 @@ connected X3, and installing the Android candidate before repeating the old
 fresh-pair baseline. The update preserved NVS and the existing Bluetooth bond;
 the installed app subsequently restored a protocol-ready connection.
 
+2026-08-11 clean-room execution:
+
+- [x] Flash genuine XTEINK stock `XT V5.1.6 EN` application-only and ROM-MD5 verify it.
+- [x] Reconnect USB and confirm the ESP32-C3 `303A:1001` interface re-enumerates.
+- [x] Run the bounded **Reset X3 setup** operation and ROM-MD5 verify only NVS `0x9000..0xDFFF`.
+- [x] Verify and remove only `XTEINK Companion` / `7C:E8:B1:71:13:3E`; observe `BOND_NONE`.
+- [x] Install Android `0.2.0-dev25` / code 26, clear only `com.xteink.companion` data, and launch genuine first run.
+- [x] Verify on the real Pixel that Welcome shows the complete optional Google-backup control without scrolling and has no duplicate folder/device instruction or redundant **Start setup** action.
+- [ ] Complete the first-run carousel.
+- [ ] Restore the exact current Xtraordinary firmware candidate through a supported production-phone flow.
+- [ ] Fresh-pair and verify advertisement, bond, GATT, services, notifications, capabilities, status, library, and policy acknowledgements.
+
 ## Restored baseline
 
 ### Pixel 10
@@ -145,9 +157,9 @@ Measured failure: battery fell from 89% to 81% in one hour.
 ## Flight passes and tickets
 
 - [x] Add Android import for `.pkpass`, Google Wallet FlightObject JSON, and a shared Google Wallet save-JWT link.
-- [x] Keep imported barcode data out of the decorative Android preview.
+- [x] Render the actual imported symbology in Android instead of a decorative pattern.
 - [x] Add bounded protocol fields for flight, route, passenger, gate, seat, and barcode payload.
-- [x] Add an actual native X3 ticket surface with a large black-and-white QR field.
+- [x] Add an actual native X3 ticket surface with a large black-and-white QR/Aztec/PDF417/linear barcode field.
 - [x] Add **Static** mode: deliver the acknowledgement before drawing, release GATT immediately, stop advertising, and retain the e-ink ticket image without replacing it with generic sleep artwork.
 - [x] Add **Live** mode: retain the connection so Android can send an updated ticket payload.
 - [x] Persist Android's uploaded-ticket state across activity/process recreation instead of treating a deliberate static disconnect as ticket deletion.
@@ -156,7 +168,7 @@ Measured failure: battery fell from 89% to 81% in one hour.
 - [x] Document why arbitrary passes already inside a consumer Google Wallet account cannot be fetched through the issuer REST API.
 - [x] Document the quickest external status-update API candidate.
 - [ ] Add an API key/proxy and live polling only if external flight-status updates are authorized.
-- [ ] Validate the imported barcode at a real airport scanner; QR is supported, while PDF417/Aztec rendering remains future work.
+- [ ] Validate regenerated QR, PDF417, and Aztec passes at real airport scanners; code generation and X3 bitmap transport are implemented, but airport hardware acceptance is still a physical check.
 - [ ] Visually inspect the ticket and QR size on X3 hardware after the firmware build gate is cleared.
 
 ## Sleep/off
@@ -331,3 +343,102 @@ Measured failure: battery fell from 89% to 81% in one hour.
 - [x] Correct the stats subtitle to **Saved offline after X3 sync**. The prior **Saved on both devices** claim contradicted the ACK contract because X3 deletes its queued copy after Android commits it.
 - [x] Remove unused Android `BuildConfig` generation. The app has no Java sources or `BuildConfig` references; avoiding that generated class removes a needless Windows ZipFS/Javac failure point from incremental packaging.
 - [x] Preserve the Pixel install signature explicitly when packaging from a sandbox: verify the installed certificate first, then sign the replacement with the matching user debug keystore. Never work around `INSTALL_FAILED_UPDATE_INCOMPATIBLE` by uninstalling, because that would destroy imported books, passes, settings, and reading history.
+
+## 2026-08-10 real boarding-pass and final device acceptance
+
+- [x] Replace the decorative app barcode with the actual imported QR, Aztec, PDF417, Data Matrix, or linear symbology and send the same bounded one-bit bitmap to X3.
+- [x] Preserve imported passes across Android process recreation so the demo pass cannot replace a real pass after restart.
+- [x] Keep a newly uploaded barcode staged until its matching `ShowTicket` payload arrives; discard the staged file on disconnect so an interrupted send cannot pair a new code with old ticket fields.
+- [x] Disable Android OS backup for app-private data so persisted boarding-pass barcodes are not copied by the platform backup path; optional Google reading-history sync remains separate and excludes passes.
+- [x] Parse the Wizz Air screenshot's scheduled departure (`13:35`) instead of gate-close (`13:05`), extract seat `17B` instead of `TBD`, and label an already-past flight **Departed** instead of **Boarding**; cover this exact layout with a regression test.
+- [x] Remove stale placeholder device/service rows from Settings; show only the managed X3 and its real synchronization state.
+- [x] Pass protocol tests, Android unit tests (including PDF417 encode/decode round-trip), lint, 14 screenshot comparisons, debug assembly, the X3 release build, and the RV32IMC verifier. APK SHA-256: `5ED1645956757B89AD83A01247E34EC1648981E71EF2B5D1925CEE32B7045892`; firmware SHA-256: `E4A8764636BB336BD54D89FD41DE85B6149FB7B10205EAD0F502656F626756D0`.
+- [ ] Install Android `0.2.0-dev14` on the Pixel without clearing app data, then re-import the real Wizz Air screenshot and visually confirm flight `W4 6762`, departure `13:35`, seat `17B`, and **Departed**.
+- [ ] Flash firmware `xtraordinary-v0.2.6-dev11-local` without erasing NVS, send the real pass, and confirm its PDF417 barcode and ticket fields render correctly on X3.
+- [ ] With X3 connected to the Pixel as a USB-host peripheral, upload a real book over USB and verify success, cancellation, reconnect/resume behavior, and multiple-file queuing without requiring Bluetooth.
+
+## 2026-08-10 ticket reconciliation, transfer latency, and linear layout
+
+### Runtime evidence supplied by the user
+
+- [x] Reconstruct the four-file timeline from filesystem capture timestamps: X3 displayed the live ticket at 17:39:44; Android briefly showed **Start & send** at 17:40:21; X3 Home still exposed **Ticket** at 17:40:30; Android restored **Live on / Stop live** at 17:40:35.
+- [x] Treat the device-retained ticket and 14-second Android recovery as a phone-side reconciliation race, not an X3 deletion or storage failure.
+
+### Changes
+
+- [x] Give every received Capabilities packet a monotonically increasing sequence. Reconcile `ticketPresent` once for that packet instead of replaying its pre-command value on unrelated status/progress updates.
+- [x] Add regression coverage proving that a stale `ticketPresent=false` snapshot cannot undo an acknowledged ticket, while a fresh reconnect snapshot remains authoritative.
+- [x] Add a reusable 2-120 second interactive-link lease. Entering an interactive app surface sends one fire-and-forget wake; there is no polling/renewal loop, and X3 returns to the configured slow interval when the bounded lease expires.
+- [x] Keep `BeginTicketBarcode` on the same fast 15-30 ms BLE transfer interval used by book transfer; restore the configured slow interval after `ShowTicket` is ACKed.
+- [x] Add exact Android transfer telemetry for barcode bytes, chunk count, negotiated MTU, and end-to-end ACK latency.
+- [x] Replace hard-coded Settings timing branches with reusable compatibility functions driven by the offered option lists. A fast window is enabled only when it is strictly earlier than sleep, matching firmware validation; selecting a shorter sleep automatically chooses the latest compatible fast window.
+- [x] Gray disabled timing choices visually and make them non-interactive. With sleep at 5 minutes, both 5- and 10-minute low-power transitions are unavailable, so the selected fast window is 1 minute.
+- [x] Replace the Android side-rail composition with route-first hierarchy, equally promoted departure/gate/terminal/seat facts, demoted flight metadata, and a full-width 82 dp scan strip. Convert the decoded 1-bit preview to ARGB_8888 so both visual themes render deterministically.
+- [x] Keep the X3 barcode bitmap at its transmitted dimensions (PDF417 remains 340 x 140 px) while using a 210 px, near-edge scan chamber and four large full-width operational facts below it. Matrix symbologies retain the existing composition.
+- [x] Android unit tests, debug assembly, and screenshot validation pass. The layout detector reports no findings.
+- [x] Build and flash firmware `xtraordinary-v0.2.6-dev13-local` application-only without erasing NVS or bond data. Firmware SHA-256: `B2A40B9184420A58484E2507450F4FBAB74EB1C23D9E0A797BA694AFB718EA4E`.
+- [x] Install Android `0.2.0-dev17` (`versionCode=18`) with app data retained through the graceful GATT-release script. APK SHA-256: `2540EE86D6FABC648354B662E2B548C3B3F55483DA8AE0B75E4E847FF194F078`.
+- [x] Post-flash handshake: bond state 12, advertisement RSSI -44, GATT status 0, MTU 256, notification subscription, capabilities/status/library exchange, and policy ACKs all observed.
+- [x] Send the real 4,286-byte PDF417 pass over 19 chunks. End-to-end transfer ACK improved from 21,857 ms before the link fix to 1,309 ms after the one-shot interactive wake; the app remained **Connected / Live on X3 / Stop live** afterward.
+
+## 2026-08-11 power controls, standby truth, scanner view, and reproducible builds
+
+- [x] Diagnose the live Settings state rather than infer it: Android showed **Synced to X3** with 10-minute fast discovery, 4-second standby interval, 20-minute sleep, and 15-page cleanup, while Bluetooth diagnostics showed GATT remained open for roughly 2 minutes 42 seconds after the settings exchange.
+- [x] Replace foreground-equals-connected behavior with a reusable one-shot probe/interactive-lease policy. Settings disconnects after its ACK; visible Passes, active Live/Focus, transfers, and durable pending work retain only the transport they require.
+- [x] Fix the rapid-edit shutdown race so a final settings tap always schedules the next policy worker instead of remaining **Saved on phone · waiting for X3** until another change.
+- [x] Add one shared X3 power-button hold policy (instant, 1 second, or 2 seconds), persisted on both sides and transferred through backward-compatible reader-policy v2 capabilities.
+- [x] Stop treating Focus/Live auto-sleep prevention as continuous user activity; these modes remain awake but can settle to the BLE-safe clock floor.
+- [x] Make Home's standby chip report the configured worst-case interval and reduce the main-loop wake rate while disconnected slow advertising is active.
+- [x] Add reusable mapped physical-button hints. A normal linear pass shows **Back / Scan**; Scan opens a rotated, integer-scaled fullscreen barcode and shows **Back / Ticket**.
+- [x] Expand new linear barcode rasters from 340 to 380 pixels, fitting the portrait composition and scaling exactly to 760 pixels in rotated scanner view. Existing stored tickets require one remove/resend to receive the wider raster.
+- [x] Keep the app's firmware-install entry reachable from the top-left device sheet even while the managed X3 is disconnected.
+- [x] Check in self-locating build wrappers for Android and firmware, and make them mandatory in `AGENTS.md`. Android uses the bundled Gradle/JDK/SDK without network or a guessed working directory; firmware pins the bundled PlatformIO/core and must run outside the Windows sandbox.
+- [x] Canonical Android gate passed: protocol tests, unit tests, lint, debug assembly, and screenshot reference generation.
+- [x] Canonical firmware wrapper passed: ESP32-C3 RV32IMC verified, RAM 34.8%, flash 82.9%, and `firmware.bin` generated.
+- [x] Install Android `0.2.0-dev18` with data retained. APK SHA-256: `83BCCDA353264CA2C91C8DAFF5B5C5E3E7F2496CCC78F628E1E36F18D1CB8389`.
+- [x] Flash `xtraordinary-v0.2.6-dev14-local` application-only on COM7; esptool verified the written hash without an NVS/full-chip erase. Firmware SHA-256: `DA0ECED428C2401D45844E27A0F2B4F4DAD6D2DDD5F2EBBBE994CFB3EB21C7FF`.
+- [ ] Confirm the Bluetooth bond remains state 12. Deferred because the owner asked Codex not to use the phone; no post-flash phone inspection was performed.
+- [ ] On hardware, rapidly tap multiple Settings values and verify the chip settles to **Synced to X3** without a later tap; then verify GATT releases and the X3 returns to standby without button input.
+- [ ] Remove/resend the real pass to upload its 380-pixel barcode, then visually confirm the portrait width and rotated scanner view on X3.
+
+## 2026-08-11 generic interactive transport, policy gate, and sparse standby
+
+- [x] Replace the Passes-specific transport policy with an owner-based `InteractiveTransportCoordinator`. The first owner starts one shared lease lifecycle, a fresh capabilities sequence replays it once, and the last owner demotes/releases the link.
+- [x] Make ticket upload a scoped caller of the same interactive primitive so a transfer reasserts the fast lease even after the screen has remained open beyond the watchdog.
+- [x] Document the reusable lifecycle in [`interactive-transport-lifecycle.md`](interactive-transport-lifecycle.md), including ownership, reconnect replay, transaction boundaries, failure handling, and separation from durable desired state.
+- [x] Add a manifest-driven engineering policy gate and invoke it before Gradle or PlatformIO in both canonical build wrappers. The current 21 rules check the machine-verifiable subset of repository policy.
+- [x] Diagnose the **Bluetooth standby · up to 4 s** behavior from source: one legacy value was incorrectly copied into both disconnected advertising and connected GATT intervals.
+- [x] Split radio policy into a 30/60/120-second disconnected standby check-in and a separate 1/2/4-second connected-background interval. Default standby is a bounded 1.5-second advertising pulse every 30 seconds; fast discovery remains 500 ms and an interactive owner uses 15-30 ms.
+- [x] Keep Focus and a displayed Live ticket awake and pulse-discoverable without retaining GATT solely because the mode is active. New commands remain durable and reconnect on a standby pulse.
+- [x] Pass the canonical Android and firmware builds for the separated policy candidate. Android dev19 passed protocol tests, unit tests, lint, and APK assembly; APK SHA-256 `B9CFD9B7718F0F6F9BAE2649C922AD3DE74C7D8F02CD0A2353955A75F8AF85B5`. Firmware dev15 passed the policy gate, ESP32-C3 RV32IMC verification, and release build at 34.8% RAM / 82.9% flash; firmware SHA-256 `9760B0AA4C1E10A844F87E78CCB04F43CAA68191BC145F1BDC118498BA38E2AB`.
+
+## 2026-08-11 applied standby label and unified ticket hierarchy
+
+- [x] Keep the standby chip derived from the interval actually applied on X3 and add a reusable `refreshHomeIfVisible()` invalidation after the radio policy is persisted.
+- [x] Use one Android pass hierarchy for matrix and linear formats; only the barcode chamber aspect ratio changes.
+- [x] Use one X3 hierarchy for both formats, move operational facts above the scanner chamber, and anchor the scanner code lower on the display.
+- [x] Preserve the rotated fullscreen **Scan** action for wide linear/PDF417 bitmaps; matrix codes stay in the portrait ticket view.
+- [x] Correct the Android layout against the established pass screen: keep the perforated side bands, magnetic/haptic pager, 48 dp next-pass reveal, and outlined Static/Live actions; make the pass taller, move passenger/group inside, and remove the separate details/notice blocks.
+- [x] Pass Android screenshot/unit/lint/assembly validation for dev20 and the X3 firmware build for dev16. APK SHA-256 `ABEFDAD4556A3D8B80BE49341A4F3FF8EA285C8BDD6F8AE5B8A3C1BC9C59D984`; firmware SHA-256 `778D8459878CF4FA7478524B105479E4FB5C784320D95FC18FD11576F2FEB55F`.
+- [ ] With phone use permitted, install/flash without clearing app data, NVS, or the Bluetooth bond and visually accept both QR and linear tickets plus the 30/60/120-second chip refresh.
+- [ ] With owner permission, install/flash without clearing app data, NVS, or the bond; then measure Home current between pulses and verify the chip, button-triggered fast discovery, Focus/Live wakefulness, and update latency.
+
+## 2026-08-11 genuine stock source and clean-room USB setup
+
+- [x] Add a distinct **XTEINK stock** source for original international X3 firmware. Pin `XT V5.1.6 EN` to the XTEINK CDN asset, size `6,412,240`, and SHA-256 `49926E09526A0201688EA6AC1936A8E62588F66DCD06297F2A011114EDE42525`.
+- [x] Correct CrossPoint's label/body to identify it as open-source community firmware; reserve “stock” for OEM XTEINK firmware.
+- [x] Let the already-started CrossPoint `v1.5.0` phone flash finish safely instead of interrupting an erase/write cycle.
+- [x] Flash genuine XTEINK stock `XT V5.1.6 EN` through the production phone flasher, verify its app-region MD5, and restart the X3.
+- [x] Generalize ROM flash begin/MD5 payloads to accept an explicit bounded region instead of encoding a feature-specific application offset.
+- [x] Add confirmed **Reset X3 setup** UI and a reusable verified NVS-region reset at `0x9000` / `0x5000`; preserve application firmware and SD-card files.
+- [x] Add a protocol unit test proving region-aware flash commands can target the X3 NVS partition.
+- [x] Document firmware sources, USB lifecycle, NVS reset semantics, recovery, and the complete clean-room sequence in [`usb-firmware-maintenance.md`](usb-firmware-maintenance.md).
+- [x] Preserve a distinct post-operation `ReconnectRequired` state and tell the user **Disconnect and reconnect X3 USB to continue** when stock firmware stops enumerating USB/JTAG.
+- [x] Pass the canonical Android gate for `0.2.0-dev23` / code 24: 27 engineering-policy rules, protocol tests, app unit tests, lint, and debug assembly. APK SHA-256 `EE342DFB8D71F8F206FAF7DA5D0D5C666CE6549F1B692A3449B6E571467CEBFE`; do not confuse this built candidate with installed dev22.
+- [x] Physically disconnect/reconnect USB while X3 is awake and confirm Espressif `303A:1001` returns on the Pixel.
+- [x] Run **Reset X3 setup** and observe successful region MD5 verification and restart for exactly NVS `0x9000..0xDFFF`.
+- [x] Remove only the verified Android bond `XTEINK Companion` / `7C:E8:B1:71:13:3E`; Bluetooth Manager recorded `BOND_NONE`.
+- [x] Clear `com.xteink.companion` app data, complete first run, link `/Documents/XtraordinaryTest`, and verify both fixture EPUBs survive process death/relaunch.
+- [x] Flash dev16, diagnose the connection-bootstrap/slow-link collision, then build and production-flash corrected `xtraordinary-v0.2.6-dev17-local` application-only with ROM-MD5 verification; SHA-256 `EE34AA63ED7B4D441E93B92981C7EC9AE9C3A6107F75D6DC87901A73E7CBDA1B`.
+- [x] Complete fresh pairing and verify advertisement, Secure Connections bond, encrypted GATT, service discovery, MTU 256, notification subscription, capabilities/status/library, clock, radio/reader policy, reading-stats request, and the complete ACK chain.
+- [ ] Exercise every production USB operation requested by the owner: firmware source selection, setup reset, book upload, cancellation, reconnect/resume, and multiple-file queueing.

@@ -6,6 +6,7 @@
 local.properties
 **/build/
 captures/
+.codex-artifacts/
 .externalNativeBuild/
 .v023/
 .v023.zip

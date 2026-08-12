@@ -81,6 +81,7 @@ fun X3CompanionApp(
     onConnectDevice: (String) -> Unit = {},
     onCheckFirmware: (String, FirmwareSource) -> Unit = { _, _ -> },
     onFlashFirmware: () -> Unit = {},
+    onResetX3Setup: () -> Unit = {},
     cloudBackupState: CloudBackupState = CloudBackupState(),
     onSyncGoogleBackup: () -> Unit = {},
     onDeleteGoogleBackup: () -> Unit = {},
@@ -242,6 +243,7 @@ fun X3CompanionApp(
             radioPolicy = state.radioPolicy,
             minimumReadingPageSeconds = state.readingStats.minimumPageSeconds,
             settingsSyncPending = state.device.settingsSyncPending,
+            hasManagedDevice = state.connectedDeviceModel != null,
             onSetVisualTheme = onSetVisualTheme,
             onSetRadioPolicy = onSetRadioPolicy,
             onSetMinimumReadingPageSeconds = onSetMinimumReadingPageSeconds,
@@ -262,6 +264,7 @@ fun X3CompanionApp(
             onConnect = onConnectDevice,
             onCheckFirmware = onCheckFirmware,
             onFlashFirmware = onFlashFirmware,
+            onResetUsbSetup = onResetX3Setup,
         )
     }
 }

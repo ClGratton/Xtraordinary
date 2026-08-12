@@ -40,7 +40,55 @@ class PayloadCodecTest {
     @Test
     fun readerRefreshPolicyUsesLittleEndianPageCount() {
         assertTrue(PayloadCodec.encodeReaderPolicy(15).contentEquals(byteArrayOf(0x0f, 0x00)))
+        assertTrue(
+            PayloadCodec.encodeReaderPolicy(30, 2_000)
+                .contentEquals(byteArrayOf(0x1e, 0x00, 0xd0.toByte(), 0x07)),
+        )
         assertEquals(MessageType.SetReaderPolicy, MessageType.fromWireValue(0x34u))
+    }
+
+    @Test
+    fun capabilitiesPreserveDevicePolicyVersion() {
+        val expected = DeviceCapabilities(
+            "X3",
+            "dev",
+            9u,
+            true,
+            true,
+            true,
+            readerPolicyVersion = 2,
+            radioPolicyVersion = 2,
+        )
+        val actual = PayloadCodec.decodeCapabilities(PayloadCodec.encodeCapabilities(expected))
+
+        assertEquals(2, actual.readerPolicyVersion)
+        assertTrue(actual.supportsReaderPolicy)
+        assertEquals(2, actual.radioPolicyVersion)
+    }
+
+    @Test
+    fun interactiveLeaseIsReusableAndBounded() {
+        assertTrue(PayloadCodec.encodeInteractiveLease(30).contentEquals(byteArrayOf(0x1e, 0x00)))
+        assertTrue(PayloadCodec.encodeInteractiveLease(500).contentEquals(byteArrayOf(0x78, 0x00)))
+        assertEquals(MessageType.AcquireInteractiveLease, MessageType.fromWireValue(0x38u))
+    }
+
+    @Test
+    fun radioPolicySeparatesStandbyDiscoveryFromConnectedCadence() {
+        val payload = PayloadCodec.encodeRadioPolicy(
+            RadioPolicy(
+                fastWindowMinutes = 5,
+                standbyIntervalSeconds = 30,
+                connectedIntervalMs = 2_000,
+                sleepAfterMinutes = 10,
+            ),
+        )
+
+        assertTrue(
+            payload.contentEquals(
+                byteArrayOf(0x05, 0x00, 0x1e, 0x00, 0xd0.toByte(), 0x07, 0x0a, 0x00),
+            ),
+        )
     }
 
     @Test
@@ -58,6 +106,7 @@ class PayloadCodecTest {
             passenger = "CLAUDIO A",
             boardingGroup = "Group 3",
             barcodePayload = "M1GRATTON/CLAUDIO EABC123 FCOJFKAZ 0610 210Y014A0001 100",
+            barcodeFormat = "AZTEC",
         )
 
         assertEquals(expected, PayloadCodec.decodeBoardingPass(PayloadCodec.encodeBoardingPass(expected)))

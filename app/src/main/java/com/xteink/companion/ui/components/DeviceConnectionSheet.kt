@@ -32,11 +32,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -63,6 +65,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.xteink.companion.R
 import com.xteink.companion.data.FirmwareSource
+import com.xteink.companion.data.UsbFlashPhase
 import com.xteink.companion.ui.DeviceUiState
 import com.xteink.companion.ui.DevicePresence
 import com.xteink.companion.ui.FirmwareCheckPhase
@@ -100,6 +103,7 @@ fun DeviceConnectionSheet(
     onConnect: (String) -> Unit = {},
     onCheckFirmware: (String, FirmwareSource) -> Unit = { _, _ -> },
     onFlashFirmware: () -> Unit = {},
+    onResetUsbSetup: () -> Unit = {},
     showFirmwareUpdate: Boolean = true,
     initialStep: DeviceSetupStep = DeviceSetupStep.Devices,
     startWithFirstTimeFlash: Boolean = false,
@@ -118,6 +122,7 @@ fun DeviceConnectionSheet(
             onConnect = onConnect,
             onCheckFirmware = onCheckFirmware,
             onFlashFirmware = onFlashFirmware,
+            onResetUsbSetup = onResetUsbSetup,
             showFirmwareUpdate = showFirmwareUpdate,
             initialStep = initialStep,
             startWithFirstTimeFlash = startWithFirstTimeFlash,
@@ -137,6 +142,7 @@ fun DeviceConnectionSheetContent(
     onConnect: (String) -> Unit = {},
     onCheckFirmware: (String, FirmwareSource) -> Unit = { _, _ -> },
     onFlashFirmware: () -> Unit = {},
+    onResetUsbSetup: () -> Unit = {},
     showFirmwareUpdate: Boolean = true,
     startWithFirstTimeFlash: Boolean = false,
 ) {
@@ -188,6 +194,10 @@ fun DeviceConnectionSheetContent(
                             requiresBluetoothReset = device.requiresBluetoothReset,
                             connecting = device.linkPhase == "Scanning" || device.linkPhase == "Connecting",
                         ),
+                        onFirmware = {
+                            selectedModelName = XteinkModel.X3.name
+                            stepName = DeviceSetupStep.FirmwareDefault.name
+                        },
                         onConnectAnother = { stepName = DeviceSetupStep.ChooseModel.name },
                         onRetry = { onConnect(managedDeviceModel ?: XteinkModel.X3.label) },
                     )
@@ -218,8 +228,8 @@ fun DeviceConnectionSheetContent(
                 onCheckFirmware = { onCheckFirmware(selectedModel.label, FirmwareSource.Xtraordinary) },
                 onFlashFirmware = onFlashFirmware,
                 onChooseAlternative = {
-                    firmwareSourceName = FirmwareSource.CrossPoint.name
-                    onCheckFirmware(selectedModel.label, FirmwareSource.CrossPoint)
+                    firmwareSourceName = FirmwareSource.XteinkStock.name
+                    onCheckFirmware(selectedModel.label, FirmwareSource.XteinkStock)
                     stepName = DeviceSetupStep.FirmwareSources.name
                 },
             )
@@ -232,6 +242,7 @@ fun DeviceConnectionSheetContent(
                     onCheckFirmware(selectedModel.label, source)
                 },
                 onFlashFirmware = onFlashFirmware,
+                onResetUsbSetup = onResetUsbSetup,
             )
         }
     }
@@ -262,6 +273,7 @@ private fun ManagedDeviceState(
     model: String,
     device: DeviceUiState,
     presence: DevicePresence,
+    onFirmware: () -> Unit,
     onConnectAnother: () -> Unit,
     onRetry: () -> Unit,
 ) {
@@ -360,6 +372,13 @@ private fun ManagedDeviceState(
             )
         }
         Spacer(Modifier.height(20.dp))
+        Button(
+            onClick = onFirmware,
+            modifier = Modifier.fillMaxWidth().height(58.dp),
+        ) {
+            Text(stringResource(R.string.install_firmware))
+        }
+        Spacer(Modifier.height(10.dp))
         FilledTonalButton(
             onClick = onConnectAnother,
             modifier = Modifier.fillMaxWidth().height(58.dp),
@@ -629,8 +648,15 @@ private fun FirmwareSourcePicker(
     selectedSource: FirmwareSource,
     onSelectSource: (FirmwareSource) -> Unit,
     onFlashFirmware: () -> Unit,
+    onResetUsbSetup: () -> Unit,
 ) {
-    val alternatives = listOf(FirmwareSource.CrossPoint, FirmwareSource.CrossInk)
+    val alternatives = listOf(
+        FirmwareSource.LocalFile,
+        FirmwareSource.XteinkStock,
+        FirmwareSource.CrossPoint,
+        FirmwareSource.CrossInk,
+    )
+    var resetConfirmationVisible by rememberSaveable { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(stringResource(R.string.choose_firmware), style = MaterialTheme.typography.headlineMedium)
         Text(
@@ -648,6 +674,44 @@ private fun FirmwareSourcePicker(
                 onFlashFirmware = onFlashFirmware,
             )
             if (index != alternatives.lastIndex) Spacer(Modifier.height(12.dp))
+        }
+        Spacer(Modifier.height(18.dp))
+        OutlinedButton(
+            onClick = { resetConfirmationVisible = true },
+            enabled = device.usbConnected,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp),
+        ) {
+            Text(stringResource(R.string.reset_x3_setup))
+        }
+        Text(
+            text = stringResource(
+                if (device.usbPhase == UsbFlashPhase.ReconnectRequired.name) {
+                    R.string.reconnect_x3_usb
+                } else {
+                    R.string.reset_x3_setup_body
+                },
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        if (resetConfirmationVisible) {
+            AlertDialog(
+                onDismissRequest = { resetConfirmationVisible = false },
+                title = { Text(stringResource(R.string.reset_x3_setup)) },
+                text = { Text(stringResource(R.string.reset_x3_setup_confirm)) },
+                confirmButton = {
+                    Button(onClick = {
+                        resetConfirmationVisible = false
+                        onResetUsbSetup()
+                    }) { Text(stringResource(R.string.reset)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { resetConfirmationVisible = false }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                },
+            )
         }
     }
 }
@@ -693,8 +757,24 @@ private fun FirmwareSourceCard(
                         ?.let { version ->
                             Spacer(Modifier.height(12.dp))
                             Text(
-                                text = stringResource(R.string.firmware_version, version),
+                                text = stringResource(
+                                    if (source == FirmwareSource.LocalFile) {
+                                        R.string.firmware_selected_version
+                                    } else {
+                                        R.string.firmware_version
+                                    },
+                                    version,
+                                ),
                                 style = MaterialTheme.typography.labelLarge,
+                            )
+                        }
+                    device.message
+                        ?.takeIf { source == FirmwareSource.LocalFile && device.firmwareSource == source }
+                        ?.let { message ->
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                text = message,
+                                style = MaterialTheme.typography.bodySmall,
                             )
                         }
                     device.firmwareProgress?.let { progress ->
@@ -732,15 +812,25 @@ private fun FirmwareInstallAction(
         label = "firmware install action",
     ) { currentPhase ->
         when (currentPhase) {
-            FirmwareCheckPhase.Available, FirmwareCheckPhase.UpToDate -> Button(
-                onClick = onFlashFirmware,
-                enabled = canFlash,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp),
-            ) {
-                Text(
-                    stringResource(if (canFlash) R.string.install_firmware else R.string.connect_to_flash),
-                    textAlign = TextAlign.Center,
-                )
+            FirmwareCheckPhase.Available, FirmwareCheckPhase.UpToDate -> Column {
+                Button(
+                    onClick = onFlashFirmware,
+                    enabled = canFlash,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp),
+                ) {
+                    Text(
+                        stringResource(if (canFlash) R.string.install_firmware else R.string.wake_x3_to_flash),
+                        textAlign = TextAlign.Center,
+                    )
+                }
+                if (!canFlash) {
+                    Text(
+                        text = stringResource(R.string.wake_x3_to_flash_help),
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                    )
+                }
             }
             FirmwareCheckPhase.Downloading, FirmwareCheckPhase.Transferring -> FilledTonalButton(
                 onClick = {},
@@ -763,7 +853,13 @@ private fun FirmwareInstallAction(
             ) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
                     Text(
-                        stringResource(R.string.firmware_installed_short),
+                        stringResource(
+                            if (device.usbPhase == UsbFlashPhase.ReconnectRequired.name) {
+                                R.string.reconnect_x3_usb
+                            } else {
+                                R.string.firmware_installed_short
+                            },
+                        ),
                         textAlign = TextAlign.Center,
                         fontWeight = FontWeight.Bold,
                     )
@@ -793,6 +889,8 @@ private fun FirmwareInstallAction(
 private fun firmwareSourceTitle(source: FirmwareSource): String = stringResource(
     when (source) {
         FirmwareSource.Xtraordinary -> R.string.firmware_xtraordinary_title
+        FirmwareSource.LocalFile -> R.string.firmware_local_file_title
+        FirmwareSource.XteinkStock -> R.string.firmware_xteink_stock_title
         FirmwareSource.CrossPoint -> R.string.firmware_crosspoint_title
         FirmwareSource.CrossInk -> R.string.firmware_crossink_title
     },
@@ -802,6 +900,8 @@ private fun firmwareSourceTitle(source: FirmwareSource): String = stringResource
 private fun firmwareSourceBody(source: FirmwareSource): String = stringResource(
     when (source) {
         FirmwareSource.Xtraordinary -> R.string.firmware_xtraordinary_body
+        FirmwareSource.LocalFile -> R.string.firmware_local_file_body
+        FirmwareSource.XteinkStock -> R.string.firmware_xteink_stock_body
         FirmwareSource.CrossPoint -> R.string.firmware_crosspoint_body
         FirmwareSource.CrossInk -> R.string.firmware_crossink_body
     },

@@ -1,0 +1,86 @@
+package com.xteink.companion.ui
+
+import android.content.Context
+
+internal data class PersistedFocusSession(
+    val task: String,
+    val selectedMinutes: Int,
+    val remainingSeconds: Int,
+    val phase: FocusPhase,
+    val deadlineEpochMs: Long,
+)
+
+internal fun PersistedFocusSession.restoreAt(nowEpochMs: Long): FocusUiState {
+    val boundedMinutes = selectedMinutes.coerceIn(5, 60)
+    val boundedRemaining = remainingSeconds.coerceIn(0, boundedMinutes * 60)
+    if (phase != FocusPhase.Running) {
+        return FocusUiState(
+            task = task.take(80),
+            selectedMinutes = boundedMinutes,
+            remainingSeconds = boundedRemaining,
+            phase = phase,
+        )
+    }
+    val millisecondsLeft = (deadlineEpochMs - nowEpochMs).coerceAtLeast(0L)
+    val secondsLeft = ((millisecondsLeft + 999L) / 1_000L)
+        .coerceAtMost((boundedMinutes * 60).toLong())
+        .toInt()
+    return FocusUiState(
+        task = task.take(80),
+        selectedMinutes = boundedMinutes,
+        remainingSeconds = secondsLeft,
+        phase = if (secondsLeft == 0) FocusPhase.Review else FocusPhase.Running,
+    )
+}
+
+internal fun FocusUiState.persistedAt(nowEpochMs: Long): PersistedFocusSession = PersistedFocusSession(
+    task = task.take(80),
+    selectedMinutes = selectedMinutes.coerceIn(5, 60),
+    remainingSeconds = remainingSeconds.coerceIn(0, selectedMinutes.coerceIn(5, 60) * 60),
+    phase = phase,
+    deadlineEpochMs = if (phase == FocusPhase.Running) {
+        nowEpochMs + remainingSeconds.coerceAtLeast(0) * 1_000L
+    } else {
+        0L
+    },
+)
+
+internal class FocusSessionStore(
+    context: Context,
+    private val nowEpochMs: () -> Long = System::currentTimeMillis,
+) {
+    private val preferences = context.getSharedPreferences("xtraordinary_focus_state", Context.MODE_PRIVATE)
+
+    fun load(): FocusUiState {
+        val defaults = FocusUiState()
+        val phase = runCatching {
+            FocusPhase.valueOf(preferences.getString(PhaseKey, defaults.phase.name) ?: defaults.phase.name)
+        }.getOrDefault(defaults.phase)
+        return PersistedFocusSession(
+            task = preferences.getString(TaskKey, defaults.task) ?: defaults.task,
+            selectedMinutes = preferences.getInt(SelectedMinutesKey, defaults.selectedMinutes),
+            remainingSeconds = preferences.getInt(RemainingSecondsKey, defaults.remainingSeconds),
+            phase = phase,
+            deadlineEpochMs = preferences.getLong(DeadlineEpochMsKey, 0L),
+        ).restoreAt(nowEpochMs())
+    }
+
+    fun save(state: FocusUiState) {
+        val persisted = state.persistedAt(nowEpochMs())
+        preferences.edit()
+            .putString(TaskKey, persisted.task)
+            .putInt(SelectedMinutesKey, persisted.selectedMinutes)
+            .putInt(RemainingSecondsKey, persisted.remainingSeconds)
+            .putString(PhaseKey, persisted.phase.name)
+            .putLong(DeadlineEpochMsKey, persisted.deadlineEpochMs)
+            .apply()
+    }
+
+    private companion object {
+        const val TaskKey = "task"
+        const val SelectedMinutesKey = "selected_minutes"
+        const val RemainingSecondsKey = "remaining_seconds"
+        const val PhaseKey = "phase"
+        const val DeadlineEpochMsKey = "deadline_epoch_ms"
+    }
+}

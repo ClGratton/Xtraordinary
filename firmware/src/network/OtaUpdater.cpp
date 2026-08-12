@@ -6,6 +6,7 @@
 // order; clang-format would otherwise sort the local header last and break the
 // build.
 #include "HttpDownloader.h"
+#include <BuildVersion.h>
 #include <Logging.h>
 #include <ReleaseJsonParser.h>
 #include <esp_crt_bundle.h>
@@ -20,7 +21,8 @@ namespace {
 constexpr char latestReleaseUrl[] = "https://api.github.com/repos/crosspoint-reader/crosspoint-reader/releases/latest";
 
 esp_err_t http_client_set_header_cb(esp_http_client_handle_t http_client) {
-  return esp_http_client_set_header(http_client, "User-Agent", "CrossPoint-ESP32-" CROSSPOINT_VERSION);
+  const std::string userAgent = std::string("CrossPoint-ESP32-") + CROSSPOINT_VERSION;
+  return esp_http_client_set_header(http_client, "User-Agent", userAgent.c_str());
 }
 }  // namespace
 

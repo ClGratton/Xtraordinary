@@ -95,8 +95,7 @@ void CompanionFocusActivity::render(RenderLock&&) {
                           ? tr(STR_PAUSED)
                           : (session_.phase() == companion::SessionPhase::COMPLETE ? tr(STR_COMPLETE) : tr(STR_FOCUS));
   renderer.drawCenteredText(UI_10_FONT_ID, 514, state);
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
-  GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+  drawMappedButtonHints(tr(STR_BACK));
   renderer.displayBuffer(HalDisplay::FAST_REFRESH);
 }
 #endif

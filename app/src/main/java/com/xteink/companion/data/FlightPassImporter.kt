@@ -21,8 +21,26 @@ data class ImportedFlightPass(
     val passenger: String,
     val boardingGroup: String,
     val barcodePayload: String,
+    val barcodeFormat: FlightBarcodeFormat,
     val source: String,
 )
+
+enum class FlightBarcodeFormat(val displayName: String) {
+    Qr("QR"),
+    Aztec("Aztec"),
+    Pdf417("PDF417"),
+    DataMatrix("Data Matrix"),
+    Code128("Code 128"),
+    Code39("Code 39"),
+    Code93("Code 93"),
+    Codabar("Codabar"),
+    Ean13("EAN-13"),
+    Ean8("EAN-8"),
+    Itf("ITF"),
+    UpcA("UPC-A"),
+    UpcE("UPC-E"),
+    Unknown("Unknown"),
+}
 
 object FlightPassImporter {
     private const val MaxJsonBytes = 512 * 1024
@@ -119,6 +137,7 @@ object FlightPassImporter {
                 .ifBlank { boarding.optString("boardingBoardingGroup") }
                 .take(24),
             barcodePayload = barcodePayload.take(256),
+            barcodeFormat = walletBarcodeFormat(barcode.optString("type")),
             source = "Imported $source",
         )
     }
@@ -153,8 +172,17 @@ object FlightPassImporter {
             passenger = field("passenger", "passengername", "name").ifBlank { "Passenger" }.take(40),
             boardingGroup = field("group", "boardinggroup", "boarding_group").take(24),
             barcodePayload = barcodePayload.take(256),
+            barcodeFormat = walletBarcodeFormat(barcode.optString("format")),
             source = "Imported .pkpass",
         )
+    }
+
+    private fun walletBarcodeFormat(raw: String): FlightBarcodeFormat = when (raw.uppercase()) {
+        "QR_CODE", "PKBARCODEFORMATQR" -> FlightBarcodeFormat.Qr
+        "AZTEC", "PKBARCODEFORMATAZTEC" -> FlightBarcodeFormat.Aztec
+        "PDF_417", "PDF417", "PKBARCODEFORMATPDF417" -> FlightBarcodeFormat.Pdf417
+        "CODE_128", "CODE128", "PKBARCODEFORMATCODE128" -> FlightBarcodeFormat.Code128
+        else -> FlightBarcodeFormat.Unknown
     }
 
     private fun readBounded(input: java.io.InputStream, maxBytes: Int): ByteArray {

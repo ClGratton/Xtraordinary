@@ -68,6 +68,10 @@ class InputManager {
    * @return duration in milliseconds
    */
   unsigned long getPowerButtonHeldTime() const;
+  uint8_t getRawState() const { return rawState; }
+  uint8_t getDebouncedState() const { return currentState; }
+  uint8_t getPressedEvents() const { return pressedEvents; }
+  uint8_t getReleasedEvents() const { return releasedEvents; }
 
   // Button indices
   static constexpr uint8_t BTN_BACK = 0;
@@ -93,6 +97,7 @@ class InputManager {
   int getButtonFromADC(int adcValue, const int ranges[], int numButtons);
 
   uint8_t currentState;
+  uint8_t rawState;
   uint8_t lastState;
   uint8_t pressedEvents;
   uint8_t releasedEvents;

@@ -227,6 +227,8 @@ class CrossPointSettings {
   uint8_t sleepTimeoutMinutes = 10;
   // E-ink refresh frequency (default 15 pages)
   uint8_t refreshFrequency = REFRESH_15;
+  // Companion-managed power-button hold duration in whole seconds: 0, 1, or 2.
+  uint8_t companionPowerButtonHoldSeconds = 1;
   uint8_t hyphenationEnabled = 0;
 
   // Reader screen margin settings
@@ -285,7 +287,7 @@ class CrossPointSettings {
   void* sdFontResolverCtx = nullptr;
 
   uint16_t getPowerButtonDuration() const {
-    return (shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::SLEEP) ? 10 : 400;
+    return static_cast<uint16_t>(companionPowerButtonHoldSeconds) * 1000u;
   }
   int getReaderFontId() const;
 

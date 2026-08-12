@@ -2,6 +2,7 @@
 
 #include <GfxRenderer.h>
 #include <Logging.h>
+#include <BuildVersion.h>
 
 #include <algorithm>
 #include <cstdio>

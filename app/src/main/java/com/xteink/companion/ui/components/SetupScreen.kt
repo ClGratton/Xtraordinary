@@ -1,6 +1,13 @@
 package com.xteink.companion.ui.components
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -35,15 +43,20 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.xteink.companion.R
@@ -59,6 +72,27 @@ private enum class SetupPage {
 }
 
 private val SetupPages = SetupPage.entries
+
+private object SetupSpacing {
+    val ScreenTop = 8.dp
+    val ScreenBottom = 16.dp
+    val ScreenHorizontal = 20.dp
+    val ScreenTitleTop = 8.dp
+    val ScreenTitleBottom = 12.dp
+    val PagerHorizontal = 20.dp
+    val PageSpacing = 12.dp
+    val PageHorizontal = 24.dp
+    val PageVertical = 20.dp
+    val MajorGroup = 16.dp
+    val ChipHorizontal = 16.dp
+    val ChipVertical = 8.dp
+    val InnerCard = 16.dp
+    val Related = 4.dp
+    val Group = 12.dp
+    val Action = 8.dp
+    val FullButtonHeight = 56.dp
+    val TextButtonHeight = 48.dp
+}
 
 @Composable
 fun SetupScreen(
@@ -95,12 +129,12 @@ fun SetupScreen(
         modifier = modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(top = 10.dp, bottom = 16.dp),
+            .padding(top = SetupSpacing.ScreenTop, bottom = SetupSpacing.ScreenBottom),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = SetupSpacing.ScreenHorizontal),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -110,19 +144,26 @@ fun SetupScreen(
         Text(
             text = stringResource(R.string.setup_title),
             style = MaterialTheme.typography.headlineLarge,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+            modifier = Modifier.padding(
+                start = SetupSpacing.ScreenHorizontal,
+                top = SetupSpacing.ScreenTitleTop,
+                end = SetupSpacing.ScreenHorizontal,
+                bottom = SetupSpacing.ScreenTitleBottom,
+            ),
         )
         MagneticHorizontalPager(
             state = pagerState,
-            contentPadding = PaddingValues(horizontal = 18.dp),
-            pageSpacing = 12.dp,
+            contentPadding = PaddingValues(horizontal = SetupSpacing.PagerHorizontal),
+            pageSpacing = SetupSpacing.PageSpacing,
             colors = MagneticPagerColors(
                 restingContainer = MaterialTheme.colorScheme.surfaceContainerLow,
                 selectedContainer = MaterialTheme.colorScheme.surfaceContainerHigh,
                 restingContent = MaterialTheme.colorScheme.onSurfaceVariant,
                 selectedContent = MaterialTheme.colorScheme.onSurface,
             ),
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .clipToBounds(),
         ) { page, containerColor, contentColor ->
             Surface(
                 color = containerColor,
@@ -132,22 +173,21 @@ fun SetupScreen(
             ) {
                 when (SetupPages[page]) {
                     SetupPage.Welcome -> WelcomeSetupPage(
-                        contentColor = contentColor,
+                        illustrationActive = pagerState.settledPage == page,
                         cloudBackupState = cloudBackupState,
                         cloudConsentAccepted = cloudConsentAccepted,
                         onCloudConsentChanged = onCloudConsentChanged,
                         onConnectGoogle = onConnectGoogle,
                         onOpenLegal = { legalDocument = it },
-                        onContinue = { moveTo(SetupPage.Library.ordinal) },
                     )
                     SetupPage.Library -> LibrarySetupPage(
+                        illustrationActive = pagerState.settledPage == page,
                         folderLinked = folderLinked,
-                        contentColor = contentColor,
                         onChooseBookFolder = onChooseBookFolder,
                         onContinue = { moveTo(SetupPage.Device.ordinal) },
                     )
                     SetupPage.Device -> DeviceSetupPage(
-                        contentColor = contentColor,
+                        illustrationActive = pagerState.settledPage == page,
                         onConnectDevice = { devicesVisible = true },
                         onFinish = onFinish,
                     )
@@ -156,7 +196,7 @@ fun SetupScreen(
         }
         SetupPageIndicator(
             selectedPage = pagerState.settledPage,
-            modifier = Modifier.padding(top = 14.dp),
+            modifier = Modifier.padding(top = SetupSpacing.Group),
         )
     }
 
@@ -180,26 +220,23 @@ fun SetupScreen(
 
 @Composable
 private fun WelcomeSetupPage(
-    contentColor: Color,
+    illustrationActive: Boolean,
     cloudBackupState: CloudBackupState,
     cloudConsentAccepted: Boolean,
     onCloudConsentChanged: (Boolean) -> Unit,
     onConnectGoogle: () -> Unit,
     onOpenLegal: (LegalDocument) -> Unit,
-    onContinue: () -> Unit,
 ) {
     SetupPageColumn {
         SetupPageLabel(step = 1, label = stringResource(R.string.setup_welcome_tab))
-        SetupBridgeIllustration(color = contentColor, modifier = Modifier.align(Alignment.CenterHorizontally))
+        WelcomeSetupIllustration(
+            active = illustrationActive,
+            description = stringResource(R.string.setup_welcome_illustration_description),
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        )
         Text(
             text = stringResource(R.string.setup_value_proposition),
             style = MaterialTheme.typography.headlineMedium,
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            text = stringResource(R.string.setup_welcome_body),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
         Surface(
@@ -207,19 +244,18 @@ private fun WelcomeSetupPage(
             shape = MaterialTheme.shapes.large,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Text("Keep reading history with Google", style = MaterialTheme.typography.titleMedium)
+            Column(modifier = Modifier.padding(SetupSpacing.InnerCard)) {
+                Text(stringResource(R.string.setup_backup_title), style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(SetupSpacing.Related))
                 Text(
-                    "Optional. Only reading sessions and the page-time filter go to a private app-data file in your Google Drive.",
+                    stringResource(R.string.setup_backup_body),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Spacer(Modifier.height(SetupSpacing.Group))
                 if (cloudBackupState.enabled) {
                     Text(
-                        cloudBackupState.accountEmail ?: "Google backup connected",
+                        cloudBackupState.accountEmail ?: stringResource(R.string.setup_backup_connected),
                         style = MaterialTheme.typography.labelLarge,
                     )
                 } else {
@@ -229,47 +265,57 @@ private fun WelcomeSetupPage(
                             onCheckedChange = onCloudConsentChanged,
                         )
                         Text(
-                            "I agree to the Terms and acknowledge the Privacy policy for optional Google backup.",
+                            stringResource(R.string.setup_backup_consent),
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.weight(1f),
                         )
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = { onOpenLegal(LegalDocument.Privacy) }) { Text("Privacy") }
-                        TextButton(onClick = { onOpenLegal(LegalDocument.Terms) }) { Text("Terms") }
+                    Spacer(Modifier.height(SetupSpacing.Related))
+                    Row(horizontalArrangement = Arrangement.spacedBy(SetupSpacing.Action)) {
+                        TextButton(onClick = { onOpenLegal(LegalDocument.Privacy) }) {
+                            Text(stringResource(R.string.setup_privacy))
+                        }
+                        TextButton(onClick = { onOpenLegal(LegalDocument.Terms) }) {
+                            Text(stringResource(R.string.setup_terms))
+                        }
                     }
+                    Spacer(Modifier.height(SetupSpacing.Action))
                     FilledTonalButton(
                         onClick = onConnectGoogle,
                         enabled = cloudConsentAccepted && !cloudBackupState.syncing,
-                        modifier = Modifier.fillMaxWidth().height(54.dp),
+                        modifier = Modifier.fillMaxWidth().height(SetupSpacing.FullButtonHeight),
                     ) {
-                        Text(if (cloudBackupState.syncing) "Connecting…" else "Back up with Google")
+                        Text(
+                            stringResource(
+                                if (cloudBackupState.syncing) R.string.setup_backup_connecting
+                                else R.string.setup_backup_action,
+                            ),
+                        )
                     }
                 }
                 cloudBackupState.message?.let { message ->
+                    Spacer(Modifier.height(SetupSpacing.Action))
                     Text(message, style = MaterialTheme.typography.bodySmall)
                 }
             }
-        }
-        Button(
-            onClick = onContinue,
-            modifier = Modifier.fillMaxWidth().height(58.dp),
-        ) {
-            Text(stringResource(R.string.start_setup))
         }
     }
 }
 
 @Composable
 private fun LibrarySetupPage(
+    illustrationActive: Boolean,
     folderLinked: Boolean,
-    contentColor: Color,
     onChooseBookFolder: () -> Unit,
     onContinue: () -> Unit,
 ) {
     SetupPageColumn {
         SetupPageLabel(step = 2, label = stringResource(R.string.setup_library_tab))
-        LibrarySetupIllustration(color = contentColor, modifier = Modifier.align(Alignment.CenterHorizontally))
+        LibrarySetupIllustration(
+            active = illustrationActive,
+            description = stringResource(R.string.setup_library_illustration_description),
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        )
         Text(
             text = stringResource(R.string.setup_library_title),
             style = MaterialTheme.typography.headlineMedium,
@@ -295,13 +341,13 @@ private fun LibrarySetupPage(
         }
         FilledTonalButton(
             onClick = onChooseBookFolder,
-            modifier = Modifier.fillMaxWidth().height(58.dp),
+            modifier = Modifier.fillMaxWidth().height(SetupSpacing.FullButtonHeight),
         ) {
             Text(stringResource(if (folderLinked) R.string.change_epub_folder else R.string.choose_book_folder))
         }
         TextButton(
             onClick = onContinue,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
+            modifier = Modifier.fillMaxWidth().height(SetupSpacing.TextButtonHeight),
         ) {
             Text(stringResource(if (folderLinked) R.string.continue_setup else R.string.do_this_later))
         }
@@ -309,10 +355,18 @@ private fun LibrarySetupPage(
 }
 
 @Composable
-private fun DeviceSetupPage(contentColor: Color, onConnectDevice: () -> Unit, onFinish: () -> Unit) {
+private fun DeviceSetupPage(
+    illustrationActive: Boolean,
+    onConnectDevice: () -> Unit,
+    onFinish: () -> Unit,
+) {
     SetupPageColumn {
         SetupPageLabel(step = 3, label = stringResource(R.string.setup_device_tab))
-        DeviceSetupIllustration(color = contentColor, modifier = Modifier.align(Alignment.CenterHorizontally))
+        DeviceSetupIllustration(
+            active = illustrationActive,
+            description = stringResource(R.string.setup_device_illustration_description),
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        )
         Text(
             text = stringResource(R.string.setup_device_title),
             style = MaterialTheme.typography.headlineMedium,
@@ -326,13 +380,13 @@ private fun DeviceSetupPage(contentColor: Color, onConnectDevice: () -> Unit, on
         )
         FilledTonalButton(
             onClick = onConnectDevice,
-            modifier = Modifier.fillMaxWidth().height(58.dp),
+            modifier = Modifier.fillMaxWidth().height(SetupSpacing.FullButtonHeight),
         ) {
             Text(stringResource(R.string.choose_device))
         }
         Button(
             onClick = onFinish,
-            modifier = Modifier.fillMaxWidth().height(58.dp),
+            modifier = Modifier.fillMaxWidth().height(SetupSpacing.FullButtonHeight),
         ) {
             Text(stringResource(R.string.finish_setup))
         }
@@ -345,8 +399,11 @@ private fun SetupPageColumn(content: @Composable ColumnScope.() -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 22.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(
+                horizontal = SetupSpacing.PageHorizontal,
+                vertical = SetupSpacing.PageVertical,
+            ),
+        verticalArrangement = Arrangement.spacedBy(SetupSpacing.MajorGroup),
         horizontalAlignment = Alignment.CenterHorizontally,
         content = content,
     )
@@ -358,7 +415,10 @@ private fun SetupPageLabel(step: Int, label: String) {
         Text(
             text = stringResource(R.string.setup_step_label, step, SetupPages.size, label),
             style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            modifier = Modifier.padding(
+                horizontal = SetupSpacing.ChipHorizontal,
+                vertical = SetupSpacing.ChipVertical,
+            ),
         )
     }
 }
@@ -386,36 +446,163 @@ private fun SetupPageIndicator(selectedPage: Int, modifier: Modifier = Modifier)
 }
 
 @Composable
-private fun SetupBridgeIllustration(color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier.size(176.dp, 154.dp)) {
-        val stroke = 3.dp.toPx()
-        drawRoundRect(color, Offset(size.width * 0.08f, size.height * 0.10f), Size(size.width * 0.32f, size.height * 0.78f), CornerRadius(14.dp.toPx()), style = Stroke(stroke))
-        drawRoundRect(color, Offset(size.width * 0.59f, size.height * 0.18f), Size(size.width * 0.33f, size.height * 0.64f), CornerRadius(8.dp.toPx()), style = Stroke(stroke))
-        drawLine(color, Offset(size.width * 0.40f, size.height * 0.49f), Offset(size.width * 0.59f, size.height * 0.49f), stroke, StrokeCap.Round)
-        repeat(3) { index ->
-            drawCircle(color, 2.5.dp.toPx(), Offset(size.width * (0.46f + index * 0.045f), size.height * 0.49f))
+private fun WelcomeSetupIllustration(
+    active: Boolean,
+    description: String,
+    modifier: Modifier = Modifier,
+) {
+    val progress = onboardingMotionProgress(active = active, label = "welcome transfer")
+    val signalColor = MaterialTheme.colorScheme.primary
+    SetupIllustrationFrame(description = description, modifier = modifier) {
+        Image(
+            painter = painterResource(R.drawable.onboarding_welcome),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize(),
+        )
+        Canvas(Modifier.fillMaxSize()) {
+            repeat(3) { index ->
+                val phase = (progress + index / 3f) % 1f
+                val pulse = 1f - kotlin.math.abs(phase - 0.5f) * 2f
+                drawCircle(
+                    color = signalColor.copy(alpha = 0.28f + pulse * 0.72f),
+                    radius = (2.4f + pulse * 1.5f).dp.toPx(),
+                    center = Offset(size.width * (0.465f + index * 0.035f), size.height * 0.47f),
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun LibrarySetupIllustration(color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier.size(176.dp, 150.dp)) {
-        val stroke = 3.dp.toPx()
-        drawRoundRect(color, Offset(size.width * 0.15f, size.height * 0.28f), Size(size.width * 0.70f, size.height * 0.52f), CornerRadius(16.dp.toPx()), style = Stroke(stroke))
-        drawLine(color, Offset(size.width * 0.16f, size.height * 0.37f), Offset(size.width * 0.84f, size.height * 0.37f), stroke, StrokeCap.Round)
-        drawRoundRect(color, Offset(size.width * 0.30f, size.height * 0.12f), Size(size.width * 0.40f, size.height * 0.42f), CornerRadius(8.dp.toPx()), style = Stroke(stroke))
-        drawLine(color, Offset(size.width * 0.50f, size.height * 0.13f), Offset(size.width * 0.50f, size.height * 0.53f), stroke)
+private fun LibrarySetupIllustration(
+    active: Boolean,
+    description: String,
+    modifier: Modifier = Modifier,
+) {
+    val progress = onboardingMotionProgress(active = active, label = "books filing")
+    val bookFill = MaterialTheme.colorScheme.surfaceContainerHighest
+    val bookOutline = MaterialTheme.colorScheme.primary
+    SetupIllustrationFrame(description = description, modifier = modifier) {
+        Canvas(Modifier.fillMaxSize()) {
+            val bookWidth = 22.dp.toPx()
+            val bookHeight = 34.dp.toPx()
+            val stroke = 2.5.dp.toPx()
+            repeat(3) { index ->
+                val phase = (progress + index * 0.24f) % 1f
+                val alpha = when {
+                    phase < 0.12f -> phase / 0.12f
+                    phase > 0.86f -> (1f - phase) / 0.14f
+                    else -> 1f
+                }.coerceIn(0f, 1f)
+                val x = size.width * (0.38f + index * 0.12f) - bookWidth / 2f
+                val y = size.height * (0.06f + phase * 0.38f)
+                drawRoundRect(
+                    color = bookFill.copy(alpha = alpha),
+                    topLeft = Offset(x, y),
+                    size = Size(bookWidth, bookHeight),
+                    cornerRadius = CornerRadius(5.dp.toPx()),
+                )
+                drawRoundRect(
+                    color = bookOutline.copy(alpha = alpha),
+                    topLeft = Offset(x, y),
+                    size = Size(bookWidth, bookHeight),
+                    cornerRadius = CornerRadius(5.dp.toPx()),
+                    style = Stroke(stroke),
+                )
+                drawLine(
+                    color = bookOutline.copy(alpha = alpha),
+                    start = Offset(x + bookWidth * 0.28f, y + bookHeight * 0.27f),
+                    end = Offset(x + bookWidth * 0.72f, y + bookHeight * 0.27f),
+                    strokeWidth = stroke,
+                    cap = StrokeCap.Round,
+                )
+            }
+        }
+        Image(
+            painter = painterResource(R.drawable.onboarding_library),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize(),
+        )
     }
 }
 
 @Composable
-private fun DeviceSetupIllustration(color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier.size(176.dp, 150.dp)) {
-        val stroke = 3.dp.toPx()
-        drawRoundRect(color, Offset(size.width * 0.31f, size.height * 0.08f), Size(size.width * 0.38f, size.height * 0.80f), CornerRadius(12.dp.toPx()), style = Stroke(stroke))
-        drawLine(color, Offset(size.width * 0.42f, size.height * 0.77f), Offset(size.width * 0.58f, size.height * 0.77f), stroke, StrokeCap.Round)
-        drawArc(color, -55f, 110f, false, Offset(size.width * 0.10f, size.height * 0.28f), Size(size.width * 0.22f, size.height * 0.34f), style = Stroke(stroke, cap = StrokeCap.Round))
-        drawArc(color, 125f, 110f, false, Offset(size.width * 0.68f, size.height * 0.28f), Size(size.width * 0.22f, size.height * 0.34f), style = Stroke(stroke, cap = StrokeCap.Round))
+private fun DeviceSetupIllustration(
+    active: Boolean,
+    description: String,
+    modifier: Modifier = Modifier,
+) {
+    val progress = onboardingMotionProgress(active = active, label = "device signal")
+    val signalColor = MaterialTheme.colorScheme.primary
+    SetupIllustrationFrame(description = description, modifier = modifier) {
+        Canvas(Modifier.fillMaxSize()) {
+            val stroke = 3.dp.toPx()
+            repeat(2) { index ->
+                val phase = (progress + index * 0.38f) % 1f
+                val alpha = (1f - phase).coerceIn(0f, 1f)
+                val inset = (index * 9).dp.toPx()
+                val arcWidth = 34.dp.toPx() + inset
+                val arcHeight = 58.dp.toPx() + inset
+                val top = (size.height - arcHeight) / 2f
+                drawArc(
+                    color = signalColor.copy(alpha = alpha),
+                    startAngle = 125f,
+                    sweepAngle = 110f,
+                    useCenter = false,
+                    topLeft = Offset(size.width * 0.12f - inset / 2f, top),
+                    size = Size(arcWidth, arcHeight),
+                    style = Stroke(stroke, cap = StrokeCap.Round),
+                )
+                drawArc(
+                    color = signalColor.copy(alpha = alpha),
+                    startAngle = -55f,
+                    sweepAngle = 110f,
+                    useCenter = false,
+                    topLeft = Offset(size.width * 0.69f - inset / 2f, top),
+                    size = Size(arcWidth, arcHeight),
+                    style = Stroke(stroke, cap = StrokeCap.Round),
+                )
+            }
+        }
+        Image(
+            painter = painterResource(R.drawable.onboarding_device),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize(),
+        )
     }
+}
+
+@Composable
+private fun SetupIllustrationFrame(
+    description: String,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier = modifier
+            .size(176.dp, 150.dp)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun onboardingMotionProgress(active: Boolean, label: String): Float {
+    if (!active || LocalInspectionMode.current) return 0.46f
+    val transition = rememberInfiniteTransition(label = label)
+    val progress by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1600, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "$label progress",
+    )
+    return progress
 }

@@ -2,6 +2,7 @@
 
 #include <GfxRenderer.h>
 #include <I18n.h>
+#include <BuildVersion.h>
 
 #include "fontIds.h"
 #include "images/Logo120.h"

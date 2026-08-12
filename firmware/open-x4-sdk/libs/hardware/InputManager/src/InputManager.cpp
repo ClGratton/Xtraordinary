@@ -20,6 +20,7 @@ const char* InputManager::BUTTON_NAMES[] = {"Back", "Confirm", "Left", "Right", 
 
 InputManager::InputManager()
     : currentState(0),
+      rawState(0),
       lastState(0),
       pressedEvents(0),
       releasedEvents(0),
@@ -74,6 +75,7 @@ uint8_t InputManager::getState() {
 void InputManager::update() {
   const unsigned long currentTime = millis();
   const uint8_t state = getState();
+  rawState = state;
 
   // Always clear events first
   pressedEvents = 0;

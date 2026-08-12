@@ -18,8 +18,8 @@ android {
         applicationId = "com.xteink.companion"
         minSdk = 26
         targetSdk = 36
-        versionCode = 13
-        versionName = "0.2.0-dev12"
+        versionCode = 34
+        versionName = "0.2.0-dev33"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -62,6 +62,7 @@ dependencies {
     implementation(libs.mlkit.text.recognition)
     implementation(libs.mlkit.barcode.scanning)
     implementation(libs.play.services.auth)
+    implementation("com.google.zxing:core:3.5.3")
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.animation)

@@ -7,6 +7,10 @@
 
 class CompanionTicketActivity final : public Activity {
   companion::TicketState& ticket_;
+  bool linearBarcode_ = false;
+  bool scannerView_ = false;
+
+  bool renderScannerView();
 
  public:
   CompanionTicketActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, companion::TicketState& ticket)

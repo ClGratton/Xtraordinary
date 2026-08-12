@@ -27,13 +27,13 @@ The product model is simple: the phone owns integrations and intelligence; XTEIN
 gradle :protocol:test :app:lintDebug :app:validateDebugScreenshotTest :app:assembleDebug
 ```
 
-The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`. Install it on a connected Android device with:
+The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`. Install it with the data-preserving GATT-release workflow:
 
 ```powershell
-adb install -r .\app\build\outputs\apk\debug\app-debug.apk
+& .\scripts\install-xtraordinary-app.ps1
 ```
 
-The repository intentionally contains no production Gemini key, Firebase project, or real boarding-pass barcode. The companion transport is currently enabled only in the X3-specific build; X4/X4 Pro firmware assets are not published until they have their own hardware validation.
+The repository intentionally contains no production Gemini key or Firebase project. Imported boarding-pass values stay local; Android regenerates their real QR, Aztec, PDF417, Data Matrix, or linear symbology as a one-bit image and sends that exact image to the X3. The companion transport is currently enabled only in the X3-specific build; X4/X4 Pro firmware assets are not published until they have their own hardware validation.
 
 ## Build the X3 companion firmware
 

@@ -326,8 +326,14 @@ void SleepActivity::renderCoverSleepScreen() const {
 }
 
 void SleepActivity::renderLastScreenSleepScreen() const {
+  const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
-  renderer.drawImage(MoonIcon, 0, pageHeight - MOONICON_HEIGHT, MOONICON_WIDTH, MOONICON_HEIGHT);
+  constexpr int statusHeight = 72;
+  const int statusTop = pageHeight - statusHeight;
+  renderer.fillRect(0, statusTop, pageWidth, statusHeight, false);
+  renderer.drawImage(MoonIcon, 12, pageHeight - MOONICON_HEIGHT - 12, MOONICON_WIDTH, MOONICON_HEIGHT);
+  renderer.drawCenteredText(UI_10_FONT_ID, statusTop + 18, tr(STR_SLEEPING), true, EpdFontFamily::BOLD);
+  renderer.drawCenteredText(SMALL_FONT_ID, statusTop + 43, tr(STR_POWER_ON_HINT));
   renderer.displayBuffer(HalDisplay::HALF_REFRESH);
 }
 

@@ -37,7 +37,7 @@ Read is top-level because reading is core to the X3. Passes is an optional tool,
 
 ## First-run setup
 
-Setup is a skippable three-page magnetic carousel: Welcome, Library, and Device. Its selected and neighboring pages use pastel surface-container tones rather than saturated accent color. Welcome owns the concise value proposition, Library opens the real EPUB folder picker, and Device hands off to the shared X3/X4/X4 Pro connection flow. Completion persists, and Settings can replay setup without creating a fourth top-level destination.
+Setup is a skippable three-page magnetic carousel: Welcome, Library, and Device. Its selected and neighboring pages use pastel surface-container tones rather than saturated accent color. Welcome owns the concise value proposition, Library opens the real EPUB folder picker, and Device hands off to the shared X3/X4/X4 Pro connection flow. Completion persists, and Settings can replay setup without creating a fourth top-level destination. Each page uses a transparent, flat Material-style PNG base at the same 176 x 150 dp footprint plus one restrained code-native motion cue: communicating dots, books filing into a folder, or outward device signal arcs. The phone is a generic Android hole-punch silhouette, never an iPhone/notch. Only the settled page animates, system reduced-motion settings are honored, previews freeze deterministically, and the motion is decorative rather than required for comprehension.
 
 ## Themes, not modes
 

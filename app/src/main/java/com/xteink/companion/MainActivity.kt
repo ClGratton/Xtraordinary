@@ -30,11 +30,14 @@ import com.xteink.companion.data.EpubFolderScanner
 import com.xteink.companion.data.FlightPassImporter
 import com.xteink.companion.data.FlightPassPhotoImporter
 import com.xteink.companion.data.CloudBackupState
+import com.xteink.companion.data.FirmwareSource
 import com.xteink.companion.data.GoogleDriveReadingSync
 import com.xteink.companion.data.OpenLibraryMetadataClient
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.auth.api.identity.RevokeAccessRequest
+import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.common.api.CommonStatusCodes
 import com.google.android.gms.common.api.Scope
 import com.xteink.companion.ui.CompanionViewModel
 import com.xteink.companion.ui.CompanionVisualTheme
@@ -48,6 +51,14 @@ import kotlinx.coroutines.withContext
 
 private const val PrepareX3ResetAction = "com.xteink.companion.action.PREPARE_X3_RESET"
 private const val DeployLogTag = "XteinkDeploy"
+private const val FlightImportLogTag = "FlightPassImport"
+private const val GoogleBackupLogTag = "GoogleBackup"
+
+internal fun googleAuthorizationFailureMessage(statusCode: Int?): String = when (statusCode) {
+    CommonStatusCodes.DEVELOPER_ERROR -> "Google backup isn't configured for this build"
+    CommonStatusCodes.CANCELED -> "Google backup authorization was canceled"
+    else -> "Google backup was not authorized"
+}
 
 class MainActivity : ComponentActivity() {
     private val viewModel by viewModels<CompanionViewModel>()
@@ -73,6 +84,7 @@ class MainActivity : ComponentActivity() {
                 mutableStateOf(setupPreferences.getBoolean("setup_complete", false))
             }
             var pendingDeviceModel by rememberSaveable { mutableStateOf<String?>(null) }
+            var pendingLocalFirmwareModel by rememberSaveable { mutableStateOf<String?>(null) }
             var cloudState by remember { mutableStateOf(googleReadingSync.loadState()) }
             var cloudConsentAccepted by rememberSaveable {
                 mutableStateOf(googleReadingSync.consentAccepted())
@@ -137,8 +149,16 @@ class MainActivity : ComponentActivity() {
                 }.onSuccess { result ->
                     result.accessToken?.let(::finishCloudAction)
                         ?: setCloudMessage("Google did not return an access token", needsAuthorization = true)
-                }.onFailure {
-                    setCloudMessage("Google backup was not authorized", needsAuthorization = true)
+                }.onFailure { error ->
+                    val statusCode = (error as? ApiException)?.statusCode
+                    Log.w(
+                        GoogleBackupLogTag,
+                        "Authorization failed: ${error.javaClass.simpleName}, status=$statusCode",
+                    )
+                    setCloudMessage(
+                        googleAuthorizationFailureMessage(statusCode),
+                        needsAuthorization = true,
+                    )
                 }
             }
 
@@ -207,6 +227,26 @@ class MainActivity : ComponentActivity() {
                 WindowCompat.getInsetsController(window, window.decorView).apply {
                     isAppearanceLightStatusBars = lightSystemBars
                     isAppearanceLightNavigationBars = lightSystemBars
+                }
+            }
+            val localFirmwarePicker = rememberLauncherForActivityResult(
+                ActivityResultContracts.OpenDocument(),
+            ) { uri ->
+                val model = pendingLocalFirmwareModel
+                pendingLocalFirmwareModel = null
+                if (uri != null && model != null) {
+                    runCatching {
+                        contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    viewModel.prepareLocalFirmware(model, uri)
+                }
+            }
+            val checkFirmware: (String, FirmwareSource) -> Unit = { model, source ->
+                if (source == FirmwareSource.LocalFile) {
+                    pendingLocalFirmwareModel = model
+                    localFirmwarePicker.launch(arrayOf("application/octet-stream", "application/x-binary"))
+                } else {
+                    viewModel.checkFirmware(model, source)
                 }
             }
             val readingHistorySignature = state.readingStats.sessions.joinToString("|") {
@@ -283,10 +323,13 @@ class MainActivity : ComponentActivity() {
                         },
                         onDismissNotice = viewModel::dismissNotice,
                         onConnectDevice = connectDevice,
-                        onCheckFirmware = viewModel::checkFirmware,
+                        onCheckFirmware = checkFirmware,
                         onFlashFirmware = viewModel::flashLatestFirmware,
+                        onResetX3Setup = viewModel::resetX3SetupOverUsb,
                         cloudBackupState = cloudState,
                         onSyncGoogleBackup = {
+                            googleReadingSync.recordConsent()
+                            cloudConsentAccepted = true
                             requestGoogleAuthorization(CloudAction.Sync, interactive = true)
                         },
                         onDeleteGoogleBackup = {
@@ -299,7 +342,7 @@ class MainActivity : ComponentActivity() {
                         device = state.device,
                         isDeviceTransportConnected = state.isX3TransportConnected,
                         onConnectDevice = connectDevice,
-                        onCheckFirmware = viewModel::checkFirmware,
+                        onCheckFirmware = checkFirmware,
                         onFlashFirmware = viewModel::flashLatestFirmware,
                         cloudBackupState = cloudState,
                         cloudConsentAccepted = cloudConsentAccepted,
@@ -363,7 +406,13 @@ class MainActivity : ComponentActivity() {
     private fun importFlightPassPhoto(uri: android.net.Uri) {
         lifecycleScope.launch {
             val result = runCatching { FlightPassPhotoImporter.read(this@MainActivity, uri) }
-            result.onSuccess(viewModel::importFlightPass).onFailure(viewModel::reportFlightPassImportFailure)
+            result.onSuccess { pass ->
+                Log.i(FlightImportLogTag, "Imported ${pass.barcodeFormat.displayName} pass from photo")
+                viewModel.importFlightPass(pass)
+            }.onFailure { error ->
+                Log.w(FlightImportLogTag, "Photo import failed: ${error.message}")
+                viewModel.reportFlightPassImportFailure(error)
+            }
         }
     }
 
@@ -377,10 +426,18 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleSharedFlightPass(intent: Intent?) {
-        if (intent?.action != Intent.ACTION_SEND || intent.type != "text/plain") return
-        val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT)?.trim().orEmpty()
-        if (sharedText.isBlank()) return
-        importFlightPassLink(sharedText)
+        if (intent?.action != Intent.ACTION_SEND) return
+        when {
+            intent.type?.startsWith("image/") == true -> {
+                @Suppress("DEPRECATION")
+                val image = intent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM) ?: return
+                importFlightPassPhoto(image)
+            }
+            intent.type == "text/plain" -> {
+                val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT)?.trim().orEmpty()
+                if (sharedText.isNotBlank()) importFlightPassLink(sharedText)
+            }
+        }
     }
 
     private fun syncLinkedFolder(showNotice: Boolean) {

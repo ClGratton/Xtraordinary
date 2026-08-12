@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -35,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -52,6 +54,14 @@ import com.xteink.companion.ui.CompanionVisualTheme
 import com.xteink.companion.ui.DevicePresence
 import com.xteink.companion.ui.RadioPolicyUiState
 import com.xteink.companion.ui.devicePresence
+import com.xteink.companion.ui.isFastWindowChoiceEnabled
+import com.xteink.companion.ui.selectFastWindow
+import com.xteink.companion.ui.selectSleepAfter
+
+private val FastDiscoveryMinuteChoices = listOf(1, 5, 10)
+private val SleepAfterMinuteChoices = listOf(5, 10, 20)
+private val StandbyCheckInSecondChoices = listOf(30, 60, 120)
+private val ConnectedIntervalSecondChoices = listOf(1, 2, 4)
 
 @Composable
 fun CompanionTopBar(
@@ -412,6 +422,7 @@ fun SettingsSheet(
     radioPolicy: RadioPolicyUiState,
     minimumReadingPageSeconds: Int,
     settingsSyncPending: Boolean,
+    hasManagedDevice: Boolean,
     onSetVisualTheme: (CompanionVisualTheme) -> Unit,
     onSetRadioPolicy: (RadioPolicyUiState) -> Unit,
     onSetMinimumReadingPageSeconds: (Int) -> Unit,
@@ -428,6 +439,7 @@ fun SettingsSheet(
             radioPolicy = radioPolicy,
             minimumReadingPageSeconds = minimumReadingPageSeconds,
             settingsSyncPending = settingsSyncPending,
+            hasManagedDevice = hasManagedDevice,
             onSetVisualTheme = onSetVisualTheme,
             onSetRadioPolicy = onSetRadioPolicy,
             onSetMinimumReadingPageSeconds = onSetMinimumReadingPageSeconds,
@@ -450,6 +462,7 @@ fun SettingsSheetContent(
     radioPolicy: RadioPolicyUiState,
     minimumReadingPageSeconds: Int,
     settingsSyncPending: Boolean,
+    hasManagedDevice: Boolean,
     onSetVisualTheme: (CompanionVisualTheme) -> Unit,
     onSetRadioPolicy: (RadioPolicyUiState) -> Unit,
     onSetMinimumReadingPageSeconds: (Int) -> Unit,
@@ -504,64 +517,61 @@ fun SettingsSheetContent(
         }
         Spacer(Modifier.height(12.dp))
         Text(stringResource(R.string.settings_radio_policy), style = MaterialTheme.typography.titleMedium)
-        Surface(
-            color = if (settingsSyncPending) {
-                MaterialTheme.colorScheme.tertiaryContainer
-            } else {
-                MaterialTheme.colorScheme.secondaryContainer
-            },
-            contentColor = if (settingsSyncPending) {
-                MaterialTheme.colorScheme.onTertiaryContainer
-            } else {
-                MaterialTheme.colorScheme.onSecondaryContainer
-            },
-            shape = CircleShape,
-            modifier = Modifier.padding(vertical = 8.dp),
-        ) {
-            Text(
-                text = stringResource(
-                    if (settingsSyncPending) R.string.settings_waiting_for_x3 else R.string.settings_synced_to_x3,
-                ),
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-            )
+        if (hasManagedDevice) {
+            Surface(
+                color = if (settingsSyncPending) {
+                    MaterialTheme.colorScheme.tertiaryContainer
+                } else {
+                    MaterialTheme.colorScheme.secondaryContainer
+                },
+                contentColor = if (settingsSyncPending) {
+                    MaterialTheme.colorScheme.onTertiaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSecondaryContainer
+                },
+                shape = CircleShape,
+                modifier = Modifier.padding(vertical = 8.dp),
+            ) {
+                Text(
+                    text = stringResource(
+                        if (settingsSyncPending) R.string.settings_waiting_for_x3 else R.string.settings_synced_to_x3,
+                    ),
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                )
+            }
         }
         PolicyChoiceRow(
             label = stringResource(R.string.settings_fast_discovery),
-            values = listOf(1, 5, 10),
+            values = FastDiscoveryMinuteChoices,
             selected = radioPolicy.fastWindowMinutes,
             suffix = " min",
-            onSelect = { minutes ->
-                val compatibleSleep = when {
-                    radioPolicy.sleepAfterMinutes > minutes -> radioPolicy.sleepAfterMinutes
-                    minutes < 5 -> 5
-                    minutes < 10 -> 10
-                    else -> 20
-                }
-                onSetRadioPolicy(
-                    radioPolicy.copy(
-                        fastWindowMinutes = minutes,
-                        sleepAfterMinutes = compatibleSleep,
-                    ),
-                )
+            optionEnabled = { minutes ->
+                isFastWindowChoiceEnabled(minutes, radioPolicy.sleepAfterMinutes)
             },
+            onSelect = { minutes -> onSetRadioPolicy(selectFastWindow(radioPolicy, minutes, SleepAfterMinuteChoices)) },
         )
         PolicyChoiceRow(
-            label = stringResource(R.string.settings_slow_poll),
-            values = listOf(1, 2, 4),
-            selected = radioPolicy.slowIntervalMs / 1_000,
+            label = stringResource(R.string.settings_standby_check_in),
+            values = StandbyCheckInSecondChoices,
+            selected = radioPolicy.standbyIntervalSeconds,
             suffix = " s",
-            onSelect = { onSetRadioPolicy(radioPolicy.copy(slowIntervalMs = it * 1_000)) },
+            onSelect = { onSetRadioPolicy(radioPolicy.copy(standbyIntervalSeconds = it)) },
+        )
+        PolicyChoiceRow(
+            label = stringResource(R.string.settings_connected_interval),
+            values = ConnectedIntervalSecondChoices,
+            selected = radioPolicy.connectedIntervalMs / 1_000,
+            suffix = " s",
+            onSelect = { onSetRadioPolicy(radioPolicy.copy(connectedIntervalMs = it * 1_000)) },
         )
         PolicyChoiceRow(
             label = stringResource(R.string.settings_sleep_after),
-            values = listOf(5, 10, 20),
+            values = SleepAfterMinuteChoices,
             selected = radioPolicy.sleepAfterMinutes,
             suffix = " min",
             onSelect = { minutes ->
-                if (minutes > radioPolicy.fastWindowMinutes) {
-                    onSetRadioPolicy(radioPolicy.copy(sleepAfterMinutes = minutes))
-                }
+                onSetRadioPolicy(selectSleepAfter(radioPolicy, minutes, FastDiscoveryMinuteChoices))
             },
         )
         Text(
@@ -584,6 +594,22 @@ fun SettingsSheetContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(12.dp))
+        Text(stringResource(R.string.settings_controls), style = MaterialTheme.typography.titleMedium)
+        val instantLabel = stringResource(R.string.instant)
+        PolicyChoiceRow(
+            label = stringResource(R.string.settings_power_button_hold),
+            values = listOf(0, 1, 2),
+            selected = radioPolicy.powerButtonHoldMs / 1_000,
+            suffix = " s",
+            valueLabel = { seconds -> if (seconds == 0) instantLabel else "$seconds s" },
+            onSelect = { seconds -> onSetRadioPolicy(radioPolicy.copy(powerButtonHoldMs = seconds * 1_000)) },
+        )
+        Text(
+            stringResource(R.string.settings_power_button_hold_body),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(12.dp))
         Text(stringResource(R.string.settings_reading_stats), style = MaterialTheme.typography.titleMedium)
         val offLabel = stringResource(R.string.off)
         PolicyChoiceRow(
@@ -600,54 +626,12 @@ fun SettingsSheetContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(12.dp))
-        Text("Google backup", style = MaterialTheme.typography.titleMedium)
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            shape = MaterialTheme.shapes.large,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                if (cloudBackupState.enabled) {
-                    Text(
-                        cloudBackupState.accountName ?: cloudBackupState.accountEmail ?: "Google connected",
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                    cloudBackupState.accountEmail?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Text(
-                        "Only reading history is stored in Drive app data. Books and passes stay local.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    cloudBackupState.message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(
-                            onClick = onSyncGoogleBackup,
-                            enabled = !cloudBackupState.syncing,
-                        ) { Text(if (cloudBackupState.syncing) "Syncing…" else "Sync now") }
-                        TextButton(
-                            onClick = onDeleteGoogleBackup,
-                            enabled = !cloudBackupState.syncing,
-                        ) { Text("Delete & disconnect") }
-                    }
-                } else {
-                    Text("Not connected", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        "Run setup again to opt in. Local reading history works without Google.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { onOpenLegal(LegalDocument.Privacy) }) { Text("Privacy") }
-                    TextButton(onClick = { onOpenLegal(LegalDocument.Terms) }) { Text("Terms") }
-                }
-            }
-        }
+        GoogleBackupSettingsCard(
+            state = cloudBackupState,
+            onConnectOrSync = onSyncGoogleBackup,
+            onDelete = onDeleteGoogleBackup,
+            onOpenLegal = onOpenLegal,
+        )
         Spacer(Modifier.height(12.dp))
         Surface(
             onClick = onOpenSetup,
@@ -671,18 +655,92 @@ fun SettingsSheetContent(
                 Text("›", style = MaterialTheme.typography.headlineMedium)
             }
         }
-        Spacer(Modifier.height(12.dp))
-        SettingsValue(stringResource(R.string.settings_device), stringResource(R.string.settings_device_value))
-        SettingsValue(
-            stringResource(R.string.settings_library_services),
-            stringResource(R.string.settings_library_services_value),
-        )
-        SettingsValue(
-            stringResource(R.string.settings_notifications),
-            stringResource(R.string.settings_notifications_value),
-        )
-        SettingsValue(stringResource(R.string.settings_gemini), stringResource(R.string.settings_gemini_value))
-        SettingsValue(stringResource(R.string.settings_flights), stringResource(R.string.settings_flights_value))
+    }
+}
+
+@Composable
+private fun GoogleBackupSettingsCard(
+    state: CloudBackupState,
+    onConnectOrSync: () -> Unit,
+    onDelete: () -> Unit,
+    onOpenLegal: (LegalDocument) -> Unit,
+) {
+    Text(stringResource(R.string.settings_google_backup), style = MaterialTheme.typography.titleMedium)
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = MaterialTheme.shapes.large,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (state.enabled) {
+                Text(
+                    state.accountName ?: state.accountEmail ?: stringResource(R.string.google_backup_connected),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                state.accountEmail?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(
+                    stringResource(R.string.google_backup_scope),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                state.message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = onConnectOrSync, enabled = !state.syncing) {
+                        Text(
+                            stringResource(
+                                if (state.syncing) R.string.google_backup_syncing
+                                else R.string.google_backup_sync_now,
+                            ),
+                        )
+                    }
+                    TextButton(onClick = onDelete, enabled = !state.syncing) {
+                        Text(stringResource(R.string.google_backup_delete_disconnect))
+                    }
+                }
+            } else {
+                Text(stringResource(R.string.google_backup_not_connected), style = MaterialTheme.typography.titleSmall)
+                Text(
+                    stringResource(R.string.google_backup_scope),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    stringResource(R.string.google_backup_consent_short),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                FilledTonalButton(
+                    onClick = onConnectOrSync,
+                    enabled = !state.syncing,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                ) {
+                    Text(
+                        stringResource(
+                            if (state.syncing) R.string.setup_backup_connecting
+                            else R.string.google_backup_connect,
+                        ),
+                    )
+                }
+                state.message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { onOpenLegal(LegalDocument.Privacy) }) {
+                    Text(stringResource(R.string.setup_privacy))
+                }
+                TextButton(onClick = { onOpenLegal(LegalDocument.Terms) }) {
+                    Text(stringResource(R.string.setup_terms))
+                }
+            }
+        }
     }
 }
 
@@ -693,6 +751,7 @@ private fun PolicyChoiceRow(
     selected: Int,
     suffix: String,
     valueLabel: (Int) -> String = { "$it$suffix" },
+    optionEnabled: (Int) -> Boolean = { true },
     onSelect: (Int) -> Unit,
 ) {
     Column(modifier = Modifier.padding(vertical = 6.dp)) {
@@ -704,8 +763,10 @@ private fun PolicyChoiceRow(
         ) {
             values.forEach { value ->
                 val isSelected = selected == value
+                val isEnabled = optionEnabled(value)
                 Surface(
                     selected = isSelected,
+                    enabled = isEnabled,
                     onClick = { onSelect(value) },
                     shape = MaterialTheme.shapes.medium,
                     color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer
@@ -719,7 +780,8 @@ private fun PolicyChoiceRow(
                     ),
                     modifier = Modifier
                         .weight(1f)
-                        .height(44.dp),
+                        .height(44.dp)
+                        .alpha(if (isEnabled) 1f else 0.38f),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Text(

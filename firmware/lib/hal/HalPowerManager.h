@@ -17,6 +17,7 @@ extern HalPowerManager powerManager;  // Singleton
 class HalPowerManager {
   int normalFreq = 0;  // MHz
   bool isLowPower = false;
+  int rejectedFrequencyMhz = 0;  // A clock configuration rejection is permanent for this boot/SoC.
 
   // I2C fuel gauge configuration for X3 battery monitoring
   bool _batteryUseI2C = false;                   // True if using I2C fuel gauge (X3), false for ADC (X4)
@@ -28,7 +29,11 @@ class HalPowerManager {
   SemaphoreHandle_t modeMutex = nullptr;  // Protect access to currentLockMode
 
  public:
-  static constexpr int LOW_POWER_FREQ = 10;                    // MHz
+  // ESP32-C3 supports the 40 MHz XTAL and XTAL/2 (20 MHz), but not the
+  // XTAL/4 10 MHz mode exposed only by the original ESP32. Requesting 10 MHz
+  // repeatedly makes the Arduino core allocate an error string on every
+  // rejection, eventually starving the main loop.
+  static constexpr int LOW_POWER_FREQ = 20;                    // MHz; ESP32-C3 XTAL/2
   static constexpr int BLE_SAFE_FREQ = 80;                     // MHz; keeps the ESP32-C3 APB at 80 MHz
   static constexpr unsigned long IDLE_POWER_SAVING_MS = 3000;  // ms
   static constexpr unsigned long BATTERY_POLL_MS = 1500;       // ms

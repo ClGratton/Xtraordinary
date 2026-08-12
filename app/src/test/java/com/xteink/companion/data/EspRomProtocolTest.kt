@@ -30,6 +30,17 @@ class EspRomProtocolTest {
     }
 
     @Test
+    fun flashRegionCanTargetTheX3NvsPartition() {
+        val payload = ByteBuffer.wrap(EspRomProtocol.flashBeginPayload(0x5000, 0x9000))
+            .order(ByteOrder.LITTLE_ENDIAN)
+
+        assertEquals(0x5000, payload.int)
+        assertEquals(0x5000 / 0x400, payload.int)
+        assertEquals(0x400, payload.int)
+        assertEquals(0x9000, payload.int)
+    }
+
+    @Test
     fun requestAndResponseUseEspRomWireHeaders() {
         val request = EspRomProtocol.request(EspRomProtocol.Sync, byteArrayOf(1, 2, 3))
         val decodedRequest = EspRomProtocol.slipDecode(request.copyOfRange(1, request.lastIndex))

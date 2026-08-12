@@ -24,6 +24,12 @@ class Activity {
   ActivityResultHandler resultHandler;
   ActivityResult result;
 
+  // Draws the existing CrossPoint physical-button graphics after mapping
+  // semantic actions to the user's configured front-button layout. Activities
+  // with back/forward states should use this instead of placing one-off labels.
+  void drawMappedButtonHints(const char* back, const char* confirm = "", const char* previous = "",
+                             const char* next = "");
+
  public:
   explicit Activity(std::string name, GfxRenderer& renderer, MappedInputManager& mappedInput)
       : name(std::move(name)), renderer(renderer), mappedInput(mappedInput) {}

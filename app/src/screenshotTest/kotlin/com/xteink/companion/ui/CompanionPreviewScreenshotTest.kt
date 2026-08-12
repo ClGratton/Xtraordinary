@@ -12,6 +12,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.android.tools.screenshot.PreviewTest
 import com.xteink.companion.data.CloudBackupState
+import com.xteink.companion.data.FlightBarcodeFormat
 import com.xteink.companion.ui.components.SettingsSheetContent
 import com.xteink.companion.ui.components.DeviceConnectionSheetContent
 import com.xteink.companion.ui.components.DeviceSetupStep
@@ -30,6 +31,38 @@ fun expressiveFocusPhoneScreenshot() {
 @Preview(name = "First-run setup", widthDp = 412, heightDp = 915, showBackground = true)
 @Composable
 fun firstRunSetupScreenshot() {
+    X3CompanionTheme(visualTheme = CompanionVisualTheme.Expressive, useDynamicColor = false) {
+        SetupScreen(
+            folderLinked = false,
+            onChooseBookFolder = {},
+            onFinish = {},
+        )
+    }
+}
+
+@PreviewTest
+@Preview(name = "First-run setup compact height", widthDp = 360, heightDp = 800, showBackground = true)
+@Composable
+fun firstRunSetupCompactScreenshot() {
+    X3CompanionTheme(visualTheme = CompanionVisualTheme.Expressive, useDynamicColor = false) {
+        SetupScreen(
+            folderLinked = false,
+            onChooseBookFolder = {},
+            onFinish = {},
+        )
+    }
+}
+
+@PreviewTest
+@Preview(
+    name = "First-run setup large text",
+    widthDp = 412,
+    heightDp = 915,
+    fontScale = 1.3f,
+    showBackground = true,
+)
+@Composable
+fun firstRunSetupLargeTextScreenshot() {
     X3CompanionTheme(visualTheme = CompanionVisualTheme.Expressive, useDynamicColor = false) {
         SetupScreen(
             folderLinked = false,
@@ -155,6 +188,55 @@ private fun screenshotReadState() = ReadUiState(
     ),
 )
 
+private val linearPassPreviewState = TicketUiState(
+    mode = TicketMode.Live,
+    passes = listOf(
+        BoardingPassUiState(
+            id = "linear-pass",
+            origin = "AHO",
+            destination = "VCE",
+            flight = "W4 6762",
+            status = "Departed",
+            departureTime = "13:35",
+            countdown = "departed",
+            gate = "TBD",
+            terminal = "-",
+            seat = "17B",
+            passenger = "CLAUDIO A.",
+            boardingGroup = "",
+            source = "Imported from photo - extracted on device",
+            barcodePayload = "M1EXAMPLE/PASSENGER EABC123 AHOVCEW4 6762 222Y017B0001 100",
+            barcodeFormat = FlightBarcodeFormat.Pdf417,
+        ),
+    ),
+    selectedPassId = "linear-pass",
+)
+
+private val matrixPassPreviewState = TicketUiState(
+    mode = TicketMode.Static,
+    passes = listOf(
+        BoardingPassUiState(
+            id = "matrix-pass",
+            origin = "AHO",
+            destination = "VCE",
+            flight = "FR 6779",
+            status = "Departed",
+            departureTime = "20:40",
+            countdown = "departed",
+            gate = "CLOSES",
+            terminal = "-",
+            seat = "05D",
+            passenger = "Claudio Gratton",
+            boardingGroup = "NON BAG",
+            source = "Imported from Google Wallet",
+            barcodePayload = "M1GRATTON/CLAUDIO EABC123 AHOVCEFR 6779 222Y005D0001 100",
+            barcodeFormat = FlightBarcodeFormat.Aztec,
+        ),
+        linearPassPreviewState.passes.single(),
+    ),
+    selectedPassId = "matrix-pass",
+)
+
 @PreviewTest
 @Preview(name = "Pass detail phone", widthDp = 412, heightDp = 915, showBackground = true)
 @Composable
@@ -163,7 +245,7 @@ fun passDetailPhoneScreenshot() {
         state = CompanionUiState(
             surface = CompanionSurface.Tools,
             toolDestination = ToolDestination.Passes,
-            ticket = TicketUiState(mode = TicketMode.Live),
+            ticket = matrixPassPreviewState,
         ),
     )
 }
@@ -177,7 +259,7 @@ fun quietPassDetailPhoneScreenshot() {
             visualTheme = CompanionVisualTheme.Quiet,
             surface = CompanionSurface.Tools,
             toolDestination = ToolDestination.Passes,
-            ticket = TicketUiState(mode = TicketMode.Live),
+            ticket = linearPassPreviewState,
         ),
     )
 }
@@ -199,6 +281,45 @@ fun expressiveFocusLargeTextScreenshot() {
 @Preview(name = "Settings themes", widthDp = 412, heightDp = 915, showBackground = true)
 @Composable
 fun settingsThemesScreenshot() {
+    SettingsScreenshotContent(cloudBackupState = CloudBackupState())
+}
+
+@PreviewTest
+@Preview(name = "Settings Google disconnected", widthDp = 412, heightDp = 915, showBackground = true)
+@Composable
+fun settingsGoogleDisconnectedScreenshot() {
+    SettingsScreenshotContent(cloudBackupState = CloudBackupState())
+}
+
+@PreviewTest
+@Preview(name = "Settings Google connected", widthDp = 412, heightDp = 915, showBackground = true)
+@Composable
+fun settingsGoogleConnectedScreenshot() {
+    SettingsScreenshotContent(
+        cloudBackupState = CloudBackupState(
+            enabled = true,
+            accountName = "Reader",
+            accountEmail = "reader@example.com",
+            message = "Reading history is up to date",
+        ),
+    )
+}
+
+@PreviewTest
+@Preview(
+    name = "Settings Google large text",
+    widthDp = 412,
+    heightDp = 915,
+    fontScale = 1.3f,
+    showBackground = true,
+)
+@Composable
+fun settingsGoogleLargeTextScreenshot() {
+    SettingsScreenshotContent(cloudBackupState = CloudBackupState())
+}
+
+@Composable
+private fun SettingsScreenshotContent(cloudBackupState: CloudBackupState) {
     X3CompanionTheme(visualTheme = CompanionVisualTheme.Expressive, useDynamicColor = false) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -210,14 +331,15 @@ fun settingsThemesScreenshot() {
             ) {
                 SettingsSheetContent(
                     visualTheme = CompanionVisualTheme.Expressive,
-                    radioPolicy = RadioPolicyUiState(),
+                    radioPolicy = RadioPolicyUiState(fastWindowMinutes = 1, sleepAfterMinutes = 5),
                     minimumReadingPageSeconds = 5,
                     settingsSyncPending = true,
+                    hasManagedDevice = true,
                     onSetVisualTheme = {},
                     onSetRadioPolicy = {},
                     onSetMinimumReadingPageSeconds = {},
                     onOpenSetup = {},
-                    cloudBackupState = CloudBackupState(),
+                    cloudBackupState = cloudBackupState,
                     onSyncGoogleBackup = {},
                     onDeleteGoogleBackup = {},
                     onOpenLegal = {},
@@ -243,8 +365,25 @@ fun deviceModelPickerScreenshot() {
     DeviceSheetScreenshot(step = DeviceSetupStep.ChooseModel)
 }
 
+@PreviewTest
+@Preview(name = "Firmware wake guidance", widthDp = 412, heightDp = 915, showBackground = true)
 @Composable
-private fun DeviceSheetScreenshot(step: DeviceSetupStep) {
+fun firmwareWakeGuidanceScreenshot() {
+    DeviceSheetScreenshot(
+        step = DeviceSetupStep.FirmwareDefault,
+        device = DeviceUiState(
+            firmwareCheckPhase = FirmwareCheckPhase.Available,
+            latestFirmwareVersion = "xtraordinary-v0.2.6-dev16-local",
+            usbConnected = false,
+        ),
+    )
+}
+
+@Composable
+private fun DeviceSheetScreenshot(
+    step: DeviceSetupStep,
+    device: DeviceUiState = DeviceUiState(),
+) {
     X3CompanionTheme(visualTheme = CompanionVisualTheme.Expressive, useDynamicColor = false) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -257,6 +396,7 @@ private fun DeviceSheetScreenshot(step: DeviceSetupStep) {
                 DeviceConnectionSheetContent(
                     onDismiss = {},
                     initialStep = step,
+                    device = device,
                     modifier = Modifier.padding(top = 20.dp),
                 )
             }

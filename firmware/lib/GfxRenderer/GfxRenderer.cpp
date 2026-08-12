@@ -1235,6 +1235,40 @@ void GfxRenderer::drawBitmap1Bit(const Bitmap& bitmap, const int x, const int y,
   free(rowBytes);
 }
 
+void GfxRenderer::drawBitmap1BitIntegerScaled(const Bitmap& bitmap, const int x, const int y, const int scale) const {
+  if (scale < 1 || scale > 4) return;
+  const int outputRowSize = (bitmap.getWidth() + 3) / 4;
+  auto* outputRow = static_cast<uint8_t*>(malloc(outputRowSize));
+  auto* rowBytes = static_cast<uint8_t*>(malloc(bitmap.getRowBytes()));
+  if (!outputRow || !rowBytes) {
+    LOG_ERR("GFX", "!! Failed to allocate scaled 1-bit BMP row buffers");
+    free(outputRow);
+    free(rowBytes);
+    return;
+  }
+
+  for (int bmpY = 0; bmpY < bitmap.getHeight(); bmpY++) {
+    if (bitmap.readNextRow(outputRow, rowBytes) != BmpReaderError::Ok) {
+      LOG_ERR("GFX", "Failed to read scaled row %d", bmpY);
+      break;
+    }
+    const int sourceY = bitmap.isTopDown() ? bmpY : bitmap.getHeight() - 1 - bmpY;
+    const int screenY = y + sourceY * scale;
+    int runStart = -1;
+    for (int bmpX = 0; bmpX <= bitmap.getWidth(); bmpX++) {
+      const bool black = bmpX < bitmap.getWidth() &&
+                         ((outputRow[bmpX / 4] >> (6 - ((bmpX * 2) % 8))) & 0x3) < 3;
+      if (black && runStart < 0) runStart = bmpX;
+      if (!black && runStart >= 0) {
+        fillRect(x + runStart * scale, screenY, (bmpX - runStart) * scale, scale, true);
+        runStart = -1;
+      }
+    }
+  }
+  free(outputRow);
+  free(rowBytes);
+}
+
 void GfxRenderer::fillPolygon(const int* xPoints, const int* yPoints, int numPoints, bool state) const {
   if (numPoints < 3) return;
 

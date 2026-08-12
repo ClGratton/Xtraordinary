@@ -71,6 +71,10 @@ class HalGPIO {
   bool wasAnyReleased() const;
   unsigned long getHeldTime() const;
   unsigned long getPowerButtonHeldTime() const;
+  uint8_t getRawButtonState() const;
+  uint8_t getDebouncedButtonState() const;
+  uint8_t getPressedButtonEvents() const;
+  uint8_t getReleasedButtonEvents() const;
 
   // Setup wake up GPIO and enter deep sleep
   void startDeepSleep();

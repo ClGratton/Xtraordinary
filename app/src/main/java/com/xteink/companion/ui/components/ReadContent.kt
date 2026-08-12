@@ -278,7 +278,7 @@ fun ReadContent(
             importing = state.importing,
             uploading = state.uploadingToX3,
             uploadProgress = state.uploadProgress,
-            canUpload = selectedPhoneOnlyIds.isNotEmpty() && isX3Connected,
+            canUpload = selectedPhoneOnlyIds.isNotEmpty() && (isX3Connected || usbConnected),
             canDelete = canDelete,
             importDescription = stringResource(R.string.import_epubs),
             uploadDescription = stringResource(R.string.upload_selected_to_device, deviceLabel),

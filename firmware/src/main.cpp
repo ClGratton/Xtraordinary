@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <BuildVersion.h>
 #include <Epub.h>
 #include <FontCacheManager.h>
 #include <FontDecompressor.h>
@@ -24,6 +25,7 @@
 #include "MappedInputManager.h"
 #include "OpdsServerStore.h"
 #include "RecentBooksStore.h"
+#include "RuntimeTrace.h"
 #include "SdCardFontSystem.h"
 #include "activities/Activity.h"
 #include "activities/ActivityManager.h"
@@ -238,15 +240,9 @@ static bool loadSleepFrameBuffer() {
 
 // Enter deep sleep mode
 void enterDeepSleep(bool fromTimeout = false) {
+  runtime_trace::mark(runtime_trace::Checkpoint::SLEEP_ENTRY);
   HalPowerManager::Lock powerLock;  // Ensure we are at normal CPU frequency for sleep preparation
   APP_STATE.lastSleepFromReader = activityManager.isReaderActivity();
-
-#ifdef ENABLE_X3_COMPANION
-  // A direct sleep from Reading/Static does not pass through Home. Briefly
-  // advertise so a phone already waiting with queued work can connect, receive
-  // status/capabilities, send its commands, and receive their ACKs.
-  companion::companionService.syncBeforeSleep(1200);
-#endif
 
   const bool isQuickResumeSleep =
       SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::QUICK_RESUME ||
@@ -264,6 +260,13 @@ void enterDeepSleep(bool fromTimeout = false) {
   if (isQuickResumeSleep) {
     saveSleepFrameBuffer();
   }
+
+#ifdef ENABLE_X3_COMPANION
+  // The sleep state must already be visible before touching fallible vendor
+  // teardown. The companion lifecycle bounds every BLE call internally, so a
+  // stuck host task can never strand the device awake with an obsolete frame.
+  companion::companionService.shutdownForDeepSleep(750);
+#endif
 
   // Tear down WiFi so the modem power domain isn't held alive across deep sleep.
   // Wake from deep sleep is effectively a chip reset, so no state needs to survive.
@@ -325,6 +328,8 @@ void setup() {
   Serial.begin(115200);
   logSerial.setTxTimeoutMs(1);  // This is a load-bearing 1. Do not modify.
 #endif
+
+  runtime_trace::begin();
 
   HalSystem::begin();
 
@@ -408,7 +413,7 @@ void setup() {
   }
 
   // First serial output only here to avoid timing inconsistencies for power button press duration verification
-  LOG_DBG("MAIN", "Starting CrossPoint version " CROSSPOINT_VERSION);
+  LOG_DBG("MAIN", "Starting CrossPoint version %s", CROSSPOINT_VERSION);
 
   // Resolve the single boot-presentation decision. Skipping the splash also
   // skips the panel-clearing pass and the X3 initial-full-sync arming (see
@@ -497,20 +502,27 @@ void setup() {
 #ifdef ENABLE_X3_COMPANION
   companion::companionService.begin();
 #endif
+  runtime_trace::mark(runtime_trace::Checkpoint::SETUP_COMPLETE);
 }
 
 void loop() {
+  runtime_trace::beginLoop();
   static unsigned long maxLoopDuration = 0;
   const unsigned long loopStartTime = millis();
   static unsigned long lastMemPrint = 0;
 
   gpio.update();
+  runtime_trace::recordInput(gpio.getRawButtonState(), gpio.getDebouncedButtonState(), gpio.getPressedButtonEvents(),
+                             gpio.getReleasedButtonEvents(), gpio.getPowerButtonHeldTime());
+  runtime_trace::mark(runtime_trace::Checkpoint::GPIO_UPDATED);
 #ifdef ENABLE_X3_COMPANION
   companion::companionService.setReading(activityManager.isReaderActivity());
   // BLE callbacks only stamp activity and enqueue work. Restore full speed on
   // the main loop before decoding a command or rendering its resulting UI.
   if (companion::companionService.requiresFullClock()) powerManager.setPowerSaving(false);
+  runtime_trace::mark(runtime_trace::Checkpoint::COMPANION_LOOP_ENTER);
   companion::companionService.loop();
+  runtime_trace::mark(runtime_trace::Checkpoint::COMPANION_LOOP_EXIT);
 #endif
   halTiltSensor.update(SETTINGS.tiltPageTurn, SETTINGS.orientation, activityManager.isReaderActivity());
 
@@ -541,6 +553,8 @@ void loop() {
           logSerial.printf("No crash report is available.\n");
         }
         logSerial.printf("\nCRASH_REPORT_END\n");
+      } else if (cmd == "RUNTIME_TRACE") {
+        runtime_trace::dump(logSerial);
 #ifdef ENABLE_X3_COMPANION
       } else if (cmd.startsWith("USB_BOOK:")) {
         const String encoded = cmd.substring(9);
@@ -573,12 +587,18 @@ void loop() {
   // Check for any user activity (button press or release) or active background work
   static unsigned long lastActivityTime = millis();
   const bool buttonActivity = gpio.wasAnyPressed() || gpio.wasAnyReleased();
-  if (buttonActivity || halTiltSensor.hadActivity() || activityManager.preventAutoSleep()) {
+  const bool tiltActivity = halTiltSensor.hadActivity();
+  if (buttonActivity || tiltActivity) {
     lastActivityTime = millis();         // Reset inactivity timer
     powerManager.setPowerSaving(false);  // Restore normal CPU frequency on user activity
 #ifdef ENABLE_X3_COMPANION
     if (buttonActivity) companion::companionService.wakeFastAdvertising();
 #endif
+  } else if (activityManager.preventAutoSleep()) {
+    // Focus and Live ticket must stay awake, but that is not continuous user
+    // activity. Keep the inactivity deadline parked without pinning the CPU at
+    // full speed on every loop iteration.
+    lastActivityTime = millis();
   }
 
   static bool screenshotButtonsReleased = true;
@@ -656,7 +676,9 @@ void loop() {
   }
 
   const unsigned long activityStartTime = millis();
+  runtime_trace::mark(runtime_trace::Checkpoint::ACTIVITY_LOOP_ENTER);
   activityManager.loop();
+  runtime_trace::mark(runtime_trace::Checkpoint::ACTIVITY_LOOP_EXIT);
   const unsigned long activityDuration = millis() - activityStartTime;
 
   const unsigned long loopDuration = millis() - loopStartTime;
@@ -679,6 +701,7 @@ void loop() {
     companionNeedsFullClock = companion::companionService.requiresFullClock();
 #endif
     if (millis() - lastActivityTime >= HalPowerManager::IDLE_POWER_SAVING_MS && !companionNeedsFullClock) {
+      runtime_trace::mark(runtime_trace::Checkpoint::POWER_SAVING_ENTER);
       // If we've been inactive for a while, increase the delay to save power
       int minimumFrequency = HalPowerManager::LOW_POWER_FREQ;
 #ifdef ENABLE_X3_COMPANION
@@ -697,4 +720,5 @@ void loop() {
       delay(10);
     }
   }
+  runtime_trace::mark(runtime_trace::Checkpoint::LOOP_COMPLETE);
 }

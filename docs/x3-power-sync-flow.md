@@ -1,7 +1,7 @@
 # X3 power, Bluetooth, synchronization, and app-state flow
 
-**Canonical behavior for:** Android `0.2.0-dev11` and X3 firmware `xtraordinary-v0.2.6-dev10-local`
-**Defaults:** 5-minute fast discovery, 2-second slow BLE interval, 10-minute inactivity sleep, full reader cleanup every 15 pages.
+**Canonical source candidate for:** Android `0.2.0-dev20` and X3 firmware `xtraordinary-v0.2.6-dev16-local`. These artifacts are built but not deployed; the installed versions remain recorded in `HANDOFF.md`.
+**Defaults:** 5-minute fast discovery, a 1.5-second advertising pulse every 30 seconds in low-power standby, a separate 2-second connected-background interval, 10-minute inactivity sleep, full reader cleanup every 15 pages, and a 1-second power-button hold.
 
 ## Terms and sources of truth
 
@@ -41,37 +41,53 @@ When Android finds the advertised X3:
    - revisioned `LibraryPage` messages.
 4. Android sends `AckStatus` for the exact status revision.
 5. Once per successful GATT session Android reapplies the phone-authoritative policy:
-   - `SetRadioPolicy(fast window, slow interval, sleep timeout)`;
-   - `SetReaderPolicy(full-refresh page count)`.
+   - `SetRadioPolicy(fast window, standby check-in, connected interval, sleep timeout)` on radio-policy-v2 firmware;
+   - `SetReaderPolicy(full-refresh page count, power-button hold)` on policy-v2 firmware; older firmware receives the legacy page-count-only payload.
 6. X3 validates and persists each command, then sends an `Ack` containing that command's message ID.
 7. Only after both ACKs for the latest selected values does Android clear `sync_pending` and display **Synced to X3**.
 
-If the user changes another setting while an older write is in flight, the older ACK cannot mark the newer values synchronized. The sync loop takes a new snapshot, sends the new values, and waits for their ACKs.
+Capabilities advertise radio-policy version 2 before Android sends the separated eight-byte policy. Legacy Android can still send the old six-byte command to new firmware; it maps to a 30-second standby default plus the legacy connected interval. New Android does not claim the separated values are synchronized to old firmware: it keeps them pending and asks for an X3 firmware update.
+
+If the user changes another setting while an older write is in flight, the older ACK cannot mark the newer values synchronized. The sync loop takes a new snapshot, sends the new values, and waits for their ACKs. An edit that lands during worker shutdown explicitly schedules a successor worker, so rapid taps cannot leave **Saved on phone · waiting for X3** stuck until another edit.
 
 ## Default power policy
 
 | Time/state | BLE behavior | CPU/power behavior | App behavior |
 |---|---|---|---|
-| Boot or Home, 0–5 minutes | Fast legacy advertising every 500 ms. Any Home button activity restarts this window. | Full speed while the radio is being restarted and for five seconds after BLE traffic; otherwise the BLE-safe 80 MHz floor. | A foreground app can connect. Pending work keeps retrying. |
-| Home, 5–10 minutes | Slow advertising every 2 seconds. Home shows **Low-power Bluetooth — Press any button for fast connection**. | BLE-safe 80 MHz floor. | Connection can take up to the slow advertising interval plus Android scan/connect time. |
+| Boot or Home, 0–5 minutes | Fast legacy advertising every 500 ms. Any Home button activity restarts this window. | Full speed while the radio is being restarted and for five seconds after BLE traffic; otherwise the BLE-safe 80 MHz floor. | App foreground performs one status probe, then disconnects unless work or an interactive surface holds a lease. Pending work keeps retrying. |
+| Home, 5–10 minutes | A 1.5-second advertising pulse every 30 seconds by default. Home formats **Bluetooth standby · up to N s** from the policy actually applied on X3, where N is the selected 30, 60, or 120 seconds, and redraws Home after that policy is persisted. | The BLE-safe clock is required only during each pulse; between pulses X3 may return to the ESP32-C3's supported 20 MHz XTAL/2 idle floor. A rejected clock target is cached rather than retried from the main loop. | Connection can take up to the selected standby check-in plus Android scan/connect time. |
 | Home, 10 minutes without activity | Advertising stops and X3 enters its normal deep-sleep path. | Hardware deep sleep/power latch behavior from CrossPoint. | App shows **Paired** if idle, or continues to hold durable pending work for the next wake. |
-| Connected control traffic | GATT is active; after three seconds X3 requests the configured slow connection interval (2 seconds by default). | 160 MHz for five seconds after traffic, then 80 MHz while BLE remains required. | **Connected**. Commands and status are revisioned/ACKed. |
-| Radio quiet | No advertising and no GATT. | After three seconds idle the CPU may fall to 10 MHz. | Last battery percentage remains visible as cached data; status is **Paired** unless work is waiting. |
+| Connected background traffic | GATT is active; after three seconds X3 requests the separately configured connection interval (2 seconds by default). | 160 MHz for five seconds after traffic, then 80 MHz while BLE remains required. | **Connected**. Commands and status are revisioned/ACKed; an idle app releases GATT. |
+| Interactive transaction | The generic owner lease requests a 15–30 ms connection while actual back-and-forth work is active. | Full clock during traffic. | The first owner holds the responsive link; the last owner returns it to balanced/background policy. |
+| Radio quiet | No advertising and no GATT. | After three seconds idle the CPU may fall to the ESP32-C3-supported 20 MHz floor. | Last battery percentage remains visible as cached data; status is **Paired** unless work is waiting. |
 
 Configurable app choices:
 
 - Switch to low-power Bluetooth after: 1, 5, or 10 minutes; default 5. This is the time before Home shows its low-power Bluetooth button tip.
-- Focus/Live slow advertising and connection interval: 1, 2, or 4 seconds; default 2.
+- Low-power Bluetooth check-in: 30, 60, or 120 seconds; default 30. Each check-in is a bounded 1.5-second advertising pulse, not continuous advertising.
+- Connected background interval: 1, 2, or 4 seconds; default 2. This is separate from disconnected discovery and is not the interactive transfer interval.
 - Inactivity sleep: 5, 10, or 20 minutes; default 10 and always longer than the fast window.
 - Reader full cleanup: every 1, 5, 10, 15, or 30 pages; default 15.
+- Power-button hold: instant, 1 second, or 2 seconds; default 1 second. Firmware owns the shared duration, so every activity uses the same setting.
 
 ## Home
 
 - Boot, leaving Reading, leaving a static ticket, and Home button activity arm a fresh fast-discovery window.
 - A saved Live ticket is content, not an active runtime mode. Boot and Home always receive the complete fast-discovery window unless Focus is active or the Live ticket is actually open on the X3. This prevents a persisted ticket from showing the low-power chip immediately after boot.
-- Fast advertising transitions to the visible low-power 2-second advertising state at the configured fast-window deadline.
+- Fast advertising transitions to the visible pulse-based standby state at the configured fast-window deadline.
 - At the inactivity deadline, Home sleeps.
-- A phone connection does not alter pairing. After the app goes to the background, idle Home GATT is released after a 1.5-second grace period unless durable work, Focus, Live, or firmware transfer still needs it.
+- A phone connection does not alter pairing. Foreground alone no longer retains GATT: after the one-shot status probe or an ACKed command, Android disconnects unless durable work, a transfer, or a visible interactive owner still needs it. A running Focus session or displayed Live ticket keeps X3 awake and pulse-discoverable; it does not by itself justify a permanent GATT connection.
+
+## Reusable interactive transport lease
+
+- Any workflow that knows it will exchange data in both directions acquires an opaque owner from the shared `InteractiveTransportCoordinator`; the coordinator contains no Passes, ticket, Focus, Settings, firmware, or navigation rules.
+- The first owner keeps/reconnects GATT, requests the fast connection policy, and starts one shared watchdog renewal. Additional owners reuse it. The last owner stops renewal, requests balanced/slow parameters, and permits an idle disconnect.
+- The X3 watchdog is 120 seconds and Android renews it every 90 seconds only while at least one owner exists. This is not four-second polling: it is one control message before expiry, while actual data remains event driven.
+- A new capabilities sequence means a new protocol session, so Android replays the lease once after reconnect. Firmware clears the previous session's lease on disconnect.
+- A bounded transaction acquires a scoped owner and reasserts the lease immediately before its first command. Ticket transfer uses this generic boundary, so a Passes screen left open longer than the watchdog cannot begin on the configured 1/2/4-second interval.
+- Opening Settings above Passes releases only the Passes screen owner. Closing Settings reacquires it if Passes is visible again. Future workflows use the same acquire/release API rather than adding transport flags.
+- Persistent slow work is separate: Live and Focus keep X3 awake and use the configured sparse standby pulses while disconnected. A new phone command or live-data change connects at a pulse, and interactive work can then acquire the fast lease.
+- The full lifecycle and failure contract is in [`interactive-transport-lifecycle.md`](interactive-transport-lifecycle.md).
 
 ## Reading
 
@@ -141,8 +157,8 @@ Reader cleanup now has a dedicated `displayReaderCleanup()` path. It uses the X3
 
 ## Focus/Pomodoro
 
-- Start/Pause/Resume/Stop carry unique message IDs and receive individual ACKs.
-- Active or paused Focus prevents X3 inactivity sleep and keeps the configured slow BLE link available.
+- Start, pause, resume, and stop are each durable desired-state changes and clear only after an ACK. Start sends a complete deadline/duration/title snapshot. Pause reasserts that snapshot and then sends `PauseSession`; resume reasserts a running `StartSession` snapshot with the frozen remaining time rather than depending on the X3 having retained an incremental pause token across disconnect. Stop sends `StopSession`.
+- Active or paused Focus prevents X3 inactivity sleep and keeps the configured slow BLE link available. This prevents deep sleep without falsely counting every loop as user input, so the CPU can settle to the BLE-safe 80 MHz floor.
 - A dropped link enters **Reconnecting…** rather than pretending to be Connected.
 - Reading-to-Focus is treated as pending work: Android waits for X3 to advertise, sends the desired session, and X3 switches to the Focus activity.
 
@@ -170,6 +186,8 @@ Active Focus timing and an in-progress firmware byte transfer are process/sessio
 - This is monitoring only. No verified charger-enable pin is exposed, so there is no firmware-enforced charge-percentage cutoff.
 
 ## Failure behavior
+
+The 2026-08-11 standby-input freeze, its disproved scan-cadence hypothesis, the ESP32-C3 clock-rejection heap leak, and dev19 physical acceptance are recorded in [`x3-standby-input-incident-2026-08-11.md`](x3-standby-input-incident-2026-08-11.md).
 
 - Ordinary idle discovery failure returns to **Paired**; it does not loop forever.
 - Every app-controlled X3 reset has a release handshake. Android first stops scans and queued writes, requests GATT disconnection, waits up to two seconds for the callback, closes the native client, and allows another 750 ms for asynchronous unregister. BLE firmware apply is ACKed before this release; firmware waits four seconds after the apply command before rebooting. Desktop USB deployment sends the debug app an explicit preparation intent and requires its `PERIPHERAL_RESET_READY` confirmation before stopping the process and opening COM7. The app's reconnect watchdog stays intentionally idle throughout the reset and resumes only after the X3 boot window.

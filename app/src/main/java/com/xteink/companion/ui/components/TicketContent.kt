@@ -1,6 +1,9 @@
 package com.xteink.companion.ui.components
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -44,7 +48,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.pluralStringResource
@@ -52,10 +58,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xteink.companion.R
+import com.xteink.companion.data.BarcodeRasterizer
+import com.xteink.companion.data.FlightBarcodeFormat
+import com.xteink.companion.data.isLinear
 import com.xteink.companion.ui.BoardingPassUiState
 import com.xteink.companion.ui.TicketMode
 import com.xteink.companion.ui.TicketUiState
@@ -147,25 +156,6 @@ fun PassesToolContent(
             removalPending = ticket.removalPending,
             modifier = Modifier.padding(horizontal = 16.dp),
         )
-        PassDetailsCard(
-            pass = selectedPass,
-            modifier = Modifier.padding(horizontal = 16.dp),
-        )
-        Text(
-            text = stringResource(
-                if (ticket.passes.all { it.isSample }) {
-                    R.string.ticket_sample_notice
-                } else {
-                    R.string.ticket_preview_notice
-                },
-            ),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-        )
     }
 
     if (importChoiceVisible) {
@@ -250,62 +240,133 @@ private fun PassControlCard(
         Row(modifier = Modifier.height(IntrinsicSize.Min)) {
             RouteRail(origin = pass.origin, destination = pass.destination)
             TicketPerforation()
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 8.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    MatrixPreviewPanel(
-                        payload = pass.barcodePayload,
-                        isSample = pass.isSample,
-                        modifier = Modifier.size(96.dp),
-                    )
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Text(pass.flight, style = MaterialTheme.typography.titleLarge, maxLines = 1)
-                        Surface(
-                            color = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                            shape = RoundedCornerShape(50),
-                        ) {
-                            Text(
-                                pass.status,
-                                style = MaterialTheme.typography.labelMedium,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                maxLines = 1,
-                            )
-                        }
-                        Surface(
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            shape = MaterialTheme.shapes.small,
-                        ) {
-                            Column(modifier = Modifier.padding(horizontal = 9.dp, vertical = 7.dp)) {
-                                Text(stringResource(R.string.departure), style = MaterialTheme.typography.labelMedium)
-                                Text(pass.departureTime, style = MaterialTheme.typography.titleMedium, maxLines = 1)
-                                Text(pass.countdown, style = MaterialTheme.typography.labelMedium, maxLines = 1)
-                            }
-                        }
-                    }
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    PassFact(stringResource(R.string.gate).substringBefore(" "), pass.gate)
-                    PassFact(stringResource(R.string.terminal), pass.terminal)
-                    PassFact(stringResource(R.string.seat), pass.seat)
-                }
-            }
+            UnifiedPassBody(
+                pass = pass,
+                modifier = Modifier.weight(1f),
+            )
             TicketPerforation()
             RouteRail(origin = pass.origin, destination = pass.destination)
+        }
+    }
+}
+
+@Composable
+private fun UnifiedPassBody(pass: BoardingPassUiState, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .heightIn(min = 390.dp)
+            .padding(horizontal = 12.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(pass.origin, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+            HorizontalRouteArrow(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(16.dp)
+                    .padding(horizontal = 10.dp),
+            )
+            Text(pass.destination, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PassStatusBadge(pass.status)
+                if (pass.countdown.isNotBlank() && !pass.countdown.equals(pass.status, ignoreCase = true)) {
+                    Text(pass.countdown, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                }
+            }
+            Text(
+                pass.flight,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        OperationalFact(
+            label = stringResource(R.string.departure),
+            value = pass.departureTime,
+            emphasized = true,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OperationalFact(
+                label = stringResource(R.string.gate).substringBefore(" "),
+                value = pass.gate,
+                modifier = Modifier.weight(1f),
+            )
+            OperationalFact(
+                label = stringResource(R.string.terminal),
+                value = pass.terminal.ifBlank { "—" },
+                modifier = Modifier.weight(1f),
+            )
+            OperationalFact(
+                label = stringResource(R.string.seat),
+                value = pass.seat,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.passenger),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    pass.passenger,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (pass.boardingGroup.isNotBlank()) {
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        stringResource(R.string.group),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(pass.boardingGroup, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                }
+            }
+        }
+        Spacer(modifier = Modifier.weight(1f))
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center,
+        ) {
+            BarcodePreviewPanel(
+                payload = pass.barcodePayload,
+                format = pass.barcodeFormat,
+                isSample = pass.isSample,
+                modifier = Modifier
+                    .then(
+                        if (pass.barcodeFormat.isLinear) {
+                            Modifier
+                                .fillMaxWidth()
+                                .height(104.dp)
+                        } else {
+                            Modifier.size(168.dp)
+                        },
+                    ),
+            )
         }
     }
 }
@@ -328,7 +389,7 @@ private fun RouteRail(origin: String, destination: String) {
             letterSpacing = 0.5.sp,
             maxLines = 1,
         )
-        RouteArrow(modifier = Modifier.size(width = 12.dp, height = 30.dp))
+        VerticalRouteArrow(modifier = Modifier.size(width = 12.dp, height = 30.dp))
         Text(
             text = destination,
             style = MaterialTheme.typography.labelMedium,
@@ -340,29 +401,14 @@ private fun RouteRail(origin: String, destination: String) {
 }
 
 @Composable
-private fun RouteArrow(modifier: Modifier = Modifier) {
+private fun VerticalRouteArrow(modifier: Modifier = Modifier) {
     val color = MaterialTheme.colorScheme.onSurfaceVariant
     Canvas(modifier = modifier) {
         val centerX = size.width / 2f
         val stroke = 1.5.dp.toPx()
-        drawLine(
-            color = color,
-            start = Offset(centerX, size.height * 0.14f),
-            end = Offset(centerX, size.height * 0.78f),
-            strokeWidth = stroke,
-        )
-        drawLine(
-            color = color,
-            start = Offset(centerX, size.height * 0.78f),
-            end = Offset(size.width * 0.24f, size.height * 0.61f),
-            strokeWidth = stroke,
-        )
-        drawLine(
-            color = color,
-            start = Offset(centerX, size.height * 0.78f),
-            end = Offset(size.width * 0.76f, size.height * 0.61f),
-            strokeWidth = stroke,
-        )
+        drawLine(color, Offset(centerX, size.height * 0.14f), Offset(centerX, size.height * 0.78f), strokeWidth = stroke)
+        drawLine(color, Offset(centerX, size.height * 0.78f), Offset(size.width * 0.24f, size.height * 0.61f), strokeWidth = stroke)
+        drawLine(color, Offset(centerX, size.height * 0.78f), Offset(size.width * 0.76f, size.height * 0.61f), strokeWidth = stroke)
     }
 }
 
@@ -387,6 +433,52 @@ private fun TicketPerforation() {
             )
             y += dash + gap
         }
+    }
+}
+
+@Composable
+private fun OperationalFact(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    emphasized: Boolean = false,
+) {
+    Column(modifier = modifier) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            value,
+            style = if (emphasized) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun HorizontalRouteArrow(modifier: Modifier = Modifier) {
+    val color = MaterialTheme.colorScheme.onSurfaceVariant
+    Canvas(modifier = modifier) {
+        val centerY = size.height / 2f
+        val stroke = 1.5.dp.toPx()
+        drawLine(color, Offset(0f, centerY), Offset(size.width, centerY), strokeWidth = stroke)
+        drawLine(color, Offset(size.width, centerY), Offset(size.width - 8.dp.toPx(), centerY - 5.dp.toPx()), strokeWidth = stroke)
+        drawLine(color, Offset(size.width, centerY), Offset(size.width - 8.dp.toPx(), centerY + 5.dp.toPx()), strokeWidth = stroke)
+    }
+}
+
+@Composable
+private fun PassStatusBadge(status: String) {
+    Surface(
+        color = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary,
+        shape = RoundedCornerShape(50),
+    ) {
+        Text(
+            status,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            maxLines = 1,
+        )
     }
 }
 
@@ -502,42 +594,23 @@ private fun PassModeChooser(
 }
 
 @Composable
-private fun PassFact(label: String, value: String) {
-    Column {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.labelLarge)
-    }
-}
-
-@Composable
-private fun PassDetailsCard(pass: BoardingPassUiState, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        shape = MaterialTheme.shapes.medium,
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(stringResource(R.string.ticket_title), style = MaterialTheme.typography.titleMedium)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                PassFact(stringResource(R.string.passenger), pass.passenger)
-                PassFact(stringResource(R.string.group), pass.boardingGroup)
-            }
-            Column {
-                Text(stringResource(R.string.source_and_freshness), style = MaterialTheme.typography.labelMedium)
-                Text(pass.source, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
-
-@Composable
-private fun MatrixPreviewPanel(payload: String, isSample: Boolean, modifier: Modifier = Modifier) {
+private fun BarcodePreviewPanel(
+    payload: String,
+    format: FlightBarcodeFormat,
+    isSample: Boolean,
+    modifier: Modifier = Modifier,
+) {
     val description = stringResource(
         if (isSample) R.string.sample_boarding_pass_description else R.string.ticket_matrix_preview_description,
     )
+    val barcodeImage = remember(payload, format) {
+        runCatching {
+            val bytes = BarcodeRasterizer.render(payload, format).bmpBytes
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                ?.copy(Bitmap.Config.ARGB_8888, false)
+                ?.asImageBitmap()
+        }.getOrNull()
+    }
     Box(
         modifier = modifier
             .background(Color.White, RoundedCornerShape(12.dp))
@@ -546,45 +619,15 @@ private fun MatrixPreviewPanel(payload: String, isSample: Boolean, modifier: Mod
             .clearAndSetSemantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
-        MatrixPreviewCode(seed = payload.hashCode(), modifier = Modifier.fillMaxSize())
-        Text(
-            text = stringResource(if (isSample) R.string.sample else R.string.preview),
-            color = Color.Black,
-            fontSize = 7.sp,
-            fontWeight = FontWeight.Black,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .background(Color.White)
-                .padding(horizontal = 3.dp),
-        )
-    }
-}
-
-@Composable
-private fun MatrixPreviewCode(seed: Int, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val modules = 25
-        val cell = size.minDimension / modules
-        val origin = Offset((size.width - cell * modules) / 2f, (size.height - cell * modules) / 2f)
-        fun finder(x: Int, y: Int, left: Int, top: Int): Boolean {
-            val localX = x - left
-            val localY = y - top
-            if (localX !in 0..6 || localY !in 0..6) return false
-            return localX == 0 || localX == 6 || localY == 0 || localY == 6 ||
-                (localX in 2..4 && localY in 2..4)
-        }
-        for (y in 0 until modules) {
-            for (x in 0 until modules) {
-                val marked = finder(x, y, 0, 0) || finder(x, y, 18, 0) || finder(x, y, 0, 18) ||
-                    ((((x * 11 + y * 7 + x * y * 3 + seed).toLong() and 0x7fffffffL) % 13) < 5)
-                if (marked) {
-                    drawRect(
-                        Color.Black,
-                        Offset(origin.x + x * cell, origin.y + y * cell),
-                        androidx.compose.ui.geometry.Size(cell, cell),
-                    )
-                }
-            }
+        if (barcodeImage != null) {
+            Image(
+                bitmap = barcodeImage,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit,
+            )
+        } else {
+            Text(format.displayName, color = Color.Black, style = MaterialTheme.typography.labelMedium)
         }
     }
 }

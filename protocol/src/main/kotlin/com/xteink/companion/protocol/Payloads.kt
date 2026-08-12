@@ -14,6 +14,7 @@ const val MAX_WIRE_PATH_BYTES = 512
 // peer negotiates less. The firmware packet limit remains 512 bytes.
 const val FIRMWARE_CHUNK_BYTES = 216
 const val BOOK_UPLOAD_CHUNK_BYTES = 488
+const val TICKET_BARCODE_CHUNK_BYTES = 488
 
 data class DeviceCapabilities(
     val model: String,
@@ -22,6 +23,8 @@ data class DeviceCapabilities(
     val supportsFirmwareUpdate: Boolean,
     val ticketPresent: Boolean = false,
     val supportsReaderPolicy: Boolean = false,
+    val readerPolicyVersion: Int = if (supportsReaderPolicy) 1 else 0,
+    val radioPolicyVersion: Int = 0,
 )
 
 enum class DeviceActivity(val wireValue: UByte) {
@@ -64,7 +67,8 @@ data class SessionStart(
 
 data class RadioPolicy(
     val fastWindowMinutes: Int,
-    val slowIntervalMs: Int,
+    val standbyIntervalSeconds: Int,
+    val connectedIntervalMs: Int,
     val sleepAfterMinutes: Int,
 )
 
@@ -93,6 +97,7 @@ data class BoardingPassPayload(
     val passenger: String,
     val boardingGroup: String,
     val barcodePayload: String,
+    val barcodeFormat: String = "QR",
 )
 
 data class LibraryEntry(
@@ -185,16 +190,35 @@ object PayloadCodec {
     fun encodeReadingStatsAck(sessionId: UInt): ByteArray =
         ByteBuffer.allocate(4).little().putInt(sessionId.toInt()).array()
 
-    fun encodeRadioPolicy(value: RadioPolicy): ByteArray = writer(6) {
+    fun encodeRadioPolicy(value: RadioPolicy): ByteArray = writer(8) {
         putShort(value.fastWindowMinutes.coerceIn(1, 30).toShort())
-        putShort(value.slowIntervalMs.coerceIn(500, 4_000).toShort())
+        putShort(value.standbyIntervalSeconds.coerceIn(10, 300).toShort())
+        putShort(value.connectedIntervalMs.coerceIn(500, 4_000).toShort())
         putShort(value.sleepAfterMinutes.coerceIn(2, 60).toShort())
     }
 
-    fun encodeReaderPolicy(fullRefreshPages: Int): ByteArray =
-        ByteBuffer.allocate(2).little().putShort(fullRefreshPages.toShort()).array()
+    fun encodeReaderPolicy(fullRefreshPages: Int, powerButtonHoldMs: Int? = null): ByteArray =
+        ByteBuffer.allocate(if (powerButtonHoldMs == null) 2 else 4).little().apply {
+            putShort(fullRefreshPages.toShort())
+            powerButtonHoldMs?.let { putShort(it.toShort()) }
+        }.array()
 
-    fun encodeBoardingPass(value: BoardingPassPayload): ByteArray = writer(384) {
+    fun encodeInteractiveLease(seconds: Int): ByteArray =
+        ByteBuffer.allocate(2).little().putShort(seconds.coerceIn(2, 120).toShort()).array()
+
+    fun encodeTicketBarcodeBegin(sizeBytes: Int): ByteArray {
+        require(sizeBytes in 1..(64 * 1024)) { "Ticket barcode image is outside the supported range" }
+        return ByteBuffer.allocate(4).little().putInt(sizeBytes).array()
+    }
+
+    fun encodeTicketBarcodeChunk(offset: Int, data: ByteArray): ByteArray = writer(4 + data.size) {
+        require(offset >= 0) { "Ticket barcode offset must be non-negative" }
+        require(data.isNotEmpty() && data.size <= TICKET_BARCODE_CHUNK_BYTES) { "Ticket barcode chunk is invalid" }
+        putInt(offset)
+        put(data)
+    }
+
+    fun encodeBoardingPass(value: BoardingPassPayload): ByteArray = writer(472) {
         put(value.mode.wireValue.toByte())
         putUtf8(value.origin, 3)
         putUtf8(value.destination, 3)
@@ -207,6 +231,7 @@ object PayloadCodec {
         putUtf8(value.passenger, 40)
         putUtf8(value.boardingGroup, 24)
         putUtf8(value.barcodePayload, 256)
+        putUtf8(value.barcodeFormat, 16)
     }
 
     fun decodeBoardingPass(bytes: ByteArray): BoardingPassPayload = reader(bytes) {
@@ -223,6 +248,7 @@ object PayloadCodec {
             passenger = utf8(40),
             boardingGroup = utf8(24),
             barcodePayload = utf8(256),
+            barcodeFormat = if (remaining() > 0) utf8(16) else "QR",
         )
     }
 
@@ -242,17 +268,27 @@ object PayloadCodec {
         putInt(value.libraryRevision.toInt())
         put(if (value.supportsFirmwareUpdate) 1 else 0)
         put(if (value.ticketPresent) 1 else 0)
-        put(if (value.supportsReaderPolicy) 1 else 0)
+        put(value.readerPolicyVersion.coerceIn(0, 255).toByte())
+        put(value.radioPolicyVersion.coerceIn(0, 255).toByte())
     }
 
     fun decodeCapabilities(bytes: ByteArray): DeviceCapabilities = reader(bytes) {
+        val model = utf8(24)
+        val firmwareVersion = utf8(48)
+        val libraryRevision = int.toUInt()
+        val supportsFirmwareUpdate = get().toInt() != 0
+        val ticketPresent = remaining() > 0 && get().toInt() != 0
+        val readerPolicyVersion = if (remaining() > 0) get().toInt() and 0xff else 0
+        val radioPolicyVersion = if (remaining() > 0) get().toInt() and 0xff else 0
         DeviceCapabilities(
-            model = utf8(24),
-            firmwareVersion = utf8(48),
-            libraryRevision = int.toUInt(),
-            supportsFirmwareUpdate = get().toInt() != 0,
-            ticketPresent = remaining() > 0 && get().toInt() != 0,
-            supportsReaderPolicy = remaining() > 0 && get().toInt() != 0,
+            model = model,
+            firmwareVersion = firmwareVersion,
+            libraryRevision = libraryRevision,
+            supportsFirmwareUpdate = supportsFirmwareUpdate,
+            ticketPresent = ticketPresent,
+            supportsReaderPolicy = readerPolicyVersion > 0,
+            readerPolicyVersion = readerPolicyVersion,
+            radioPolicyVersion = radioPolicyVersion,
         )
     }
 

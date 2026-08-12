@@ -75,6 +75,15 @@ $env:XTRAORDINARY_VERSION = "xtraordinary-v0.2.6-dev9-local"
 pio run --project-dir .\firmware --environment x3_companion_release -j 1
 ```
 
+`XTRAORDINARY_VERSION` is generated into the single `BuildVersion` library
+object. It must not return to a global `-DCROSSPOINT_VERSION` build flag: that
+flag invalidated every translation unit and made a version-only candidate take
+7 minutes 19 seconds on this workstation. After the one-time migration,
+changing only the candidate version completed the same canonical policy,
+link, architecture, size, and image workflow in 54.34 seconds on 2026-08-12.
+If a version-only build starts compiling Arduino, NimBLE, SdFat, or EPUB again,
+treat it as a cache-invalidation regression rather than a normal small edit.
+
 The Espressif 14.2 assembler resolves its own executable path at startup. In a restricted Codex filesystem sandbox it can panic with `Failed to get path name. Error code: 5` before compiling the first object. Confirm with the project assembler's `--version`; if it succeeds only outside the sandbox, run the same canonical PlatformIO command with filesystem permission. Do not clean caches, relink libraries, patch firmware, or start parallel builds for this access-denied signature.
 
 ## Safe X3 application flash

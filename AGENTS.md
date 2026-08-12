@@ -1,0 +1,10 @@
+# Xtraordinary engineering guidance
+
+- Read `HANDOFF.md` and `docs/x3-takeover-tracker.md` before changing the Android companion or X3 firmware.
+- Design for maintenance: before adding a feature-specific command, state flag, timeout, or UI rule, identify the reusable lifecycle or policy primitive and implement the feature through it. Keep validation and dependent-option logic centralized so new values do not require copied conditionals.
+- Preserve Bluetooth bonding and pairing data during builds, flashes, and diagnostics unless the user explicitly requests a bond reset.
+- Build Android only through `scripts/build-xtraordinary-app.ps1`; it resolves the repository root and activates the checked-in toolchain paths, so callers must not guess a working directory.
+- Build X3 firmware only through `scripts/build-x3-firmware.ps1`, outside the sandbox, and never concurrently with Gradle. Direct sandboxed PlatformIO compiler children consistently fail on Windows with error 5.
+- Every canonical build must pass `scripts/check-engineering-policies.ps1` before a compiler starts. Do not bypass the gate; extend `docs/engineering-policy.json` when a new machine-checkable policy is adopted.
+- Treat app state, acknowledged device state, and cached capabilities as distinct. Reconcile only from fresh protocol evidence.
+- For e-ink layouts, establish information hierarchy using size and position; do not rely on multiple gray shades for contrast.

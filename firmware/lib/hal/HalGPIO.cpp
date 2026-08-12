@@ -225,6 +225,14 @@ unsigned long HalGPIO::getHeldTime() const { return inputMgr.getHeldTime(); }
 
 unsigned long HalGPIO::getPowerButtonHeldTime() const { return inputMgr.getPowerButtonHeldTime(); }
 
+uint8_t HalGPIO::getRawButtonState() const { return inputMgr.getRawState(); }
+
+uint8_t HalGPIO::getDebouncedButtonState() const { return inputMgr.getDebouncedState(); }
+
+uint8_t HalGPIO::getPressedButtonEvents() const { return inputMgr.getPressedEvents(); }
+
+uint8_t HalGPIO::getReleasedButtonEvents() const { return inputMgr.getReleasedEvents(); }
+
 void HalGPIO::startDeepSleep() {
   // Ensure that the power button has been released to avoid immediately turning back on if you're holding it
   while (inputMgr.isPressed(BTN_POWER)) {

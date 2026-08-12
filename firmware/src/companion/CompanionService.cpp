@@ -1,9 +1,11 @@
 #ifdef ENABLE_X3_COMPANION
 
 #include "CompanionService.h"
+#include "RuntimeTrace.h"
 #include "RadioPolicy.h"
 
 #include <Arduino.h>
+#include <BuildVersion.h>
 #include <Logging.h>
 #include <Memory.h>
 #include <NimBLEDevice.h>
@@ -24,6 +26,7 @@
 #include "CrossPointSettings.h"
 #include "CompanionUiBridge.h"
 #include "network/FirmwareFlasher.h"
+#include <Bitmap.h>
 
 extern MappedInputManager mappedInputManager;
 
@@ -36,14 +39,22 @@ constexpr char EVENTS_UUID[] = "7e400004-b5a3-f393-e0a9-e50e24dcca9e";
 constexpr char STATUS_UUID[] = "7e400005-b5a3-f393-e0a9-e50e24dcca9e";
 constexpr char FIRMWARE_PATH[] = "/.crosspoint/companion/firmware.bin";
 constexpr char TICKET_PATH[] = "/.crosspoint/companion/ticket.bin";
+constexpr char TICKET_BARCODE_PATH[] = "/.crosspoint/companion/ticket-barcode.bmp";
+constexpr char TICKET_BARCODE_TEMP_PATH[] = "/.crosspoint/companion/ticket-barcode.tmp";
 constexpr char RADIO_POLICY_PATH[] = "/.crosspoint/companion/radio.bin";
 constexpr char BOOK_UPLOAD_TEMP_PATH[] = "/.crosspoint/companion/book-upload.tmp";
 constexpr uint32_t BOOK_UPLOAD_IDLE_TIMEOUT_MS = 15000;
 constexpr uint32_t TICKET_MAGIC = 0x544b5431;  // TKT1
 constexpr uint16_t TICKET_STORAGE_VERSION = 1;
 constexpr uint16_t ADVERTISING_INTERVAL = 800;  // 500 ms in 0.625 ms units
+constexpr uint32_t STANDBY_PULSE_DURATION_MS = 1500;
 constexpr uint32_t FULL_CLOCK_AFTER_BLE_ACTIVITY_MS = 5000;
 constexpr uint32_t CONNECTION_PARAMETER_DELAY_MS = 3000;
+// Pairing, encryption, CCC subscription, MTU negotiation, and the first HELLO
+// all belong to one connection-bootstrap lifecycle. Keep that lifecycle on the
+// proven fast link; a user must not have to accept Android's pairing sheet
+// within the ordinary three-second slow-connection delay.
+constexpr uint16_t CONNECTION_BOOTSTRAP_LEASE_SECONDS = 30;
 constexpr uint16_t CONNECTION_SUPERVISION_TIMEOUT = 1000;  // 10 s in 10 ms units.
 constexpr uint8_t HELLO_REVISIONED_STATUS = 0x01;
 constexpr uint32_t RADIO_RESUME_RETRY_MS = 1000;
@@ -113,11 +124,20 @@ struct TicketStorageRecord {
   TicketState ticket{};
 };
 
-struct RadioPolicyStorageRecord {
+struct LegacyRadioPolicyStorageRecord {
   uint32_t magic = 0x52414431;  // RAD1
   uint16_t version = 1;
   uint16_t fastWindowMinutes = 5;
   uint16_t slowIntervalMs = 2000;
+  uint16_t sleepAfterMinutes = 10;
+};
+
+struct RadioPolicyStorageRecord {
+  uint32_t magic = 0x52414432;  // RAD2
+  uint16_t version = 2;
+  uint16_t fastWindowMinutes = 5;
+  uint16_t standbyIntervalSeconds = 30;
+  uint16_t connectedIntervalMs = 2000;
   uint16_t sleepAfterMinutes = 10;
 };
 
@@ -195,21 +215,57 @@ void CompanionService::begin() {
 
 bool CompanionService::connected() const { return server_ && server_->getConnectedCount() > 0; }
 
+bool CompanionService::shouldUseSlowConnection() const {
+  return !interactiveLeaseActive();
+}
+
+bool CompanionService::interactiveLeaseActive() const {
+  return interactiveLeaseUntilMs_ != 0 && static_cast<int32_t>(interactiveLeaseUntilMs_ - millis()) > 0;
+}
+
+void CompanionService::acquireInteractiveLease(uint16_t seconds) {
+  interactiveLeaseUntilMs_ = millis() + static_cast<uint32_t>(seconds) * 1000u;
+  requestFastConnection();
+}
+
+void CompanionService::requestFastConnection() {
+  connectionParamsPending_ = false;
+  if (connected()) {
+    server_->updateConnParams(connectionHandle_, 12, 24, 0, CONNECTION_SUPERVISION_TIMEOUT);
+  }
+}
+
+void CompanionService::scheduleSlowConnection() {
+  connectedAtMs_ = millis();
+  connectionParamsPending_ = connected() && shouldUseSlowConnection();
+}
+
 bool CompanionService::requiresBleSafeClock() const {
-  return initialized_ && !readingRadioQuiet_ && !ticketRadioQuiet_;
+  return initialized_ && !readingRadioQuiet_ && !ticketRadioQuiet_ &&
+         (connected() || !slowAdvertising_ || standbyPulseActive_ || radioResumePending_);
 }
 
 bool CompanionService::requiresFullClock() const {
   // Starting/reconfiguring the controller and processing traffic stay at full
   // speed. Once advertising is running, the BLE-safe 80 MHz floor is enough;
   // keeping 160 MHz for the entire fast-discovery window only wastes battery.
-  return radioResumePending_ || bookUploadActive_ ||
+  return radioResumePending_ || standbyPulseStartDue() || bookUploadActive_ ||
          (connected() && static_cast<uint32_t>(millis() - lastBleActivityMs_) < FULL_CLOCK_AFTER_BLE_ACTIVITY_MS);
 }
 
 void CompanionService::loop() {
-  if (radioResumePending_ && static_cast<int32_t>(millis() - radioResumeRetryAtMs_) >= 0) resumeFastRadio();
+  if (radioResumePending_ && static_cast<int32_t>(millis() - radioResumeRetryAtMs_) >= 0) {
+    runtime_trace::mark(runtime_trace::Checkpoint::COMPANION_RADIO_RESUME_ENTER);
+    resumeFastRadio();
+    runtime_trace::mark(runtime_trace::Checkpoint::COMPANION_RADIO_RESUME_EXIT);
+  }
+  runtime_trace::mark(runtime_trace::Checkpoint::COMPANION_ADVERTISING_POLICY_ENTER);
   updateAdvertisingPolicy();
+  runtime_trace::mark(runtime_trace::Checkpoint::COMPANION_ADVERTISING_POLICY_EXIT);
+  if (interactiveLeaseUntilMs_ != 0 && static_cast<int32_t>(millis() - interactiveLeaseUntilMs_) >= 0) {
+    interactiveLeaseUntilMs_ = 0;
+    scheduleSlowConnection();
+  }
   if (bookUploadActive_ &&
       static_cast<uint32_t>(millis() - bookUploadLastActivityMs_) >= BOOK_UPLOAD_IDLE_TIMEOUT_MS) {
     LOG_ERR("CMP", "Aborting stalled book upload");
@@ -331,32 +387,48 @@ void CompanionService::notifyPowerChanged() {
   statusNotifyPending_ = true;
 }
 
-void CompanionService::syncBeforeSleep(uint32_t windowMs) {
-  if (!initialized_ || windowMs == 0) return;
+bool CompanionService::shutdownForDeepSleep(uint32_t timeoutMs) {
+  if (!initialized_) return true;
 
-  // Reading and Static intentionally keep their radios silent. A direct power
-  // off would otherwise skip Home and give queued phone work no discovery
-  // window at all. Offer one short fast-advertising window before the power
-  // latch is released; stored bonds and the displayed e-ink frame are unchanged.
-  setReading(false);
-  readingRadioQuiet_ = false;
-  ticketRadioQuiet_ = false;
-  radioResumePending_ = true;
-  radioResumeRetryAtMs_ = 0;
-  resumeFastRadio();
+  // NimBLE's deinit path waits synchronously for its host task. Treat that
+  // third-party acknowledgement as fallible: every vendor call runs in a
+  // disposable worker while the main power lifecycle keeps a hard deadline.
+  // Deep sleep is a chip-reset boundary, so a late worker needs no cleanup.
+  initialized_ = false;
+  deepSleepShutdownFinished_ = false;
+  deepSleepShutdownStopped_ = false;
+  const BaseType_t created = xTaskCreate(
+      [](void* context) {
+        auto* service = static_cast<CompanionService*>(context);
+        if (service->server_) service->server_->advertiseOnDisconnect(false);
+        if (service->advertising_ && service->advertising_->isAdvertising()) {
+          service->advertising_->stop();
+        }
+        if (service->server_ && service->connected()) {
+          service->server_->disconnect(service->connectionHandle_);
+        }
+        // false releases the controller but preserves the stored bond database.
+        service->deepSleepShutdownStopped_ = NimBLEDevice::deinit(false);
+        service->deepSleepShutdownFinished_ = true;
+        vTaskDelete(nullptr);
+      },
+      "BleSleepStop", 4096, this, 2, nullptr);
+  if (created != pdPASS) {
+    LOG_ERR("CMP", "Could not start bounded BLE shutdown worker");
+    return false;
+  }
 
   const uint32_t startedAt = millis();
-  uint32_t connectedAt = 0;
-  while (static_cast<uint32_t>(millis() - startedAt) < windowMs) {
-    loop();
-    if (connected() && connectedAt == 0) connectedAt = millis();
-    if (connectedAt != 0 && static_cast<uint32_t>(millis() - connectedAt) >= 600 &&
-        static_cast<uint32_t>(millis() - lastBleActivityMs_) >= 200 &&
-        uxQueueMessagesWaiting(commandQueue_) == 0 && !pendingResponse_) {
-      break;
-    }
-    delay(10);
+  while (!deepSleepShutdownFinished_ && static_cast<uint32_t>(millis() - startedAt) < timeoutMs) {
+    delay(5);
   }
+  if (!deepSleepShutdownFinished_) {
+    LOG_ERR("CMP", "BLE shutdown exceeded %u ms; continuing into deep sleep",
+            static_cast<unsigned>(timeoutMs));
+    return false;
+  }
+  LOG_INF("CMP", "BLE shutdown before deep sleep stopped=%d", deepSleepShutdownStopped_);
+  return deepSleepShutdownStopped_;
 }
 
 void CompanionService::onWrite(const uint8_t* bytes, size_t length) {
@@ -395,7 +467,13 @@ void CompanionService::onClientConnected(uint16_t connectionHandle) {
   connectionHandle_ = connectionHandle;
   connectedAtMs_ = millis();
   lastBleActivityMs_ = connectedAtMs_;
-  connectionParamsPending_ = true;
+  // A newly opened transport is not idle: Android may still be completing SMP
+  // and the app must subscribe before it can send HELLO. Reuse the bounded
+  // interactive-lease primitive for the whole bootstrap lifecycle, then let
+  // the normal expiry path converge on the configured low-duty interval.
+  interactiveLeaseUntilMs_ = connectedAtMs_ +
+      static_cast<uint32_t>(CONNECTION_BOOTSTRAP_LEASE_SECONDS) * 1000u;
+  connectionParamsPending_ = false;
   revisionedStatusSupported_ = false;
   statusNotifyPending_ = false;
   readingRadioQuiet_ = false;
@@ -405,6 +483,10 @@ void CompanionService::onClientConnected(uint16_t connectionHandle) {
 
 void CompanionService::onClientDisconnected() {
   if (bookUploadActive_) abortBookUpload(false);
+  if (ticketBarcodeUploadActive_ || ticketBarcodeCommitted_) abortTicketBarcode();
+  // Interactive mode belongs to one GATT session. Never let a long lease from
+  // a departed app keep the next idle connection at full cadence.
+  interactiveLeaseUntilMs_ = 0;
   connectionHandle_ = 0xffff;
   connectionParamsPending_ = false;
   revisionedStatusSupported_ = false;
@@ -413,6 +495,10 @@ void CompanionService::onClientDisconnected() {
   // current Reading / Slow revision. No bond data is changed.
   readingRadioQuiet_ = reading_ && readingSlowConfirmed_;
   ticketRadioQuiet_ = staticTicketPinned_;
+  if (slowAdvertising_ && !readingRadioQuiet_ && !ticketRadioQuiet_) {
+    standbyPulseActive_ = true;
+    standbyPulseStartedAtMs_ = millis();
+  }
   LOG_INF("CMP", "BLE client disconnected readingQuiet=%d ticketQuiet=%d", readingRadioQuiet_, ticketRadioQuiet_);
 }
 
@@ -459,7 +545,10 @@ void CompanionService::handlePacket(const uint8_t* bytes, size_t length) {
       const uint16_t titleLength = readU16(envelope.payload + 12);
       ok = titleLength <= 160 && envelope.payloadLength == 14u + titleLength &&
            session_.start(duration, reinterpret_cast<const char*>(envelope.payload + 14), titleLength);
-      if (ok) showFocus(session_);
+      if (ok) {
+        showFocus(session_);
+        scheduleSlowConnection();
+      }
       break;
     }
     case MessageType::PAUSE_SESSION:
@@ -472,30 +561,49 @@ void CompanionService::handlePacket(const uint8_t* bytes, size_t length) {
       break;
     case MessageType::STOP_SESSION:
       session_.stop();
+      acquireInteractiveLease(15);
       showHome();
       break;
     case MessageType::SHOW_TICKET:
       ok = decodeTicket(envelope);
+      if (ok && ticketBarcodeCommitted_) {
+        ok = promoteTicketBarcode();
+      }
       if (ok) {
         ok = persistTicket();
       }
       if (ok) {
         ticketPresent_ = true;
+        ticketBarcodeCommitted_ = false;
         enterTicket();
-        // A full e-ink refresh can keep the main task busy for several seconds.
-        // Queue the acknowledgement first, then defer the activity transition
-        // by at least one configured connection interval so the notification
-        // actually reaches Android before display rendering begins.
+        // Barcode upload temporarily uses a fast connection interval. Queue the
+        // acknowledgement first, leave enough time for its notification, then
+        // let the normal slow live-ticket interval resume after the transfer.
         sendAck(envelope.messageId);
         ticketHidePending_ = false;
         ticketShowPending_ = true;
-        ticketUiAtMs_ = millis() + static_cast<uint32_t>(slowConnectionIntervalUnits_) * 5u / 4u + 250u;
+        ticketUiAtMs_ = millis() + 350u;
+        scheduleSlowConnection();
         return;
       }
+      break;
+    case MessageType::BEGIN_TICKET_BARCODE:
+      ok = beginTicketBarcode(envelope);
+      break;
+    case MessageType::TICKET_BARCODE_CHUNK:
+      ok = writeTicketBarcodeChunk(envelope);
+      break;
+    case MessageType::COMMIT_TICKET_BARCODE:
+      ok = envelope.payloadLength == 0 && commitTicketBarcode();
+      break;
+    case MessageType::ACQUIRE_INTERACTIVE_LEASE:
+      ok = envelope.payloadLength == 2 && readU16(envelope.payload) >= 2 && readU16(envelope.payload) <= 120;
+      if (ok) acquireInteractiveLease(readU16(envelope.payload));
       break;
     case MessageType::CLEAR_TICKET:
       ok = envelope.payloadLength == 0 && clearTicket();
       if (ok) {
+        acquireInteractiveLease(15);
         // As above, let the acknowledgement leave over BLE before a possible
         // full Home refresh.
         sendAck(envelope.messageId);
@@ -585,7 +693,7 @@ bool CompanionService::decodeTicket(const EnvelopeView& envelope) {
   size_t cursor = 1;
   TicketState decodedTicket{};
   decodedTicket.mode = static_cast<TicketMode>(mode);
-  const bool decoded =
+  bool decoded =
       readBoundedString(envelope, cursor, decodedTicket.origin, sizeof(decodedTicket.origin)) &&
       readBoundedString(envelope, cursor, decodedTicket.destination, sizeof(decodedTicket.destination)) &&
       readBoundedString(envelope, cursor, decodedTicket.flight, sizeof(decodedTicket.flight)) &&
@@ -597,7 +705,14 @@ bool CompanionService::decodeTicket(const EnvelopeView& envelope) {
       readBoundedString(envelope, cursor, decodedTicket.passenger, sizeof(decodedTicket.passenger)) &&
       readBoundedString(envelope, cursor, decodedTicket.boardingGroup, sizeof(decodedTicket.boardingGroup)) &&
       readBoundedString(envelope, cursor, decodedTicket.barcodePayload, sizeof(decodedTicket.barcodePayload));
+  const bool carriesBarcodeFormat = decoded && cursor < envelope.payloadLength;
+  if (carriesBarcodeFormat) {
+    char barcodeFormat[17] = {};
+    decoded = readBoundedString(envelope, cursor, barcodeFormat, sizeof(barcodeFormat));
+  }
+  if (decoded && carriesBarcodeFormat && !ticketBarcodeCommitted_) return false;
   if (!decoded || cursor != envelope.payloadLength || decodedTicket.barcodePayload[0] == '\0') return false;
+  if (!carriesBarcodeFormat && Storage.ready()) Storage.remove(TICKET_BARCODE_PATH);
   ticket_ = decodedTicket;
   return true;
 }
@@ -643,33 +758,123 @@ bool CompanionService::persistTicket() {
 bool CompanionService::clearTicket() {
   const bool removed = !Storage.ready() || !Storage.exists(TICKET_PATH) || Storage.remove(TICKET_PATH);
   if (!removed) return false;
+  if (Storage.ready()) {
+    Storage.remove(TICKET_BARCODE_PATH);
+    Storage.remove(TICKET_BARCODE_TEMP_PATH);
+  }
   ticket_ = TicketState{};
+  ticketBarcodeCommitted_ = false;
   ticketPresent_ = false;
   leaveTicket();
   return true;
 }
 
+bool CompanionService::beginTicketBarcode(const EnvelopeView& envelope) {
+  if (reading_ || bookUploadActive_ || !Storage.ready() || envelope.payloadLength != 4) return false;
+  const uint32_t size = readU32(envelope.payload);
+  if (size == 0 || size > 64u * 1024u) return false;
+  if (!Storage.ensureDirectoryExists("/.crosspoint/companion")) return false;
+  if (ticketBarcodeUploadActive_ || ticketBarcodeCommitted_) abortTicketBarcode();
+  Storage.remove(TICKET_BARCODE_TEMP_PATH);
+  ticketBarcodeFile_ = Storage.open(TICKET_BARCODE_TEMP_PATH, O_WRITE | O_CREAT | O_TRUNC);
+  if (!ticketBarcodeFile_) return false;
+  ticketBarcodeExpectedSize_ = size;
+  ticketBarcodeReceived_ = 0;
+  ticketBarcodeUploadActive_ = true;
+  // The idle/live connection may already be at the user-configured 1-4 second
+  // interval. Promote this bounded bitmap transfer just as book upload does;
+  // SHOW_TICKET schedules the slow interval again after its ACK.
+  requestFastConnection();
+  LOG_INF("CMP", "Ticket barcode upload started bytes=%u", static_cast<unsigned>(size));
+  return true;
+}
+
+bool CompanionService::writeTicketBarcodeChunk(const EnvelopeView& envelope) {
+  if (!ticketBarcodeUploadActive_ || !ticketBarcodeFile_ || envelope.payloadLength < 5) return false;
+  const uint32_t offset = readU32(envelope.payload);
+  const size_t count = envelope.payloadLength - 4;
+  if (offset != ticketBarcodeReceived_ || ticketBarcodeReceived_ + count > ticketBarcodeExpectedSize_) return false;
+  if (ticketBarcodeFile_.write(envelope.payload + 4, count) != count) return false;
+  ticketBarcodeReceived_ += count;
+  return true;
+}
+
+bool CompanionService::commitTicketBarcode() {
+  if (!ticketBarcodeUploadActive_ || !ticketBarcodeFile_ || ticketBarcodeReceived_ != ticketBarcodeExpectedSize_) {
+    return false;
+  }
+  ticketBarcodeFile_.flush();
+  if (!ticketBarcodeFile_.close()) {
+    abortTicketBarcode();
+    return false;
+  }
+  HalFile input = Storage.open(TICKET_BARCODE_TEMP_PATH, O_RDONLY);
+  if (!input) {
+    abortTicketBarcode();
+    return false;
+  }
+  Bitmap bitmap(input);
+  const BmpReaderError parseResult = bitmap.parseHeaders();
+  const bool valid = parseResult == BmpReaderError::Ok && bitmap.is1Bit() && bitmap.getWidth() > 0 &&
+                     bitmap.getWidth() <= 380 && bitmap.getHeight() > 0 && bitmap.getHeight() <= 340;
+  input.close();
+  if (!valid) {
+    LOG_ERR("CMP", "Rejected ticket barcode bitmap: %s", Bitmap::errorToString(parseResult));
+    abortTicketBarcode();
+    return false;
+  }
+  ticketBarcodeUploadActive_ = false;
+  ticketBarcodeCommitted_ = true;
+  ticketBarcodeExpectedSize_ = 0;
+  ticketBarcodeReceived_ = 0;
+  return true;
+}
+
+bool CompanionService::promoteTicketBarcode() {
+  if (!ticketBarcodeCommitted_ || !Storage.ready() || !Storage.exists(TICKET_BARCODE_TEMP_PATH)) return false;
+  Storage.remove(TICKET_BARCODE_PATH);
+  if (!Storage.rename(TICKET_BARCODE_TEMP_PATH, TICKET_BARCODE_PATH)) {
+    abortTicketBarcode();
+    return false;
+  }
+  ticketBarcodeCommitted_ = false;
+  return true;
+}
+
+void CompanionService::abortTicketBarcode() {
+  if (ticketBarcodeFile_) ticketBarcodeFile_.close();
+  Storage.remove(TICKET_BARCODE_TEMP_PATH);
+  ticketBarcodeUploadActive_ = false;
+  ticketBarcodeExpectedSize_ = 0;
+  ticketBarcodeReceived_ = 0;
+}
+
 bool CompanionService::applyRadioPolicy(const EnvelopeView& envelope) {
-  if (envelope.payloadLength != 6) return false;
+  if (envelope.payloadLength != 6 && envelope.payloadLength != 8) return false;
   const uint16_t fastMinutes = readU16(envelope.payload);
-  const uint16_t slowIntervalMs = readU16(envelope.payload + 2);
-  const uint16_t sleepMinutes = readU16(envelope.payload + 4);
-  if (fastMinutes < 1 || fastMinutes > 30 || slowIntervalMs < 500 || slowIntervalMs > 4000 ||
-      sleepMinutes < 2 || sleepMinutes > 60 || fastMinutes >= sleepMinutes) {
+  const bool legacy = envelope.payloadLength == 6;
+  const uint16_t standbyIntervalSeconds = legacy ? 30 : readU16(envelope.payload + 2);
+  const uint16_t connectedIntervalMs = legacy ? readU16(envelope.payload + 2) : readU16(envelope.payload + 4);
+  const uint16_t sleepMinutes = readU16(envelope.payload + (legacy ? 4 : 6));
+  if (!isValidRadioPolicy(fastMinutes, standbyIntervalSeconds, connectedIntervalMs, sleepMinutes)) {
     return false;
   }
   fastAdvertisingWindowMs_ = static_cast<uint32_t>(fastMinutes) * 60u * 1000u;
   companionSleepAfterMs_ = static_cast<uint32_t>(sleepMinutes) * 60u * 1000u;
-  slowAdvertisingIntervalUnits_ = static_cast<uint16_t>((static_cast<uint32_t>(slowIntervalMs) * 8u) / 5u);
-  slowConnectionIntervalUnits_ = static_cast<uint16_t>((static_cast<uint32_t>(slowIntervalMs) * 4u) / 5u);
-  connectionParamsPending_ = connected();
-  connectedAtMs_ = millis();
-  return persistRadioPolicy();
+  standbyAdvertisingIntervalMs_ = static_cast<uint32_t>(standbyIntervalSeconds) * 1000u;
+  slowConnectionIntervalUnits_ = static_cast<uint16_t>((static_cast<uint32_t>(connectedIntervalMs) * 4u) / 5u);
+  scheduleSlowConnection();
+  const bool persisted = persistRadioPolicy();
+  if (persisted) refreshHomeIfVisible();
+  return persisted;
 }
 
 bool CompanionService::applyReaderPolicy(const EnvelopeView& envelope) {
-  if (envelope.payloadLength != 2) return false;
-  switch (readU16(envelope.payload)) {
+  if (envelope.payloadLength != 2 && envelope.payloadLength != 4) return false;
+  const uint16_t refreshPages = readU16(envelope.payload);
+  const uint16_t powerButtonHoldMs = envelope.payloadLength == 4 ? readU16(envelope.payload + 2) : 1000;
+  if (powerButtonHoldMs != 0 && powerButtonHoldMs != 1000 && powerButtonHoldMs != 2000) return false;
+  switch (refreshPages) {
     case 1:
       SETTINGS.refreshFrequency = CrossPointSettings::REFRESH_1;
       break;
@@ -688,33 +893,52 @@ bool CompanionService::applyReaderPolicy(const EnvelopeView& envelope) {
     default:
       return false;
   }
+  SETTINGS.companionPowerButtonHoldSeconds = static_cast<uint8_t>(powerButtonHoldMs / 1000u);
   return SETTINGS.saveToFile();
 }
 
 bool CompanionService::loadRadioPolicy() {
   if (!Storage.ready()) return false;
   HalFile input = Storage.open(RADIO_POLICY_PATH, O_RDONLY);
-  if (!input || input.fileSize() != sizeof(RadioPolicyStorageRecord)) return false;
-  RadioPolicyStorageRecord record{};
-  const bool valid = input.read(&record, sizeof(record)) == sizeof(record) && record.magic == 0x52414431 &&
-                     record.version == 1 && record.fastWindowMinutes >= 1 && record.fastWindowMinutes <= 30 &&
-                     record.slowIntervalMs >= 500 && record.slowIntervalMs <= 4000 &&
-                     record.sleepAfterMinutes >= 2 && record.sleepAfterMinutes <= 60 &&
-                     record.fastWindowMinutes < record.sleepAfterMinutes;
+  if (!input) return false;
+  if (input.fileSize() == sizeof(RadioPolicyStorageRecord)) {
+    RadioPolicyStorageRecord record{};
+    const bool valid = input.read(&record, sizeof(record)) == sizeof(record) && record.magic == 0x52414432 &&
+                       record.version == 2 &&
+                       isValidRadioPolicy(record.fastWindowMinutes, record.standbyIntervalSeconds,
+                                          record.connectedIntervalMs, record.sleepAfterMinutes);
+    input.close();
+    if (!valid) return false;
+    fastAdvertisingWindowMs_ = static_cast<uint32_t>(record.fastWindowMinutes) * 60u * 1000u;
+    standbyAdvertisingIntervalMs_ = static_cast<uint32_t>(record.standbyIntervalSeconds) * 1000u;
+    companionSleepAfterMs_ = static_cast<uint32_t>(record.sleepAfterMinutes) * 60u * 1000u;
+    slowConnectionIntervalUnits_ = static_cast<uint16_t>((static_cast<uint32_t>(record.connectedIntervalMs) * 4u) / 5u);
+    return true;
+  }
+  if (input.fileSize() == sizeof(LegacyRadioPolicyStorageRecord)) {
+    LegacyRadioPolicyStorageRecord record{};
+    const bool valid = input.read(&record, sizeof(record)) == sizeof(record) && record.magic == 0x52414431 &&
+                       record.version == 1 &&
+                       isValidRadioPolicy(record.fastWindowMinutes, 30, record.slowIntervalMs,
+                                          record.sleepAfterMinutes);
+    input.close();
+    if (!valid) return false;
+    fastAdvertisingWindowMs_ = static_cast<uint32_t>(record.fastWindowMinutes) * 60u * 1000u;
+    standbyAdvertisingIntervalMs_ = 30u * 1000u;
+    companionSleepAfterMs_ = static_cast<uint32_t>(record.sleepAfterMinutes) * 60u * 1000u;
+    slowConnectionIntervalUnits_ = static_cast<uint16_t>((static_cast<uint32_t>(record.slowIntervalMs) * 4u) / 5u);
+    return persistRadioPolicy();
+  }
   input.close();
-  if (!valid) return false;
-  fastAdvertisingWindowMs_ = static_cast<uint32_t>(record.fastWindowMinutes) * 60u * 1000u;
-  companionSleepAfterMs_ = static_cast<uint32_t>(record.sleepAfterMinutes) * 60u * 1000u;
-  slowAdvertisingIntervalUnits_ = static_cast<uint16_t>((static_cast<uint32_t>(record.slowIntervalMs) * 8u) / 5u);
-  slowConnectionIntervalUnits_ = static_cast<uint16_t>((static_cast<uint32_t>(record.slowIntervalMs) * 4u) / 5u);
-  return true;
+  return false;
 }
 
 bool CompanionService::persistRadioPolicy() {
   if (!Storage.ready() || !Storage.ensureDirectoryExists("/.crosspoint/companion")) return true;
   RadioPolicyStorageRecord record{};
   record.fastWindowMinutes = static_cast<uint16_t>(fastAdvertisingWindowMs_ / (60u * 1000u));
-  record.slowIntervalMs = static_cast<uint16_t>(slowConnectionIntervalUnits_ * 5u / 4u);
+  record.standbyIntervalSeconds = static_cast<uint16_t>(standbyAdvertisingIntervalMs_ / 1000u);
+  record.connectedIntervalMs = static_cast<uint16_t>(slowConnectionIntervalUnits_ * 5u / 4u);
   record.sleepAfterMinutes = static_cast<uint16_t>(companionSleepAfterMs_ / (60u * 1000u));
   HalFile output = Storage.open(RADIO_POLICY_PATH, O_WRITE | O_CREAT | O_TRUNC);
   if (!output || output.write(&record, sizeof(record)) != sizeof(record)) return false;
@@ -726,8 +950,51 @@ void CompanionService::armFastAdvertising() {
   if (!advertising_) return;
   advertisingWindowStartedAtMs_ = millis();
   slowAdvertising_ = false;
+  standbyPulseActive_ = false;
   advertisingWindowExpired_ = false;
   advertising_->setAdvertisingInterval(ADVERTISING_INTERVAL);
+}
+
+void CompanionService::enterStandbyAdvertising() {
+  if (!advertising_) return;
+  if (advertising_->isAdvertising()) advertising_->stop();
+  advertising_->setAdvertisingInterval(ADVERTISING_INTERVAL);
+  server_->advertiseOnDisconnect(true);
+  standbyPulseStartedAtMs_ = millis();
+  standbyPulseActive_ = advertising_->start();
+  slowAdvertising_ = true;
+  advertisingWindowExpired_ = false;
+  LOG_INF("CMP", "Bluetooth standby pulse started; period=%u ms duration=%u ms",
+          static_cast<unsigned>(standbyAdvertisingIntervalMs_),
+          static_cast<unsigned>(STANDBY_PULSE_DURATION_MS));
+}
+
+bool CompanionService::standbyPulseStartDue() const {
+  return initialized_ && advertising_ && slowAdvertising_ && !standbyPulseActive_ && !connected() &&
+         !readingRadioQuiet_ && !ticketRadioQuiet_ &&
+         static_cast<uint32_t>(millis() - standbyPulseStartedAtMs_) >= standbyAdvertisingIntervalMs_;
+}
+
+void CompanionService::updateStandbyAdvertising() {
+  if (!advertising_ || !slowAdvertising_ || connected()) return;
+  const uint32_t elapsed = millis() - standbyPulseStartedAtMs_;
+  if (standbyPulseActive_ && elapsed >= STANDBY_PULSE_DURATION_MS) {
+    if (advertising_->isAdvertising()) {
+      runtime_trace::mark(runtime_trace::Checkpoint::COMPANION_ADVERTISING_STOP_ENTER);
+      advertising_->stop();
+      runtime_trace::mark(runtime_trace::Checkpoint::COMPANION_ADVERTISING_STOP_EXIT);
+    }
+    server_->advertiseOnDisconnect(false);
+    standbyPulseActive_ = false;
+    return;
+  }
+  if (standbyPulseStartDue()) {
+    server_->advertiseOnDisconnect(true);
+    standbyPulseStartedAtMs_ = millis();
+    runtime_trace::mark(runtime_trace::Checkpoint::COMPANION_ADVERTISING_START_ENTER);
+    standbyPulseActive_ = advertising_->start();
+    runtime_trace::mark(runtime_trace::Checkpoint::COMPANION_ADVERTISING_START_EXIT);
+  }
 }
 
 void CompanionService::updateAdvertisingPolicy() {
@@ -740,34 +1007,29 @@ void CompanionService::updateAdvertisingPolicy() {
   const bool persistentSlowMode =
       requiresPersistentSlowAdvertising(session_.active(), liveTicketDisplayed_);
   if (persistentSlowMode) {
-    server_->advertiseOnDisconnect(true);
     if (!slowAdvertising_ || advertisingWindowExpired_) {
-      advertising_->stop();
-      advertising_->setAdvertisingInterval(slowAdvertisingIntervalUnits_);
-      advertisingWindowExpired_ = false;
-      slowAdvertising_ = true;
-      advertising_->start();
-      LOG_INF("CMP", "Active Focus / Live advertising at %u ms",
-              static_cast<unsigned>(slowAdvertisingIntervalUnits_ * 5u / 8u));
+      enterStandbyAdvertising();
+    } else {
+      updateStandbyAdvertising();
     }
     return;
   }
   if (advertisingWindowExpired_) return;
   const uint32_t elapsed = millis() - advertisingWindowStartedAtMs_;
   if (elapsed >= companionSleepAfterMs_) {
+    runtime_trace::mark(runtime_trace::Checkpoint::COMPANION_ADVERTISING_STOP_ENTER);
     advertising_->stop();
+    runtime_trace::mark(runtime_trace::Checkpoint::COMPANION_ADVERTISING_STOP_EXIT);
     server_->advertiseOnDisconnect(false);
+    standbyPulseActive_ = false;
     advertisingWindowExpired_ = true;
     LOG_INF("CMP", "Companion advertising stopped at sleep deadline");
     return;
   }
   if (!slowAdvertising_ && elapsed >= fastAdvertisingWindowMs_) {
-    advertising_->stop();
-    advertising_->setAdvertisingInterval(slowAdvertisingIntervalUnits_);
-    advertising_->start();
-    slowAdvertising_ = true;
-    LOG_INF("CMP", "Companion advertising slowed to %u ms",
-            static_cast<unsigned>(slowAdvertisingIntervalUnits_ * 5u / 8u));
+    enterStandbyAdvertising();
+  } else if (slowAdvertising_) {
+    updateStandbyAdvertising();
   }
 }
 
@@ -817,7 +1079,8 @@ void CompanionService::sendCapabilities(MessageType type) {
   cursor += 4;
   payload[cursor++] = 1;
   payload[cursor++] = ticketPresent_ ? 1 : 0;
-  payload[cursor++] = 1;  // Supports SET_READER_POLICY.
+  payload[cursor++] = 2;  // SET_READER_POLICY v2 also carries the power-button hold duration.
+  payload[cursor++] = 2;  // SET_RADIO_POLICY v2 separates standby discovery and connected cadence.
   notify(type, payload, cursor);
 }
 
@@ -1069,10 +1332,7 @@ bool CompanionService::beginBookUpload(const EnvelopeView& envelope) {
   bookUploadReceived_ = 0;
   bookUploadActive_ = true;
   bookUploadLastActivityMs_ = millis();
-  connectionParamsPending_ = false;
-  if (connected()) {
-    server_->updateConnParams(connectionHandle_, 12, 24, 0, CONNECTION_SUPERVISION_TIMEOUT);
-  }
+  requestFastConnection();
   LOG_INF("CMP", "Book upload started path=%s bytes=%llu", bookUploadFinalPath_, bookUploadExpectedSize_);
   return true;
 }
@@ -1122,8 +1382,7 @@ bool CompanionService::commitBookUpload() {
   LOG_INF("CMP", "Book upload committed path=%s", bookUploadFinalPath_);
   bookUploadActive_ = false;
   bookUploadFinalPath_[0] = '\0';
-  connectedAtMs_ = millis();
-  connectionParamsPending_ = connected();
+  scheduleSlowConnection();
   return scanLibrary();
 }
 
@@ -1136,8 +1395,7 @@ void CompanionService::abortBookUpload(bool restoreSlowConnection) {
   bookUploadLastActivityMs_ = 0;
   bookUploadFinalPath_[0] = '\0';
   if (restoreSlowConnection) {
-    connectedAtMs_ = millis();
-    connectionParamsPending_ = connected();
+    scheduleSlowConnection();
   }
 }
 

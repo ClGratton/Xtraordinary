@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "screenshotTest": "app/src/screenshotTest/kotlin/com/xteink/companion/ui/CompanionPreviewScreenshotTest.kt",
+  "surfaces": [
+    {
+      "id": "focus",
+      "implementation": "app/src/main/java/com/xteink/companion/ui/components/ControlDeckFocusContent.kt",
+      "defaultPreview": "expressiveFocusPhoneScreenshot",
+      "adaptivePreview": "expressiveFocusLargeTextScreenshot"
+    },
+    {
+      "id": "setup",
+      "implementation": "app/src/main/java/com/xteink/companion/ui/components/SetupScreen.kt",
+      "defaultPreview": "firstRunSetupScreenshot",
+      "adaptivePreview": "firstRunSetupLargeTextScreenshot"
+    },
+    {
+      "id": "read",
+      "implementation": "app/src/main/java/com/xteink/companion/ui/components/ReadContent.kt",
+      "defaultPreview": "readLibraryPhoneScreenshot",
+      "adaptivePreview": "readContentSelectedScreenshot"
+    },
+    {
+      "id": "tools",
+      "implementation": "app/src/main/java/com/xteink/companion/ui/components/ToolsHubContent.kt",
+      "defaultPreview": "toolsHubPhoneScreenshot",
+      "adaptivePreview": "passDetailPhoneScreenshot"
+    },
+    {
+      "id": "devices",
+      "implementation": "app/src/main/java/com/xteink/companion/ui/components/DeviceConnectionSheet.kt",
+      "defaultPreview": "devicesEmptyScreenshot",
+      "adaptivePreview": "firmwareWakeGuidanceScreenshot"
+    },
+    {
+      "id": "settings",
+      "implementation": "app/src/main/java/com/xteink/companion/ui/components/SharedComponents.kt",
+      "defaultPreview": "settingsGoogleDisconnectedScreenshot",
+      "adaptivePreview": "settingsGoogleLargeTextScreenshot"
+    }
+  ]
+}

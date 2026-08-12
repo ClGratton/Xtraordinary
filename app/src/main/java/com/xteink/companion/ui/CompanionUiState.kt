@@ -1,6 +1,7 @@
 package com.xteink.companion.ui
 
 import com.xteink.companion.data.FirmwareSource
+import com.xteink.companion.data.FlightBarcodeFormat
 import com.xteink.companion.data.ReadingSessionStat
 
 enum class CompanionVisualTheme {
@@ -71,6 +72,7 @@ data class BoardingPassUiState(
     val boardingGroup: String,
     val source: String,
     val barcodePayload: String,
+    val barcodeFormat: FlightBarcodeFormat = FlightBarcodeFormat.Unknown,
     val isSample: Boolean = false,
 )
 
@@ -89,6 +91,7 @@ private val SamplePasses = listOf(
         passenger = "CLAUDIO A.",
         boardingGroup = "Main 2",
         barcodePayload = "SAMPLE-DL2048-NOT-SCANNABLE",
+        barcodeFormat = FlightBarcodeFormat.Qr,
         isSample = true,
         source = "Sample Wallet pass · updated 2 min ago",
     ),
@@ -106,6 +109,7 @@ private val SamplePasses = listOf(
         passenger = "CLAUDIO A.",
         boardingGroup = "Group 3",
         barcodePayload = "SAMPLE-AZ610-NOT-SCANNABLE",
+        barcodeFormat = FlightBarcodeFormat.Qr,
         isSample = true,
         source = "Sample airline notification · updated now",
     ),
@@ -205,9 +209,11 @@ data class DeviceUiState(
 
 data class RadioPolicyUiState(
     val fastWindowMinutes: Int = 5,
-    val slowIntervalMs: Int = 2_000,
+    val standbyIntervalSeconds: Int = 30,
+    val connectedIntervalMs: Int = 2_000,
     val sleepAfterMinutes: Int = 10,
     val fullRefreshPages: Int = 15,
+    val powerButtonHoldMs: Int = 1_000,
 )
 
 data class CompanionUiState(

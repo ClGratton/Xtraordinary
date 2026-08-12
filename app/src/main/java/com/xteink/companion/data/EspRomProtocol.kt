@@ -30,10 +30,12 @@ internal object EspRomProtocol {
 
     fun syncPayload(): ByteArray = byteArrayOf(0x07, 0x07, 0x12, 0x20) + ByteArray(32) { 0x55 }
 
-    fun flashBeginPayload(size: Int): ByteArray {
-        require(size in 1..MaxAppSize) { "Firmware image does not fit the X3 app partition" }
+    fun flashBeginPayload(size: Int, offset: Int = FlashOffset): ByteArray {
+        require(size > 0 && offset >= 0 && offset.toLong() + size <= FlashSize) {
+            "Flash region is outside the X3 flash"
+        }
         val blocks = (size + FlashBlockSize - 1) / FlashBlockSize
-        return littleEndianInts(size, blocks, FlashBlockSize, FlashOffset, 0)
+        return littleEndianInts(size, blocks, FlashBlockSize, offset, 0)
     }
 
     fun flashDataPayload(block: ByteArray, sequence: Int): ByteArray {
@@ -41,7 +43,8 @@ internal object EspRomProtocol {
         return littleEndianInts(block.size, sequence, 0, 0) + block
     }
 
-    fun flashMd5Payload(size: Int): ByteArray = littleEndianInts(FlashOffset, size, 0, 0)
+    fun flashMd5Payload(size: Int, offset: Int = FlashOffset): ByteArray =
+        littleEndianInts(offset, size, 0, 0)
 
     fun readRegisterPayload(address: Int): ByteArray = littleEndianInts(address)
 
@@ -52,12 +55,14 @@ internal object EspRomProtocol {
 
     fun spiSetParametersPayload(): ByteArray = littleEndianInts(
         0,
-        16 * 1024 * 1024,
+        FlashSize,
         64 * 1024,
         4 * 1024,
         256,
         0xFFFF,
     )
+
+    private const val FlashSize = 16 * 1024 * 1024
 
     fun request(operation: Int, data: ByteArray, checksum: Int = 0): ByteArray {
         require(data.size <= 0xFFFF)

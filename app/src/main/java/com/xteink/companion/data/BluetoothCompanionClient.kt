@@ -43,6 +43,7 @@ import com.xteink.companion.protocol.PayloadCodec
 import com.xteink.companion.protocol.RadioPolicy
 import com.xteink.companion.protocol.ReadingStatsChunkPayload
 import com.xteink.companion.protocol.SessionStart
+import com.xteink.companion.protocol.TICKET_BARCODE_CHUNK_BYTES
 import com.xteink.companion.protocol.XTEINK_CONTROL_UUID
 import com.xteink.companion.protocol.XTEINK_DATA_UUID
 import com.xteink.companion.protocol.XTEINK_EVENTS_UUID
@@ -76,6 +77,7 @@ data class CompanionLinkState(
     val phase: LinkPhase = LinkPhase.Disconnected,
     val requestedModel: String? = null,
     val capabilities: DeviceCapabilities? = null,
+    val capabilitiesSequence: Long = 0L,
     val deviceStatus: DeviceStatus? = null,
     val message: String? = null,
     val transferProgress: Float? = null,
@@ -102,6 +104,7 @@ class BluetoothCompanionClient(private val context: Context) {
     private var gracefulDisconnectGatt: BluetoothGatt? = null
     private var gracefulDisconnectCompletion: CompletableDeferred<Unit>? = null
     private var negotiatedMtu = DefaultAttMtu
+    private var capabilitiesSequence = 0L
 
     private val _state = MutableStateFlow(CompanionLinkState())
     val state: StateFlow<CompanionLinkState> = _state.asStateFlow()
@@ -471,12 +474,70 @@ class BluetoothCompanionClient(private val context: Context) {
     suspend fun refreshLibrary() = sendAwaitingAck(MessageType.GetLibrary)
     suspend fun acknowledgeReadingStats(sessionId: UInt) =
         sendAwaitingAck(MessageType.AckReadingStats, PayloadCodec.encodeReadingStatsAck(sessionId))
-    suspend fun showTicket(ticket: BoardingPassPayload) =
-        sendAwaitingAck(MessageType.ShowTicket, PayloadCodec.encodeBoardingPass(ticket))
+    suspend fun showTicket(ticket: BoardingPassPayload, barcodeBmp: ByteArray) = withContext(Dispatchers.IO) {
+        require(barcodeBmp.isNotEmpty()) { "Ticket barcode image is empty" }
+        val startedAtNanos = System.nanoTime()
+        requestTransferConnectionPriority(high = true)
+        try {
+            sendAwaitingAck(
+                MessageType.BeginTicketBarcode,
+                PayloadCodec.encodeTicketBarcodeBegin(barcodeBmp.size),
+            )
+            val chunkBytes = (negotiatedMtu - AttWriteOverheadBytes)
+                .coerceIn(MinimumBookChunkBytes, TICKET_BARCODE_CHUNK_BYTES)
+            val chunkCount = (barcodeBmp.size + chunkBytes - 1) / chunkBytes
+            Log.i(
+                LogTag,
+                "ticket transfer started bytes=${barcodeBmp.size} chunks=$chunkCount mtu=$negotiatedMtu",
+            )
+            var offset = 0
+            val acknowledgements = ArrayList<CompletableDeferred<Unit>>(BookUploadWindowSize)
+            while (offset < barcodeBmp.size) {
+                val end = (offset + chunkBytes).coerceAtMost(barcodeBmp.size)
+                acknowledgements += enqueueAwaitingAck(
+                    MessageType.TicketBarcodeChunk,
+                    PayloadCodec.encodeTicketBarcodeChunk(offset, barcodeBmp.copyOfRange(offset, end)),
+                )
+                offset = end
+                if (acknowledgements.size == BookUploadWindowSize) {
+                    withTimeout(BookUploadAckTimeoutMs) { acknowledgements.awaitAll() }
+                    acknowledgements.clear()
+                }
+            }
+            if (acknowledgements.isNotEmpty()) {
+                withTimeout(BookUploadAckTimeoutMs) { acknowledgements.awaitAll() }
+            }
+            sendAwaitingAck(MessageType.CommitTicketBarcode, timeoutMillis = 20_000)
+            sendAwaitingAck(MessageType.ShowTicket, PayloadCodec.encodeBoardingPass(ticket), timeoutMillis = 20_000)
+            Log.i(
+                LogTag,
+                "ticket transfer ACKed elapsedMs=${(System.nanoTime() - startedAtNanos) / 1_000_000L}",
+            )
+        } finally {
+            requestTransferConnectionPriority(high = false)
+        }
+    }
     suspend fun setRadioPolicy(policy: RadioPolicy) =
         sendAwaitingAck(MessageType.SetRadioPolicy, PayloadCodec.encodeRadioPolicy(policy))
-    suspend fun setReaderPolicy(fullRefreshPages: Int) =
-        sendAwaitingAck(MessageType.SetReaderPolicy, PayloadCodec.encodeReaderPolicy(fullRefreshPages))
+    suspend fun setReaderPolicy(fullRefreshPages: Int, powerButtonHoldMs: Int, policyVersion: Int) =
+        sendAwaitingAck(
+            MessageType.SetReaderPolicy,
+            PayloadCodec.encodeReaderPolicy(
+                fullRefreshPages,
+                powerButtonHoldMs.takeIf { policyVersion >= 2 },
+            ),
+        )
+    suspend fun acquireInteractiveLease(seconds: Int = InteractiveTransportContract.LeaseSeconds) {
+        requestTransferConnectionPriority(high = true)
+        send(MessageType.AcquireInteractiveLease, PayloadCodec.encodeInteractiveLease(seconds), awaitAck = false)
+    }
+    suspend fun releaseInteractiveLease() {
+        requestTransferConnectionPriority(high = false)
+        // Existing firmware accepts 2-120 seconds. Replacing the current lease
+        // with the minimum duration provides a backward-compatible explicit
+        // demotion; current firmware also clears the lease on disconnect.
+        send(MessageType.AcquireInteractiveLease, PayloadCodec.encodeInteractiveLease(2), awaitAck = false)
+    }
     suspend fun clearTicket() = sendAwaitingAck(MessageType.ClearTicket)
     suspend fun awaitConnected(timeoutMillis: Long = 20_000) {
         withTimeout(timeoutMillis) {
@@ -619,7 +680,7 @@ class BluetoothCompanionClient(private val context: Context) {
         Log.i(LogTag, "queue send type=$type id=$id bytes=${bytes.size} awaitAck=$awaitAck")
         val uuid = if (
             type == MessageType.FirmwareChunk || type == MessageType.SceneChunk ||
-            type == MessageType.BookUploadChunk
+            type == MessageType.BookUploadChunk || type == MessageType.TicketBarcodeChunk
         ) {
             UUID.fromString(XTEINK_DATA_UUID)
         } else {
@@ -722,24 +783,34 @@ class BluetoothCompanionClient(private val context: Context) {
 
         override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
             Log.i(LogTag, "notifications subscribed status=$status")
+            if (gatt !== this@BluetoothCompanionClient.gatt) {
+                Log.i(LogTag, "ignoring stale notification subscription callback")
+                return
+            }
             if (status != BluetoothGatt.GATT_SUCCESS) {
                 failLink("Could not subscribe to XTEINK")
                 return
             }
             _state.value = _state.value.copy(phase = LinkPhase.Connected, message = null)
-            send(
-                MessageType.Hello,
-                PayloadCodec.encodeHello(supportsRevisionedDeviceStatus = true),
-                awaitAck = false,
-            )
-            send(MessageType.GetStatus, byteArrayOf(), awaitAck = false)
-            send(MessageType.GetLibrary, byteArrayOf(), awaitAck = false)
-            send(
-                MessageType.SetClock,
-                PayloadCodec.encodeClock(System.currentTimeMillis() / 1_000L),
-                awaitAck = false,
-            )
-            send(MessageType.GetReadingStats, byteArrayOf(), awaitAck = false)
+            runCatching {
+                send(
+                    MessageType.Hello,
+                    PayloadCodec.encodeHello(supportsRevisionedDeviceStatus = true),
+                    awaitAck = false,
+                )
+                send(MessageType.GetStatus, byteArrayOf(), awaitAck = false)
+                send(MessageType.GetLibrary, byteArrayOf(), awaitAck = false)
+                send(
+                    MessageType.SetClock,
+                    PayloadCodec.encodeClock(System.currentTimeMillis() / 1_000L),
+                    awaitAck = false,
+                )
+                send(MessageType.GetReadingStats, byteArrayOf(), awaitAck = false)
+            }.onFailure { error ->
+                if (gatt === this@BluetoothCompanionClient.gatt) {
+                    failLink(error.message ?: "XTEINK disconnected during setup")
+                }
+            }
         }
 
         override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
@@ -773,7 +844,11 @@ class BluetoothCompanionClient(private val context: Context) {
                 }
                 MessageType.Capabilities -> {
                     val capabilities = PayloadCodec.decodeCapabilities(envelope.payload)
-                    _state.value = _state.value.copy(capabilities = capabilities)
+                    capabilitiesSequence += 1L
+                    _state.value = _state.value.copy(
+                        capabilities = capabilities,
+                        capabilitiesSequence = capabilitiesSequence,
+                    )
                 }
                 MessageType.StatusChanged -> {
                     val status = PayloadCodec.decodeDeviceStatus(envelope.payload)

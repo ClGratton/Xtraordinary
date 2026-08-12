@@ -1,6 +1,7 @@
 #include "HttpDownloader.h"
 
 #include <Arduino.h>
+#include <BuildVersion.h>
 #include <Logging.h>
 #include <Memory.h>
 #include <base64.h>
@@ -65,7 +66,8 @@ HttpDownloader::DownloadError runGet(const std::string& url, const std::string& 
     return HttpDownloader::HTTP_ERROR;
   }
 
-  esp_http_client_set_header(client, "User-Agent", "CrossPoint-ESP32-" CROSSPOINT_VERSION);
+  const std::string userAgent = std::string("CrossPoint-ESP32-") + CROSSPOINT_VERSION;
+  esp_http_client_set_header(client, "User-Agent", userAgent.c_str());
   if (!username.empty() && !password.empty()) {
     // Preemptive Basic auth, like the prior addHeader; don't wait for a 401.
     const std::string credentials = username + ":" + password;

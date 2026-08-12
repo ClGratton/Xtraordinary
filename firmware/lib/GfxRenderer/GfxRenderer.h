@@ -188,6 +188,10 @@ class GfxRenderer {
   void drawBitmap(const Bitmap& bitmap, int x, int y, int maxWidth, int maxHeight, float cropX = 0,
                   float cropY = 0) const;
   void drawBitmap1Bit(const Bitmap& bitmap, int x, int y, int maxWidth, int maxHeight) const;
+  // Scanner-safe integer enlargement for monochrome assets. Integer scaling
+  // preserves barcode module widths; generic image fitting may use fractional
+  // scaling and must not be used for a fullscreen barcode.
+  void drawBitmap1BitIntegerScaled(const Bitmap& bitmap, int x, int y, int scale) const;
   void fillPolygon(const int* xPoints, const int* yPoints, int numPoints, bool state = true) const;
 
   // Text

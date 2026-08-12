@@ -1,0 +1,281 @@
+{
+  "schemaVersion": 1,
+  "rules": [
+    {
+      "id": "canonical-android-build",
+      "type": "required_pattern",
+      "path": "AGENTS.md",
+      "pattern": "scripts/build-xtraordinary-app\\.ps1",
+      "message": "AGENTS.md must require the canonical Android build wrapper."
+    },
+    {
+      "id": "canonical-firmware-build",
+      "type": "required_pattern",
+      "path": "AGENTS.md",
+      "pattern": "scripts/build-x3-firmware\\.ps1",
+      "message": "AGENTS.md must require the canonical firmware build wrapper."
+    },
+    {
+      "id": "android-wrapper-runs-policy-gate",
+      "type": "required_pattern",
+      "path": "scripts/build-xtraordinary-app.ps1",
+      "pattern": "check-engineering-policies\\.ps1",
+      "message": "The Android wrapper must run the engineering policy gate before Gradle."
+    },
+    {
+      "id": "firmware-wrapper-runs-policy-gate",
+      "type": "required_pattern",
+      "path": "scripts/build-x3-firmware.ps1",
+      "pattern": "check-engineering-policies\\.ps1",
+      "message": "The firmware wrapper must run the engineering policy gate before PlatformIO."
+    },
+    {
+      "id": "generic-interactive-coordinator-exists",
+      "type": "required_file",
+      "path": "app/src/main/java/com/xteink/companion/data/InteractiveTransportCoordinator.kt",
+      "message": "Interactive transport must use the shared owner coordinator."
+    },
+    {
+      "id": "generic-interactive-coordinator-tested",
+      "type": "required_file",
+      "path": "app/src/test/java/com/xteink/companion/data/InteractiveTransportCoordinatorTest.kt",
+      "message": "The shared interactive transport coordinator needs lifecycle tests."
+    },
+    {
+      "id": "generic-coordinator-has-owner-set",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/data/InteractiveTransportCoordinator.kt",
+      "pattern": "linkedSetOf<InteractiveTransportOwner>",
+      "message": "Interactive transport ownership must support multiple concurrent callers."
+    },
+    {
+      "id": "generic-coordinator-has-reconnect-replay",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/data/InteractiveTransportCoordinator.kt",
+      "pattern": "shouldApplyLease\\(capabilitiesSequence",
+      "message": "Interactive transport must replay its lease for a fresh protocol session."
+    },
+    {
+      "id": "generic-coordinator-has-no-feature-names",
+      "type": "forbidden_pattern",
+      "path": "app/src/main/java/com/xteink/companion/data/InteractiveTransportCoordinator.kt",
+      "pattern": "(?i)\\b(passes?|tickets?|focus|settings?|firmware|books?)\\b",
+      "message": "The shared coordinator must not know feature names."
+    },
+    {
+      "id": "generic-contract-has-no-feature-names",
+      "type": "forbidden_pattern",
+      "path": "app/src/main/java/com/xteink/companion/data/InteractiveTransportContract.kt",
+      "pattern": "(?i)\\b(passes?|tickets?|focus|settings?|firmware|books?)\\b",
+      "message": "The shared timing contract must not know feature names."
+    },
+    {
+      "id": "transaction-uses-shared-transport",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/CompanionViewModel.kt",
+      "pattern": "withInteractiveTransport\\(TicketTransferOwner\\)",
+      "message": "Ticket transfer must use the reusable transaction-scoped transport primitive."
+    },
+    {
+      "id": "firmware-clears-session-lease",
+      "type": "required_pattern",
+      "path": "firmware/src/companion/CompanionService.cpp",
+      "pattern": "onClientDisconnected\\(\\)[\\s\\S]*?interactiveLeaseUntilMs_ = 0",
+      "message": "Firmware must clear an interactive lease when its GATT owner disconnects."
+    },
+    {
+      "id": "flash-preserves-app-offset",
+      "type": "required_pattern",
+      "path": "firmware/platformio.ini",
+      "pattern": "(?m)^board_upload\\.offset_address\\s*=\\s*0x10000\\s*$",
+      "message": "Application-only firmware output must retain the 0x10000 app offset."
+    },
+    {
+      "id": "firmware-wrapper-does-not-erase-bonds",
+      "type": "forbidden_pattern",
+      "path": "scripts/build-x3-firmware.ps1",
+      "pattern": "(?i)erase[_-]?(flash|all)|erase.*nvs",
+      "message": "The canonical firmware build must not erase NVS or Bluetooth bond data."
+    },
+    {
+      "id": "radio-policy-separates-discovery-and-connection",
+      "type": "required_pattern",
+      "path": "protocol/src/main/kotlin/com/xteink/companion/protocol/Payloads.kt",
+      "pattern": "standbyIntervalSeconds[\\s\\S]*?connectedIntervalMs",
+      "message": "Radio policy must keep disconnected standby discovery separate from connected cadence."
+    },
+    {
+      "id": "firmware-uses-bounded-standby-pulses",
+      "type": "required_pattern",
+      "path": "firmware/src/companion/CompanionService.cpp",
+      "pattern": "STANDBY_PULSE_DURATION_MS[\\s\\S]*?updateStandbyAdvertising",
+      "message": "Low-power standby must use bounded advertising pulses instead of continuous 1-4 second advertising."
+    },
+    {
+      "id": "firmware-does-not-recouple-standby-and-connection",
+      "type": "forbidden_pattern",
+      "path": "firmware/src/companion/CompanionService.h",
+      "pattern": "slowAdvertisingIntervalUnits",
+      "message": "Disconnected advertising and the connected interval must not share the old field."
+    },
+    {
+      "id": "firmware-advertises-radio-policy-v2",
+      "type": "required_pattern",
+      "path": "firmware/src/companion/CompanionService.cpp",
+      "pattern": "SET_RADIO_POLICY v2 separates standby discovery",
+      "message": "Firmware must advertise support before Android sends the separated policy payload."
+    },
+    {
+      "id": "android-capability-gates-radio-policy-v2",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/CompanionViewModel.kt",
+      "pattern": "radioPolicyVersion < 2",
+      "message": "Android must not claim separated standby values are synchronized to legacy firmware."
+    },
+    {
+      "id": "standby-policy-is-documented",
+      "type": "required_pattern",
+      "path": "docs/x3-power-sync-flow.md",
+      "pattern": "30, 60, or 120 seconds",
+      "message": "The canonical power flow must document sparse standby check-ins."
+    },
+    {
+      "id": "interactive-lifecycle-documented",
+      "type": "required_file",
+      "path": "docs/interactive-transport-lifecycle.md",
+      "message": "The reusable interactive transport lifecycle must be documented."
+    },
+    {
+      "id": "standby-chip-uses-applied-device-policy",
+      "type": "required_pattern",
+      "path": "firmware/src/activities/home/HomeActivity.cpp",
+      "pattern": "standbyAdvertisingIntervalMs\\(\\)",
+      "message": "Home must derive its standby delay from the applied firmware policy, not copied UI text."
+    },
+    {
+      "id": "firmware-idle-clock-is-c3-supported",
+      "type": "required_pattern",
+      "path": "firmware/lib/hal/HalPowerManager.h",
+      "pattern": "LOW_POWER_FREQ\\s*=\\s*20",
+      "message": "ESP32-C3 idle power saving must use its supported 20 MHz XTAL/2 floor, never the ESP32-only 10 MHz divider."
+    },
+    {
+      "id": "firmware-clock-rejection-is-not-retried",
+      "type": "required_pattern",
+      "path": "firmware/lib/hal/HalPowerManager.cpp",
+      "pattern": "rejectedFrequencyMhz == targetFrequency[\\s\\S]*?return",
+      "message": "A deterministic clock-configuration rejection must not be retried on every main-loop iteration."
+    },
+    {
+      "id": "runtime-freeze-trace-is-rtc-retained",
+      "type": "required_pattern",
+      "path": "firmware/src/RuntimeTrace.cpp",
+      "pattern": "RTC_NOINIT_ATTR RetainedTrace[\\s\\S]*?printSnapshot\\(output, \"PREVIOUS\"[\\s\\S]*?printSnapshot\\(output, \"ACTIVE\"",
+      "message": "Hardware freeze diagnostics must survive a reset without writing SD or NVS in the main loop."
+    },
+    {
+      "id": "companion-radio-stops-before-deep-sleep",
+      "type": "required_pattern",
+      "path": "firmware/src/main.cpp",
+      "pattern": "goToSleep\\(fromTimeout\\)[\\s\\S]*?shutdownForDeepSleep\\(750\\)",
+      "message": "The truthful sleep frame must render before bounded BLE controller teardown."
+    },
+    {
+      "id": "deep-sleep-does-not-reopen-radio",
+      "type": "forbidden_pattern",
+      "path": "firmware/src/main.cpp",
+      "pattern": "syncBeforeSleep|resumeFastRadio",
+      "message": "Entering sleep must never reopen Bluetooth; durable phone work replays after the next wake."
+    },
+    {
+      "id": "companion-radio-teardown-preserves-bonds",
+      "type": "required_pattern",
+      "path": "firmware/src/companion/CompanionService.cpp",
+      "pattern": "shutdownForDeepSleep\\(uint32_t timeoutMs\\)[\\s\\S]*?xTaskCreate[\\s\\S]*?NimBLEDevice::deinit\\(false\\)[\\s\\S]*?millis\\(\\) - startedAt\\) < timeoutMs",
+      "message": "Deep-sleep BLE teardown must preserve bonds and keep every vendor call behind a hard deadline."
+    },
+    {
+      "id": "standby-advertising-restart-restores-full-clock",
+      "type": "required_pattern",
+      "path": "firmware/src/companion/CompanionService.cpp",
+      "pattern": "requiresFullClock\\(\\) const[\\s\\S]*?standbyPulseStartDue\\(\\)[\\s\\S]*?bool CompanionService::standbyPulseStartDue\\(\\) const[\\s\\S]*?millis\\(\\) - standbyPulseStartedAtMs_[\\s\\S]*?if \\(standbyPulseStartDue\\(\\)\\)[\\s\\S]*?advertising_->start\\(\\)",
+      "message": "A due standby advertising restart must restore full CPU speed before entering the synchronous NimBLE start path."
+    },
+    {
+      "id": "firmware-version-does-not-invalidate-all-objects",
+      "type": "forbidden_pattern",
+      "path": "firmware/platformio.ini",
+      "pattern": "-DCROSSPOINT_VERSION",
+      "message": "Firmware versions must be generated into one translation unit; a global version define forces a full seven-minute rebuild for every candidate."
+    },
+    {
+      "id": "quick-resume-makes-sleep-explicit",
+      "type": "required_pattern",
+      "path": "firmware/src/activities/boot_sleep/SleepActivity.cpp",
+      "pattern": "renderLastScreenSleepScreen\\(\\)[\\s\\S]*?STR_SLEEPING[\\s\\S]*?STR_POWER_ON_HINT",
+      "message": "Quick Resume must visibly distinguish sleep from the retained awake screen and explain the power-button wake action."
+    },
+    {
+      "id": "radio-policy-invalidates-home-generically",
+      "type": "required_pattern",
+      "path": "firmware/src/companion/CompanionService.cpp",
+      "pattern": "persistRadioPolicy\\(\\)[\\s\\S]*?refreshHomeIfVisible\\(\\)",
+      "message": "An acknowledged radio-policy change must invalidate Home through the reusable UI bridge."
+    },
+    {
+      "id": "ticket-formats-share-android-hierarchy",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/components/TicketContent.kt",
+      "pattern": "UnifiedPassBody\\(",
+      "message": "Matrix and linear ticket formats must share one Android information hierarchy."
+    },
+    {
+      "id": "oem-stock-source-is-distinct",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/data/FirmwareReleaseRepository.kt",
+      "pattern": "FirmwareSource\\.XteinkStock[\\s\\S]*?XT V5\\.1\\.6 EN[\\s\\S]*?49926e09526a0201688ea6ac1936a8e62588f66dcd06297f2a011114ede42525",
+      "message": "The OEM XTEINK stock source must remain distinct and checksum-pinned."
+    },
+    {
+      "id": "usb-setup-reset-is-nvs-bounded",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/data/UsbEspFlasher.kt",
+      "pattern": "NvsOffset = 0x9000[\\s\\S]*?NvsSize = 0x5000",
+      "message": "USB setup reset must remain bounded to the X3 NVS partition."
+    },
+    {
+      "id": "usb-reconnect-state-is-explicit",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/data/UsbEspFlasher.kt",
+      "pattern": "ReconnectRequired[\\s\\S]*?Disconnect and reconnect X3 USB to continue",
+      "message": "A post-flash USB disappearance must preserve explicit disconnect/reconnect guidance."
+    },
+    {
+      "id": "ui-decision-workflow-is-documented",
+      "type": "required_pattern",
+      "path": "docs/ui-decision-workflow.md",
+      "pattern": "## Mandatory sequence[\\s\\S]*?## Definition of done[\\s\\S]*?## Prohibited shortcuts",
+      "message": "UI work must retain the structured research, hierarchy, state, and render-verification workflow."
+    },
+    {
+      "id": "ui-surfaces-have-render-evidence",
+      "type": "ui_surface_evidence",
+      "path": "docs/ui-surface-evidence.json",
+      "message": "Every registered UI surface must keep default and adaptive screenshot evidence."
+    },
+    {
+      "id": "settings-does-not-delegate-google-to-setup",
+      "type": "forbidden_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/components/SharedComponents.kt",
+      "pattern": "Run setup again to opt in",
+      "message": "Settings must own Google backup connection instead of replaying setup."
+    },
+    {
+      "id": "onboarding-uses-finished-illustrations",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/components/SetupScreen.kt",
+      "pattern": "onboarding_welcome[\\s\\S]*?onboarding_library[\\s\\S]*?onboarding_device",
+      "message": "The three onboarding pages must keep the coordinated finished illustration set."
+    }
+  ]
+}

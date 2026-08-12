@@ -252,6 +252,9 @@ void hideTicketIfVisible() {
     activityManager.goHome(HomeMenuItem::TICKET);
   }
 }
+void refreshHomeIfVisible() {
+  if (activityManager.isHomeActivity()) activityManager.requestUpdate();
+}
 void refreshFocus() { activityManager.requestUpdate(); }
 }  // namespace companion
 #endif

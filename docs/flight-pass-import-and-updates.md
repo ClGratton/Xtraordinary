@@ -2,7 +2,7 @@
 
 ## Architecture
 
-The ticket and Focus timer are native X3 screens. Android sends bounded session or boarding-pass data over the existing companion protocol; it does not stream a dynamic bitmap page to the device. This keeps transfers small and lets the X3 retain a static e-ink ticket after Bluetooth disconnects.
+The ticket and Focus timer are native X3 screens. Android sends bounded ticket fields plus a small one-bit barcode bitmap over the companion protocol. It does not stream the complete screen. This keeps transfers bounded and lets the X3 retain a static e-ink ticket after Bluetooth disconnects.
 
 ## Supported import inputs
 
@@ -14,9 +14,15 @@ The Android **Import flight** action accepts:
 
 The importer extracts route, flight, time, gate, seat, passenger, boarding group, and the barcode value. It does not place issuer credentials in the app. A decoded save JWT is user-selected input, not proof that the issuer signature is trusted.
 
-Imported passes currently remain in the running app session and are not written to local storage. This avoids silently persisting a sensitive boarding barcode; explicit secure persistence can be added later if required.
+Imported passes are stored in the app's private local preferences so a process restart cannot bring the demo cards back over a real import. Android backup is disabled for this app data, and the optional Google reading-history backup explicitly excludes boarding passes.
 
-The current X3 renderer re-encodes the imported barcode value as a QR code. This is suitable only when the source pass uses a QR-compatible workflow. PDF417, Aztec, and other barcode symbologies need explicit renderer support before they can be considered scanner-ready.
+Android decodes the source value and symbology, regenerates the same real symbology with ZXing, and uses the resulting one-bit BMP for both the app preview and X3. `BeginTicketBarcode`, sequential `TicketBarcodeChunk` packets, and `CommitTicketBarcode` validate a staged image; `ShowTicket` then promotes it alongside the matching fields. A disconnect before `ShowTicket` discards only the staged image. The X3 validates 1-bit BMP dimensions before promotion and never substitutes QR for a successfully imported PDF417 or Aztec pass.
+
+The image is bounded to 340 x 340 pixels and 64 KiB, includes the encoder's quiet zone, and persists beside the ticket metadata on the SD card. Each chunk is protected by the normal envelope CRC and exact sequential offset checks. A disconnected transfer leaves the previous committed barcode untouched.
+
+## One hierarchy, two scanner formats
+
+QR/Aztec-style matrix codes and PDF417/linear barcodes are variants of the same pass, not separate ticket designs. Android therefore keeps the same order for both: route, status and flight, departure/gate/terminal/seat, then the scanner code. Only the code chamber changes aspect ratio. X3 uses the same order, anchors the code in the lower half of the display, and exposes the rotated fullscreen **Scan** action only when the transmitted bitmap is wider than it is tall.
 
 ## Static and Live modes
 

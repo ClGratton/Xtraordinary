@@ -46,11 +46,21 @@ void HalPowerManager::setPowerSaving(bool enabled, int minimumFrequencyMhz) {
   const int currentFrequency = getCpuFrequencyMhz();
 
   if (currentFrequency != targetFrequency) {
-    LOG_DBG("PWR", "Changing CPU frequency from %d to %d MHz", currentFrequency, targetFrequency);
-    if (!setCpuFrequencyMhz(targetFrequency)) {
-      LOG_DBG("PWR", "Failed to set CPU frequency = %d MHz", targetFrequency);
+    // rtc_clk_cpu_freq_mhz_to_config() rejects unsupported frequencies
+    // deterministically for the running SoC. Do not hammer the Arduino clock
+    // setter after a rejection: its error path allocates a supported-frequency
+    // string, so an unbounded retry loop can exhaust heap and starve input.
+    if (rejectedFrequencyMhz == targetFrequency) {
       return;
     }
+    LOG_DBG("PWR", "Changing CPU frequency from %d to %d MHz", currentFrequency, targetFrequency);
+    if (!setCpuFrequencyMhz(targetFrequency)) {
+      rejectedFrequencyMhz = targetFrequency;
+      LOG_ERR("PWR", "Rejected unsupported CPU frequency = %d MHz; remaining at %d MHz", targetFrequency,
+              currentFrequency);
+      return;
+    }
+    rejectedFrequencyMhz = 0;
     isLowPower = targetFrequency != normalFreq;
   }
 

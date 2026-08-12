@@ -11,6 +11,7 @@
 #include <Xtc.h>
 
 #include <cstring>
+#include <cstdio>
 #include <vector>
 
 #include "CrossPointSettings.h"
@@ -292,7 +293,10 @@ void HomeActivity::render(RenderLock&&) {
     const int pillY = pageHeight - metrics.buttonHintsHeight - lowPowerPillHeight - metrics.verticalSpacing;
     const int pillWidth = pageWidth - metrics.contentSidePadding * 2;
     renderer.fillRoundedRect(pillX, pillY, pillWidth, lowPowerPillHeight, lowPowerPillHeight / 2, Color::LightGray);
-    renderer.drawCenteredText(SMALL_FONT_ID, pillY + 10, "Low-power Bluetooth");
+    char standbyLabel[48];
+    std::snprintf(standbyLabel, sizeof(standbyLabel), "Bluetooth standby · up to %u s",
+                  static_cast<unsigned>((companion::companionService.standbyAdvertisingIntervalMs() + 999u) / 1000u));
+    renderer.drawCenteredText(SMALL_FONT_ID, pillY + 10, standbyLabel);
     renderer.drawCenteredText(SMALL_FONT_ID, pillY + 29, "Press any button for fast connection");
   }
 

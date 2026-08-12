@@ -7,11 +7,16 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.xteink.companion.data.BluetoothCompanionClient
+import com.xteink.companion.data.BarcodeRasterizer
 import com.xteink.companion.data.BookLibraryRepository
 import com.xteink.companion.data.FirmwareRelease
 import com.xteink.companion.data.FirmwareReleaseRepository
 import com.xteink.companion.data.FirmwareSource
+import com.xteink.companion.data.FlightBarcodeFormat
 import com.xteink.companion.data.ImportedFlightPass
+import com.xteink.companion.data.InteractiveTransportCoordinator
+import com.xteink.companion.data.InteractiveTransportContract
+import com.xteink.companion.data.InteractiveTransportOwner
 import com.xteink.companion.data.LinkPhase
 import com.xteink.companion.data.ReadingStatsRepository
 import com.xteink.companion.data.ReadingSessionStat
@@ -35,10 +40,16 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 import java.security.MessageDigest
 
 class CompanionViewModel(application: Application) : AndroidViewModel(application) {
     private val readingStatsRepository = ReadingStatsRepository(application)
+    private val focusSessionStore = FocusSessionStore(application)
+    private val initialFocus = focusSessionStore.load()
+    private val presentationStore = CompanionPresentationStore(application)
+    private val initialVisualTheme = presentationStore.loadVisualTheme()
     private val radioPreferences =
         application.getSharedPreferences("xtraordinary_radio_policy", Application.MODE_PRIVATE)
     private val ticketPreferences =
@@ -50,20 +61,28 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     }.getOrDefault(TicketMode.Static)
     private val initialTicketOnX3 = ticketPreferences.getBoolean("is_on_x3", false)
     private val initialTicketRemovalPending = ticketPreferences.getBoolean("removal_pending", false)
+    private val initialImportedPasses = decodeStoredPasses(ticketPreferences.getString("passes_json", null))
     private val initialPendingTicketPayload = ticketPreferences.getString("pending_show_payload", null)?.let { encoded ->
         runCatching { PayloadCodec.decodeBoardingPass(Base64.decode(encoded, Base64.DEFAULT)) }.getOrNull()
     }
     private val initialRadioPolicy = RadioPolicyUiState(
         fastWindowMinutes = radioPreferences.getInt("fast_window_minutes", 5),
-        slowIntervalMs = radioPreferences.getInt("slow_interval_ms", 2_000),
+        standbyIntervalSeconds = radioPreferences.getInt("standby_interval_seconds", 30),
+        connectedIntervalMs = radioPreferences.getInt(
+            "connected_interval_ms",
+            radioPreferences.getInt("slow_interval_ms", 2_000),
+        ),
         sleepAfterMinutes = radioPreferences.getInt("sleep_after_minutes", 10),
         fullRefreshPages = radioPreferences.getInt("full_refresh_pages", 15),
+        powerButtonHoldMs = radioPreferences.getInt("power_button_hold_ms", 1_000),
     )
     private val initialRadioPolicySyncPending = radioPreferences.getBoolean("sync_pending", true)
     private val initialBatteryPercentage = radioPreferences.getInt("last_battery_percentage", -1)
         .takeIf { it in 0..100 }
     private val _uiState = MutableStateFlow(
         CompanionUiState(
+            visualTheme = initialVisualTheme,
+            focus = initialFocus,
             radioPolicy = initialRadioPolicy,
             device = DeviceUiState(
                 batteryPercentage = initialBatteryPercentage,
@@ -71,6 +90,8 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             ),
             ticket = TicketUiState(
                 mode = initialTicketMode,
+                passes = initialImportedPasses.ifEmpty { TicketUiState().passes },
+                selectedPassId = initialImportedPasses.firstOrNull()?.id ?: TicketUiState().selectedPassId,
                 isOnX3 = initialTicketOnX3,
                 sendPending = initialPendingTicketPayload != null,
                 removalPending = initialTicketRemovalPending,
@@ -99,14 +120,19 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     private var radioPolicySyncJob: Job? = null
     private var readingQuietJob: Job? = null
     private var bookUploadJob: Job? = null
+    private var interactiveTransportRenewalJob: Job? = null
     private var lastDeletedReadingSession: ReadingSessionStat? = null
     private var radioPolicyRevision = 0L
     private var radioPolicySyncPending = initialRadioPolicySyncPending
     private var radioPolicyValidatedForConnection = false
+    private var lastTicketCapabilitiesSequence = -1L
     private var appForeground = false
+    private var foregroundProbePending = false
+    private val interactiveTransport = InteractiveTransportCoordinator()
     private var intentionalTransportIdle = true
     private var reconnectAttempt = 0
-    private var pendingFocusSync = false
+    private var pendingFocusSync = initialFocus.phase == FocusPhase.Running ||
+        initialFocus.phase == FocusPhase.Paused
     private var liveTicketActive = initialTicketOnX3 && initialTicketMode == TicketMode.Live
     private var pendingTicketPayload: BoardingPassPayload? = initialPendingTicketPayload
     private val pendingDeletePaths = connectionPreferences
@@ -131,6 +157,11 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             companionClient.state.collect { link ->
                 val capabilities = link.capabilities
+                val hasFreshTicketSnapshot = capabilities != null &&
+                    link.capabilitiesSequence != lastTicketCapabilitiesSequence
+                if (hasFreshTicketSnapshot) {
+                    lastTicketCapabilitiesSequence = link.capabilitiesSequence
+                }
                 if (link.phase == LinkPhase.Connected && link.requestedModel != null) {
                     connectionPreferences.edit().putString(LastConnectedModelKey, link.requestedModel).apply()
                 }
@@ -150,10 +181,11 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                     // instead of starting an endless reconnect loop.
                     intentionalTransportIdle = true
                 }
-                if (capabilities != null) {
-                    val removalPending = capabilities.ticketPresent && _uiState.value.ticket.removalPending
-                    persistTicketState(capabilities.ticketPresent, _uiState.value.ticket.mode, removalPending)
-                    if (!capabilities.ticketPresent) liveTicketActive = false
+                if (hasFreshTicketSnapshot) {
+                    val ticketPresent = capabilities.ticketPresent
+                    val removalPending = ticketPresent && _uiState.value.ticket.removalPending
+                    persistTicketState(ticketPresent, _uiState.value.ticket.mode, removalPending)
+                    if (!ticketPresent) liveTicketActive = false
                 }
                 if (transportConnected && capabilities != null && !radioPolicyValidatedForConnection) {
                     // The phone policy is authoritative. Re-apply it once per
@@ -166,6 +198,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 } else if (!transportConnected) {
                     radioPolicyValidatedForConnection = false
                 }
+                if (transportConnected && capabilities != null) foregroundProbePending = false
                 link.deviceStatus?.batteryPercentage?.let { percentage ->
                     radioPreferences.edit().putInt("last_battery_percentage", percentage).apply()
                 }
@@ -191,12 +224,18 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                             charging = transportConnected && link.deviceStatus?.charging == true,
                             settingsSyncPending = radioPolicySyncPending,
                         ),
-                        ticket = if (capabilities == null) state.ticket else state.ticket.copy(
-                            isOnX3 = capabilities.ticketPresent,
-                            removalPending = capabilities.ticketPresent && state.ticket.removalPending,
+                        // A Capabilities packet is authoritative once. Reusing its
+                        // pre-command ticketPresent bit after ShowTicket is ACKed
+                        // would roll the UI back until the next reconnect.
+                        ticket = reconcileTicketFromCapabilities(
+                            ticket = state.ticket,
+                            ticketPresent = capabilities?.ticketPresent ?: false,
+                            hasFreshSnapshot = hasFreshTicketSnapshot,
                         ),
                     )
                 }
+                syncPassesInteractiveOwner()
+                scheduleInteractiveLeaseForConnection(link.capabilitiesSequence)
                 if (transportConnected && capabilities != null) {
                     reconnectAttempt = 0
                     reconnectJob?.cancel()
@@ -241,11 +280,13 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                     _uiState.update { state ->
                     val firmwarePhase = when (usb.phase) {
                         UsbFlashPhase.EnteringBootloader,
+                        UsbFlashPhase.ResettingSetup,
                         UsbFlashPhase.Erasing,
                         UsbFlashPhase.Writing,
                         UsbFlashPhase.Verifying,
                         UsbFlashPhase.Restarting -> FirmwareCheckPhase.Transferring
-                        UsbFlashPhase.Complete -> FirmwareCheckPhase.Complete
+                        UsbFlashPhase.Complete,
+                        UsbFlashPhase.ReconnectRequired -> FirmwareCheckPhase.Complete
                         UsbFlashPhase.Error -> if (state.device.firmwareCheckPhase == FirmwareCheckPhase.Transferring) {
                             FirmwareCheckPhase.Error
                         } else state.device.firmwareCheckPhase
@@ -277,6 +318,9 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                         ),
                     )
                 }
+                if (_uiState.value.focus.phase == FocusPhase.Review) {
+                    focusSessionStore.save(_uiState.value.focus)
+                }
                 // A persistent Focus or Live session must recover even if an
                 // Android GATT callback races the one-shot reconnect job. This
                 // watchdog only acts while the app is foregrounded and no scan
@@ -294,24 +338,29 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun setVisualTheme(theme: CompanionVisualTheme) {
+        presentationStore.saveVisualTheme(theme)
         _uiState.update { it.copy(visualTheme = theme) }
     }
 
     fun setRadioPolicy(policy: RadioPolicyUiState) {
         val normalized = policy.copy(
             fastWindowMinutes = policy.fastWindowMinutes.coerceIn(1, 30),
-            slowIntervalMs = policy.slowIntervalMs.coerceIn(500, 4_000),
+            standbyIntervalSeconds = policy.standbyIntervalSeconds.coerceIn(10, 300),
+            connectedIntervalMs = policy.connectedIntervalMs.coerceIn(500, 4_000),
             sleepAfterMinutes = policy.sleepAfterMinutes.coerceIn(
                 policy.fastWindowMinutes.coerceIn(1, 30) + 1,
                 60,
             ),
             fullRefreshPages = policy.fullRefreshPages.takeIf { it in setOf(1, 5, 10, 15, 30) } ?: 15,
+            powerButtonHoldMs = policy.powerButtonHoldMs.takeIf { it in setOf(0, 1_000, 2_000) } ?: 1_000,
         )
         radioPreferences.edit()
             .putInt("fast_window_minutes", normalized.fastWindowMinutes)
-            .putInt("slow_interval_ms", normalized.slowIntervalMs)
+            .putInt("standby_interval_seconds", normalized.standbyIntervalSeconds)
+            .putInt("connected_interval_ms", normalized.connectedIntervalMs)
             .putInt("sleep_after_minutes", normalized.sleepAfterMinutes)
             .putInt("full_refresh_pages", normalized.fullRefreshPages)
+            .putInt("power_button_hold_ms", normalized.powerButtonHoldMs)
             .putBoolean("sync_pending", true)
             .apply()
         radioPolicyRevision++
@@ -337,15 +386,26 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 val revision = radioPolicyRevision
                 val policy = _uiState.value.radioPolicy
                 val result = runCatching {
+                    val capabilities = companionClient.state.value.capabilities
+                        ?: error("X3 capabilities are not available")
+                    if (capabilities.radioPolicyVersion < 2) {
+                        error("Update X3 firmware to apply separate Bluetooth standby check-ins")
+                    }
                     companionClient.setRadioPolicy(
                         RadioPolicy(
                             fastWindowMinutes = policy.fastWindowMinutes,
-                            slowIntervalMs = policy.slowIntervalMs,
+                            standbyIntervalSeconds = policy.standbyIntervalSeconds,
+                            connectedIntervalMs = policy.connectedIntervalMs,
                             sleepAfterMinutes = policy.sleepAfterMinutes,
                         ),
                     )
-                    if (companionClient.state.value.capabilities?.supportsReaderPolicy == true) {
-                        companionClient.setReaderPolicy(policy.fullRefreshPages)
+                    if (capabilities.supportsReaderPolicy) {
+                        val policyVersion = capabilities.readerPolicyVersion
+                        companionClient.setReaderPolicy(
+                            policy.fullRefreshPages,
+                            policy.powerButtonHoldMs,
+                            policyVersion,
+                        )
                     }
                 }
                 if (result.isFailure) {
@@ -362,7 +422,15 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             }
             radioPolicySyncJob = null
-            releaseBackgroundTransportIfIdle()
+            if (radioPolicySyncPending && _uiState.value.isX3TransportConnected) {
+                // An edit can land after the loop observes a clean revision but
+                // before this job publishes completion. Always hand the newest
+                // desired state to a fresh worker instead of leaving the chip
+                // at "Waiting for X3" until another tap.
+                syncRadioPolicy()
+            } else {
+                releaseTransportIfIdle()
+            }
         }
     }
 
@@ -371,6 +439,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             if (state.focus.phase != FocusPhase.Setup) state
             else state.copy(focus = state.focus.copy(task = task.take(80)))
         }
+        focusSessionStore.save(_uiState.value.focus)
     }
 
     fun setDuration(minutes: Int) {
@@ -384,6 +453,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 ),
             )
         }
+        focusSessionStore.save(_uiState.value.focus)
     }
 
     fun startFocus() {
@@ -397,6 +467,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 notice = if (state.isX3Connected) null else UiNotice.FocusStartedWithoutX3,
             )
         }
+        focusSessionStore.save(_uiState.value.focus)
         requestFocusSync()
     }
 
@@ -409,6 +480,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             }
             state.copy(focus = state.focus.copy(phase = nextPhase))
         }
+        focusSessionStore.save(_uiState.value.focus)
         requestFocusSync()
     }
 
@@ -421,6 +493,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 ),
             )
         }
+        focusSessionStore.save(_uiState.value.focus)
         requestFocusSync()
     }
 
@@ -434,29 +507,35 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 ),
             )
         }
+        focusSessionStore.save(_uiState.value.focus)
         requestFocusSync()
     }
 
     fun showTools() {
         _uiState.update { it.copy(surface = CompanionSurface.Tools) }
+        syncPassesInteractiveOwner()
     }
 
     fun showRead() {
         _uiState.update { it.copy(surface = CompanionSurface.Read) }
+        syncPassesInteractiveOwner()
     }
 
     fun showFocus() {
         _uiState.update { it.copy(surface = CompanionSurface.Focus) }
+        syncPassesInteractiveOwner()
     }
 
     fun openPasses() {
         _uiState.update {
             it.copy(surface = CompanionSurface.Tools, toolDestination = ToolDestination.Passes)
         }
+        syncPassesInteractiveOwner()
     }
 
     fun showToolHub() {
         _uiState.update { it.copy(toolDestination = ToolDestination.Hub) }
+        syncPassesInteractiveOwner()
     }
 
     fun setTicketMode(mode: TicketMode) {
@@ -465,6 +544,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun openStats() {
         _uiState.update { it.copy(surface = CompanionSurface.Tools, toolDestination = ToolDestination.Stats) }
+        syncPassesInteractiveOwner()
     }
 
     fun setReadingStatsView(view: ReadingStatsView) {
@@ -561,15 +641,19 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             boardingGroup = pass.boardingGroup,
             source = pass.source,
             barcodePayload = pass.barcodePayload,
+            barcodeFormat = pass.barcodeFormat,
         )
         _uiState.update { state ->
-            val passes = listOf(imported) + state.ticket.passes.filterNot { it.id == imported.id }
+            val passes = listOf(imported) + state.ticket.passes.filterNot {
+                it.id == imported.id || it.isSample
+            }
             state.copy(
                 surface = CompanionSurface.Tools,
                 toolDestination = ToolDestination.Passes,
                 ticket = state.ticket.copy(passes = passes, selectedPassId = imported.id),
             )
         }
+        persistImportedPasses()
     }
 
     fun reportFlightPassImportFailure(error: Throwable) {
@@ -687,21 +771,25 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun onAppForegrounded() {
         appForeground = true
+        foregroundProbePending = true
         intentionalTransportIdle = false
         backgroundDisconnectJob?.cancel()
         backgroundDisconnectJob = null
         ensureTransportConnected()
+        syncPassesInteractiveOwner()
     }
 
     fun onAppBackgrounded() {
         appForeground = false
+        foregroundProbePending = false
+        syncPassesInteractiveOwner()
         backgroundDisconnectJob?.cancel()
         backgroundDisconnectJob = viewModelScope.launch {
             delay(BackgroundDisconnectGraceMs)
             val state = _uiState.value
             val firmwareInProgress = state.device.firmwareCheckPhase == FirmwareCheckPhase.Downloading ||
                 state.device.firmwareCheckPhase == FirmwareCheckPhase.Transferring
-            if (!firmwareInProgress && !liveTicketActive && !requiresPersistentTransport()) {
+            if (!firmwareInProgress && !requiresPersistentTransport()) {
                 intentionalTransportIdle = true
                 reconnectJob?.cancel()
                 reconnectJob = null
@@ -718,6 +806,32 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun checkLatestFirmware(model: String) = checkFirmware(model, FirmwareSource.Xtraordinary)
+
+    fun prepareLocalFirmware(model: String, uri: Uri) {
+        _uiState.update {
+            it.copy(device = it.device.copy(
+                firmwareCheckPhase = FirmwareCheckPhase.Checking,
+                firmwareSource = FirmwareSource.LocalFile,
+                latestFirmwareVersion = null,
+                message = null,
+            ))
+        }
+        viewModelScope.launch {
+            runCatching { firmwareReleases.localFor(model, uri) }
+                .onSuccess { release ->
+                    latestRelease = release
+                    _uiState.update {
+                        it.copy(device = it.device.copy(
+                            firmwareCheckPhase = FirmwareCheckPhase.Available,
+                            firmwareSource = FirmwareSource.LocalFile,
+                            latestFirmwareVersion = release.version,
+                            message = "SHA-256 ${release.sha256.uppercase()}",
+                        ))
+                    }
+                }
+                .onFailure { reportDeviceError(it) }
+        }
+    }
 
     fun checkFirmware(model: String, source: FirmwareSource) {
         _uiState.update {
@@ -825,6 +939,29 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             it.copy(surface = CompanionSurface.Read)
         }
     }
+
+    fun resetX3SetupOverUsb() {
+        if (!_uiState.value.device.usbConnected) {
+            _uiState.update {
+                it.copy(notice = UiNotice.DeviceMessage("Connect the X3 to this phone by USB before resetting"))
+            }
+            return
+        }
+        viewModelScope.launch {
+            val result = runCatching {
+                prepareForExternalDeviceReset()
+                usbFlasher.resetSetupData()
+            }
+            if (result.isSuccess) {
+                _uiState.update {
+                    it.copy(notice = UiNotice.DeviceMessage("X3 setup and pairing reset; SD card preserved"))
+                }
+            } else {
+                result.exceptionOrNull()?.let(::reportDeviceError)
+            }
+        }
+    }
+
 
     fun requestUploadBooksToX3(bookIds: Set<String>, method: BookTransferMethod) {
         if (bookIds.isEmpty() || _uiState.value.read.uploadingToX3) return
@@ -964,7 +1101,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 )
             }
             bookUploadJob = null
-            releaseBackgroundTransportIfIdle()
+            releaseTransportIfIdle()
         }
     }
 
@@ -1014,6 +1151,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             passenger = pass.passenger,
             boardingGroup = pass.boardingGroup,
             barcodePayload = pass.barcodePayload,
+            barcodeFormat = pass.barcodeFormat.name,
         )
         persistPendingTicketPayload()
         _uiState.update { it.copy(ticket = it.ticket.copy(sendPending = true)) }
@@ -1026,7 +1164,12 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         if (!companionClient.isReady() || ticketSendJob?.isActive == true) return
         ticketSendJob = viewModelScope.launch {
             val result = runCatching {
-                companionClient.showTicket(payload)
+                val format = runCatching { FlightBarcodeFormat.valueOf(payload.barcodeFormat) }
+                    .getOrDefault(FlightBarcodeFormat.Unknown)
+                val barcodeBmp = BarcodeRasterizer.render(payload.barcodePayload, format).bmpBytes
+                withInteractiveTransport(TicketTransferOwner) {
+                    companionClient.showTicket(payload, barcodeBmp)
+                }
             }
             if (result.isSuccess) {
                 pendingTicketPayload = null
@@ -1057,6 +1200,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 handleDeferredTransportFailure(result.exceptionOrNull())
             }
             ticketSendJob = null
+            releaseTransportIfIdle()
         }
     }
 
@@ -1104,6 +1248,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun showSettings(show: Boolean) {
         _uiState.update { it.copy(settingsVisible = show) }
+        syncPassesInteractiveOwner()
     }
 
     private fun persistTicketState(present: Boolean, mode: TicketMode, removalPending: Boolean) {
@@ -1113,6 +1258,63 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             .putBoolean("removal_pending", removalPending)
             .apply()
     }
+
+    private fun persistImportedPasses() {
+        val passes = _uiState.value.ticket.passes.filterNot { it.isSample }
+        val array = JSONArray()
+        passes.forEach { pass ->
+            array.put(
+                JSONObject()
+                    .put("id", pass.id)
+                    .put("origin", pass.origin)
+                    .put("destination", pass.destination)
+                    .put("flight", pass.flight)
+                    .put("status", pass.status)
+                    .put("departureTime", pass.departureTime)
+                    .put("gate", pass.gate)
+                    .put("terminal", pass.terminal)
+                    .put("seat", pass.seat)
+                    .put("passenger", pass.passenger)
+                    .put("boardingGroup", pass.boardingGroup)
+                    .put("source", pass.source)
+                    .put("barcodePayload", pass.barcodePayload)
+                    .put("barcodeFormat", pass.barcodeFormat.name),
+            )
+        }
+        ticketPreferences.edit().putString("passes_json", array.toString()).apply()
+    }
+
+    private fun decodeStoredPasses(encoded: String?): List<BoardingPassUiState> = runCatching {
+        val array = JSONArray(encoded ?: "[]")
+        buildList {
+            for (index in 0 until array.length()) {
+                val value = array.getJSONObject(index)
+                val payload = value.getString("barcodePayload")
+                if (payload.isBlank()) continue
+                add(
+                    BoardingPassUiState(
+                        id = value.getString("id"),
+                        origin = value.optString("origin", "---"),
+                        destination = value.optString("destination", "---"),
+                        flight = value.optString("flight", "Flight"),
+                        status = value.optString("status", "Imported"),
+                        departureTime = value.optString("departureTime"),
+                        countdown = "",
+                        gate = value.optString("gate", "TBD"),
+                        terminal = value.optString("terminal"),
+                        seat = value.optString("seat", "TBD"),
+                        passenger = value.optString("passenger", "Passenger"),
+                        boardingGroup = value.optString("boardingGroup"),
+                        source = value.optString("source", "Imported pass"),
+                        barcodePayload = payload,
+                        barcodeFormat = runCatching {
+                            FlightBarcodeFormat.valueOf(value.optString("barcodeFormat"))
+                        }.getOrDefault(FlightBarcodeFormat.Unknown),
+                    ),
+                )
+            }
+        }
+    }.getOrDefault(emptyList())
 
     private fun persistPendingTicketPayload() {
         val encoded = pendingTicketPayload?.let {
@@ -1179,16 +1381,93 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun requiresPersistentTransport(): Boolean {
         val state = _uiState.value
-        val focusNeedsLink = state.focus.phase == FocusPhase.Running || state.focus.phase == FocusPhase.Paused
         val firmwareNeedsLink = state.device.firmwareCheckPhase == FirmwareCheckPhase.Downloading ||
             state.device.firmwareCheckPhase == FirmwareCheckPhase.Transferring
         val bluetoothBookUpload = pendingBookUploadMethod == BookTransferMethod.Bluetooth &&
             (pendingBookUploadIds.isNotEmpty() || bookUploadJob?.isActive == true)
-        return radioPolicySyncPending || pendingTicketPayload != null || liveTicketActive || ticketSendJob?.isActive == true || focusNeedsLink || firmwareNeedsLink || pendingFocusSync || bluetoothBookUpload ||
+        return interactiveTransport.isActive || radioPolicySyncPending || pendingTicketPayload != null || ticketSendJob?.isActive == true || firmwareNeedsLink || pendingFocusSync || bluetoothBookUpload ||
             pendingDeletePaths.isNotEmpty() || state.ticket.removalPending
     }
 
-    private fun canMaintainTransport(): Boolean = appForeground || requiresPersistentTransport()
+    private fun canMaintainTransport(): Boolean = foregroundProbePending || requiresPersistentTransport()
+
+    private fun syncPassesInteractiveOwner() {
+        val state = _uiState.value
+        val visible = appForeground &&
+            !state.settingsVisible &&
+            state.surface == CompanionSurface.Tools &&
+            state.toolDestination == ToolDestination.Passes
+        if (visible) {
+            acquireInteractiveTransport(PassesScreenOwner)
+        } else {
+            releaseInteractiveTransport(PassesScreenOwner)
+        }
+    }
+
+    private fun acquireInteractiveTransport(owner: InteractiveTransportOwner) {
+        if (!interactiveTransport.acquire(owner)) return
+        intentionalTransportIdle = false
+        ensureTransportConnected()
+        scheduleInteractiveLeaseForConnection()
+        interactiveTransportRenewalJob?.cancel()
+        interactiveTransportRenewalJob = viewModelScope.launch {
+            while (isActive && interactiveTransport.isActive) {
+                delay(InteractiveTransportContract.RenewalIntervalMs)
+                applyInteractiveLease(force = true)
+            }
+        }
+    }
+
+    private fun releaseInteractiveTransport(owner: InteractiveTransportOwner) {
+        if (!interactiveTransport.release(owner)) return
+        interactiveTransportRenewalJob?.cancel()
+        interactiveTransportRenewalJob = null
+        if (companionClient.isReady()) {
+            viewModelScope.launch {
+                runCatching { companionClient.releaseInteractiveLease() }
+                    .onFailure { error ->
+                        Log.i("CompanionViewModel", "Interactive link release was unavailable", error)
+                    }
+            }
+        }
+        releaseTransportIfIdle()
+    }
+
+    private suspend fun <T> withInteractiveTransport(
+        owner: InteractiveTransportOwner,
+        block: suspend () -> T,
+    ): T {
+        acquireInteractiveTransport(owner)
+        return try {
+            applyInteractiveLease(force = true)
+            block()
+        } finally {
+            releaseInteractiveTransport(owner)
+        }
+    }
+
+    private fun scheduleInteractiveLeaseForConnection(
+        capabilitiesSequence: Long = companionClient.state.value.capabilitiesSequence,
+    ) {
+        viewModelScope.launch {
+            applyInteractiveLease(capabilitiesSequence = capabilitiesSequence)
+        }
+    }
+
+    private suspend fun applyInteractiveLease(
+        capabilitiesSequence: Long = companionClient.state.value.capabilitiesSequence,
+        force: Boolean = false,
+    ) {
+        if (!companionClient.isReady() ||
+            !interactiveTransport.shouldApplyLease(capabilitiesSequence, force)
+        ) return
+        runCatching {
+            companionClient.acquireInteractiveLease(InteractiveTransportContract.LeaseSeconds)
+        }.onFailure { error ->
+            interactiveTransport.markLeaseFailed(capabilitiesSequence)
+            Log.i("CompanionViewModel", "Interactive link lease was unavailable", error)
+        }
+    }
 
     private fun scheduleReadingRadioQuiet() {
         if (readingQuietJob?.isActive == true) return
@@ -1238,8 +1517,8 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    private fun releaseBackgroundTransportIfIdle() {
-        if (appForeground || requiresPersistentTransport()) return
+    private fun releaseTransportIfIdle() {
+        if (foregroundProbePending || requiresPersistentTransport()) return
         intentionalTransportIdle = true
         reconnectJob?.cancel()
         reconnectJob = null
@@ -1288,6 +1567,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             }
             focusSyncJob = null
+            releaseTransportIfIdle()
         }
     }
 
@@ -1303,7 +1583,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             if (result.isSuccess) {
                 pendingDeletePaths.removeAll(paths.toSet())
                 persistPendingDeletePaths()
-                releaseBackgroundTransportIfIdle()
+                releaseTransportIfIdle()
             } else {
                 handleDeferredTransportFailure(result.exceptionOrNull())
             }
@@ -1344,6 +1624,8 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private companion object {
+        val PassesScreenOwner = InteractiveTransportOwner("passes-screen")
+        val TicketTransferOwner = InteractiveTransportOwner("ticket-transfer")
         const val BackgroundDisconnectGraceMs = 1_500L
         const val LastConnectedModelKey = "last_connected_model"
         const val PendingDeletePathsKey = "pending_delete_paths"
