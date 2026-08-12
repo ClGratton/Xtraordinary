@@ -154,6 +154,16 @@ unpushed, ahead/behind, or remote-mismatched source before starting a compiler.
 Per-build version text is generated into an ignored include so compiling cannot
 silently rewrite the pushed source identity.
 
+Dev26 (`xtraordinary-v0.2.6-dev26-sleep-wake-local`, SHA-256
+`36088314D34DA6CD06315221F5E859E1565A7D9EF07C5F39DE2AED47F0D5AF0B`) was
+built from pushed commit `4d7ebaa3d5f9483e8593ce837153e17168d2febc`, flashed
+application-only, and write-hash verified. The owner confirmed the Sleeping
+frame remained visible during the final-sync interval and a genuinely fast tap
+woke the X3 and kept it awake. A fresh post-wake encrypted protocol connection
+then completed service discovery, MTU 256, notification subscription,
+Capabilities, and StatusChanged. This closes the instant-wake regression while
+retaining the rule that non-zero policies still verify the configured hold.
+
 ## Regression rule
 
 Do not treat visible e-ink immobility as proof of an input-scan defect or sleep. Trace the entire loop, power transition, allocation/logging path, input state, activity dispatch, render request, controller teardown, sleep entry, and wake source. Any deterministic hardware-configuration rejection must be bounded. Every third-party teardown call on the power-off path must also be behind a deadline, and physical acceptance must cross the configured deep-sleep deadline. A failed manual Power hold with no render and no BLE disconnect must be diagnosed at the input/event boundary before changing downstream sleep code.
