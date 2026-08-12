@@ -18,8 +18,9 @@ def warn(msg):
 
 def run_git_value(project_dir, args, label):
     try:
+        safe_directory = os.path.abspath(os.path.dirname(project_dir)).replace('\\', '/')
         value = subprocess.check_output(
-            ['git', *args],
+            ['git', '-c', f'safe.directory={safe_directory}', *args],
             text=True, stderr=subprocess.PIPE, cwd=project_dir
         ).strip()
         # Strip characters that would break a C string literal
@@ -109,10 +110,9 @@ def cpp_string(value):
 def generate_version_source(env):
     version_string = resolve_version(env)
     output_path = os.path.join(
-        env['PROJECT_DIR'], 'lib', 'BuildVersion', 'BuildVersion.cpp'
+        env['PROJECT_DIR'], 'lib', 'BuildVersion', 'BuildVersion.generated.inc'
     )
     content = (
-        '#include "BuildVersion.h"\n\n'
         f'const char CROSSPOINT_VERSION[] = "{cpp_string(version_string)}";\n'
     )
     existing = None

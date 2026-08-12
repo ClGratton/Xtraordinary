@@ -12,7 +12,7 @@ This is the evidence ledger for the current reset-first acceptance run. A check 
 ## Current state
 
 - Android: `0.2.0-dev33` / code 34 installed with app data and bond retained; APK SHA-256 `72F57F8E382A966FB838569DB86103771F8146151334763F6C5599A2C6A904BF`.
-- X3: `xtraordinary-v0.2.6-dev22-local`, PC-USB-flashed application-only with write hash verified; SHA-256 `B937AE2757D993C979DC07DF7CFD95DB676BB2D98F3761234C50A77A37C6AD76`.
+- X3: `xtraordinary-v0.2.6-dev25-clock-local`, PC-USB-flashed application-only with write hash verified; SHA-256 `6D058C4A9385FE12CE91BE9D2CCEE2FAABFC3E6F9D0F7C6FCB4FD16043DDB09B`.
 - X3 NVS reset and Android bond removal: complete.
 - Bluetooth bond: fresh Secure Connections bond to `XTEINK Companion`; 16-byte AES key recorded.
 - Linked test folder: `/Documents/XtraordinaryTest`, containing two repository EPUB fixtures.
@@ -39,7 +39,7 @@ This is the evidence ledger for the current reset-first acceptance run. A check 
 | Fresh discovery | X3 advertises after firmware boot and Pixel discovers it without an old bond | Device E2E | Pass: expected address/name/UUID at RSSI -39 |
 | Fresh pairing | Android bond reaches bonded, encrypted GATT opens, notifications subscribe | Device E2E | Pass: Secure Connections, 16-byte AES key, `BOND_BONDED`; dev17 notification subscription succeeds |
 | Protocol ready | MTU, capabilities, status, clock, library pages, and policy acknowledgements observed | Device E2E | Pass on dev22: preserved bond opened status-0 GATT, notifications subscribed, fresh capabilities and four LibraryPage packets arrived, and radio/reader policies were ACKed |
-| Standby physical input | Left, right, and confirm respond to ordinary short presses while Home says `Bluetooth standby · up to 30 s` | Device E2E | Failed/open: dev19 proved the supported 20 MHz floor keeps standby Home responsive, but the check did not cross the sleep deadline. Dev20 and dev21 reproduced the unchanged Home frame at the real deadline. On dev22, a manual one-second Power hold produced no **Sleeping** band and no BLE disconnect, so the Power event is not reaching the sleep lifecycle. USB wake and post-wake acceptance remain untested. |
+| Standby physical input and sleep/wake | Ordinary controls work in standby; sleep visibly renders before radio teardown; configured instant Power tap wakes; post-wake protocol is fresh | Device E2E | Partial on dev25: 155-second trace crossed repeated standby pulses, owner physically confirmed side-button navigation, five-minute run rendered **Sleeping** and entered deep sleep, and an approximately 500–600 ms Power press woke it. Fast tap fails with two Windows USB sounds because zero-duration wake is rechecked after boot debounce. Candidate fix is source-complete but not yet built/flashed. Fresh post-wake handshake remains open. |
 | Reading library transfer | One fixture sends by USB/BLE, commit is ACKed, X3 library reflects it, queue clears only after commit | Device E2E | Pass over BLE on dev19: `Bidi Test` sent with Begin, pipelined ACK-backed chunks, Commit ACK, and refreshed LibraryPage sequence; UI changed from `Phone only` to `/Books/RTL_test.epub`, X3 count 2 → 3, and showed `1 book uploaded to X3` |
 | Transfer cancellation | Explicit cancel sends abort, temp data disappears, no partial library entry remains | Device E2E | Pass on dev19 BLE: Begin ACKed, four chunks were in flight, Stop sent `AbortBookUpload`, firmware ACKed it, UI retained `Phone only`, and no partial X3 library entry appeared. Retrying the same 68 KB fixture completed from a fresh Begin through Commit and `/Books/test_tables.epub`. |
 | Transfer process death | Durable queue retries from byte zero after supervision/firmware timeout | Device E2E | Pass on dev19 BLE: app PID 28638 was force-stopped after Begin plus eight chunks and before Commit; after the 15-second stale window, relaunch PID 32048 restored the queue without user input, issued fresh Begin id 8, retransmitted the complete fixture, Commit id 310 was ACKed, and UI showed `1 book uploaded to X3`. |
@@ -49,12 +49,12 @@ This is the evidence ledger for the current reset-first acceptance run. A check 
 | Trial/ads/upgrade | Trial elapses, same identity cannot reset it, ads appear only on allowed surfaces, purchase restores | Unit/integration/device E2E | Not implemented; design and external decisions in `monetization-entitlement-design.md` |
 | Community build | Ad/billing SDKs absent and build remains ad-free | Build contract | Not implemented |
 | Accessibility | 48dp+ actions, screen-reader semantics, contrast, reflow/large text | Unit/visual/manual | Setup and Settings large-text visual coverage pass; full manual sweep pending |
-| Regression gate | Policy, protocol tests, app unit tests, lint, 20 screenshots, APK assembly | Automated | Automated firmware pass: 37 policy rules and canonical dev22 build with ESP32-C3 RV32IMC verification. Existing Android dev33 gate remains passed. Physical deep-sleep/wake acceptance failed and remains open. |
+| Regression gate | Policy, protocol tests, app unit tests, lint, 20 screenshots, APK assembly | Automated | Last deployed firmware pass: canonical dev25 build and ESP32-C3 RV32IMC verification. Existing Android dev33 gate remains passed. The next candidate must be committed and pushed before either compiler starts, then rerun both canonical gates. |
 
 ## Next executable sequence
 
-1. Instrument and trace raw Power GPIO, debounce/hold recognition, event dispatch, and `ActivityManager` sleep entry. Do not change BLE teardown or deep-sleep configuration until the button event is proven.
-2. Re-run manual sleep, visible sleep-band, BLE disconnect, USB-powered wake, fresh handshake, and ordinary-button acceptance.
-3. Run library transfer/cancel/resume, X3 Focus synchronization, Passes, Settings, and remaining process-death regressions.
-4. Configure Android OAuth and execute Drive create/restore/delete/revoke tests.
-5. Resolve the monetization product/backend decisions before implementing or claiming trial/ads acceptance.
+1. Commit and push the sleep/wake candidate, run the canonical build, flash application-only without NVS/bond loss, and announce the exact fast-tap plus five-minute sleep acceptance windows in advance.
+2. Verify fast-tap wake, visible sleep throughout final sync, BLE disconnect, repeated standby pulses, ordinary buttons, and a fresh post-wake capabilities/status/library/policy handshake.
+3. Run USB book success, cancellation, stale-host retry, and multi-file queueing; rerun BLE/process-death transfer and Focus regressions only where the new firmware path could affect them.
+4. Finish Static/Live pass removal and persistence, Settings ACK truth, firmware-source flashing, accessibility, and automated regression coverage.
+5. Configure valid Android OAuth before Drive create/restore/delete/revoke; resolve the external product/backend decisions before trial expiry, ads, upgrade, recovery, and community ad-free build acceptance can be claimed.

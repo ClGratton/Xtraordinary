@@ -6,5 +6,6 @@
 - Build Android only through `scripts/build-xtraordinary-app.ps1`; it resolves the repository root and activates the checked-in toolchain paths, so callers must not guess a working directory.
 - Build X3 firmware only through `scripts/build-x3-firmware.ps1`, outside the sandbox, and never concurrently with Gradle. Direct sandboxed PlatformIO compiler children consistently fail on Windows with error 5.
 - Every canonical build must pass `scripts/check-engineering-policies.ps1` before a compiler starts. Do not bypass the gate; extend `docs/engineering-policy.json` when a new machine-checkable policy is adopted.
+- Before any Android or firmware compiler starts, the complete source change must be committed on a named branch and pushed to its configured upstream. Both canonical wrappers must run `scripts/assert-pushed-source.ps1`, which rejects dirty trees, detached commits, missing upstreams, and local or remote commit mismatches. Generated build outputs are disposable; source history is not.
 - Treat app state, acknowledged device state, and cached capabilities as distinct. Reconcile only from fresh protocol evidence.
 - For e-ink layouts, establish information hierarchy using size and position; do not rely on multiple gray shades for contrast.

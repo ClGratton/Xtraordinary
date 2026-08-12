@@ -246,8 +246,11 @@ void HalGPIO::startDeepSleep() {
 }
 
 void HalGPIO::verifyPowerButtonWakeup(uint16_t requiredDurationMs, bool shortPressAllowed) {
-  if (shortPressAllowed) {
-    // Fast path - no duration check needed
+  if (shortPressAllowed || requiredDurationMs == 0) {
+    // The GPIO wake cause is already proof of an intentional press. In instant
+    // mode the press may be over before boot-time debounce can observe it, so
+    // waiting for a debounced level would incorrectly send a valid tap back to
+    // sleep. Non-zero hold policies still use the duration check below.
     return;
   }
   // TODO: Intermittent edge case remains: a single tap followed by another single tap

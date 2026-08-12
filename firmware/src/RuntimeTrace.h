@@ -29,11 +29,19 @@ enum class Checkpoint : uint16_t {
   SLEEP_ENTRY,
 };
 
+#ifdef ENABLE_X3_COMPANION
 void begin();
 void mark(Checkpoint checkpoint);
 void beginLoop();
 void recordInput(uint8_t rawState, uint8_t debouncedState, uint8_t pressedEvents, uint8_t releasedEvents,
                  uint32_t powerHeldMs);
 void dump(Print& output);
+#else
+inline void begin() {}
+inline void mark(Checkpoint) {}
+inline void beginLoop() {}
+inline void recordInput(uint8_t, uint8_t, uint8_t, uint8_t, uint32_t) {}
+inline void dump(Print&) {}
+#endif
 
 }  // namespace runtime_trace

@@ -313,7 +313,7 @@ void CompanionService::loop() {
   if (transportQueueAvailable && !pendingResponse_ && !librarySendPending_ && statsSendPending_ && connected()) {
     sendNextReadingStatsChunk();
   }
-  if (applyPending_ && static_cast<int32_t>(millis() - applyAtMs_) >= 0) {
+  if (!deepSleepPreparing_ && applyPending_ && static_cast<int32_t>(millis() - applyAtMs_) >= 0) {
     applyPending_ = false;
     const auto result = firmware_flash::flashFromSdPath(FIRMWARE_PATH, nullptr, nullptr, true);
     if (result == firmware_flash::Result::OK) {
@@ -321,10 +321,10 @@ void CompanionService::loop() {
       ESP.restart();
     }
   }
-  if (ticketShowPending_ && static_cast<int32_t>(millis() - ticketUiAtMs_) >= 0) {
+  if (!deepSleepPreparing_ && ticketShowPending_ && static_cast<int32_t>(millis() - ticketUiAtMs_) >= 0) {
     ticketShowPending_ = false;
     showTicket(ticket_);
-  } else if (ticketHidePending_ && static_cast<int32_t>(millis() - ticketUiAtMs_) >= 0) {
+  } else if (!deepSleepPreparing_ && ticketHidePending_ && static_cast<int32_t>(millis() - ticketUiAtMs_) >= 0) {
     ticketHidePending_ = false;
     hideTicketIfVisible();
   }
@@ -387,19 +387,43 @@ void CompanionService::notifyPowerChanged() {
   statusNotifyPending_ = true;
 }
 
-bool CompanionService::shutdownForDeepSleep(uint32_t timeoutMs) {
+bool CompanionService::finalizeForDeepSleep(uint32_t syncWindowMs, uint32_t timeoutMs) {
   if (!initialized_) return true;
 
-  // NimBLE's deinit path waits synchronously for its host task. Treat that
-  // third-party acknowledgement as fallible: every vendor call runs in a
-  // disposable worker while the main power lifecycle keeps a hard deadline.
-  // Deep sleep is a chip-reset boundary, so a late worker needs no cleanup.
-  initialized_ = false;
+  // The caller has already rendered the truthful Sleeping frame. One worker
+  // owns the entire final-sync and shutdown lifecycle because both advertising
+  // restart and NimBLE deinit may wait synchronously for the vendor host task.
+  // The main power lifecycle keeps a hard deadline around all of it.
+  deepSleepPreparing_ = true;
+  deepSleepSyncWindowMs_ = syncWindowMs;
   deepSleepShutdownFinished_ = false;
   deepSleepShutdownStopped_ = false;
   const BaseType_t created = xTaskCreate(
       [](void* context) {
         auto* service = static_cast<CompanionService*>(context);
+
+        if (service->deepSleepSyncWindowMs_ > 0) {
+          service->reading_ = false;
+          service->readingRadioQuiet_ = false;
+          service->ticketRadioQuiet_ = false;
+          service->radioResumePending_ = false;
+          service->resumeFastRadio();
+
+          const uint32_t syncStartedAt = millis();
+          uint32_t connectedAt = 0;
+          while (static_cast<uint32_t>(millis() - syncStartedAt) < service->deepSleepSyncWindowMs_) {
+            service->loop();
+            if (service->connected() && connectedAt == 0) connectedAt = millis();
+            if (connectedAt != 0 && static_cast<uint32_t>(millis() - connectedAt) >= 600 &&
+                static_cast<uint32_t>(millis() - service->lastBleActivityMs_) >= 200 &&
+                uxQueueMessagesWaiting(service->commandQueue_) == 0 && !service->pendingResponse_) {
+              break;
+            }
+            delay(10);
+          }
+        }
+
+        service->initialized_ = false;
         if (service->server_) service->server_->advertiseOnDisconnect(false);
         if (service->advertising_ && service->advertising_->isAdvertising()) {
           service->advertising_->stop();
@@ -414,7 +438,8 @@ bool CompanionService::shutdownForDeepSleep(uint32_t timeoutMs) {
       },
       "BleSleepStop", 4096, this, 2, nullptr);
   if (created != pdPASS) {
-    LOG_ERR("CMP", "Could not start bounded BLE shutdown worker");
+    initialized_ = false;
+    LOG_ERR("CMP", "Could not start bounded final-sync/BLE shutdown worker");
     return false;
   }
 
@@ -423,11 +448,11 @@ bool CompanionService::shutdownForDeepSleep(uint32_t timeoutMs) {
     delay(5);
   }
   if (!deepSleepShutdownFinished_) {
-    LOG_ERR("CMP", "BLE shutdown exceeded %u ms; continuing into deep sleep",
+    LOG_ERR("CMP", "Final sync/BLE shutdown exceeded %u ms; continuing into deep sleep",
             static_cast<unsigned>(timeoutMs));
     return false;
   }
-  LOG_INF("CMP", "BLE shutdown before deep sleep stopped=%d", deepSleepShutdownStopped_);
+  LOG_INF("CMP", "Final sync/BLE shutdown before deep sleep stopped=%d", deepSleepShutdownStopped_);
   return deepSleepShutdownStopped_;
 }
 
@@ -505,6 +530,10 @@ void CompanionService::onClientDisconnected() {
 void CompanionService::handlePacket(const uint8_t* bytes, size_t length) {
   EnvelopeView envelope{};
   if (!decodeEnvelope(bytes, length, envelope)) return;
+  if (deepSleepPreparing_ && envelope.type == MessageType::APPLY_FIRMWARE) {
+    sendNack(envelope.messageId, "Device is entering sleep");
+    return;
+  }
   bool ok = true;
   switch (envelope.type) {
     case MessageType::HELLO:
@@ -546,23 +575,23 @@ void CompanionService::handlePacket(const uint8_t* bytes, size_t length) {
       ok = titleLength <= 160 && envelope.payloadLength == 14u + titleLength &&
            session_.start(duration, reinterpret_cast<const char*>(envelope.payload + 14), titleLength);
       if (ok) {
-        showFocus(session_);
+        if (!deepSleepPreparing_) showFocus(session_);
         scheduleSlowConnection();
       }
       break;
     }
     case MessageType::PAUSE_SESSION:
       session_.pause();
-      refreshFocus();
+      if (!deepSleepPreparing_) refreshFocus();
       break;
     case MessageType::RESUME_SESSION:
       session_.resume();
-      refreshFocus();
+      if (!deepSleepPreparing_) refreshFocus();
       break;
     case MessageType::STOP_SESSION:
       session_.stop();
       acquireInteractiveLease(15);
-      showHome();
+      if (!deepSleepPreparing_) showHome();
       break;
     case MessageType::SHOW_TICKET:
       ok = decodeTicket(envelope);
@@ -865,7 +894,7 @@ bool CompanionService::applyRadioPolicy(const EnvelopeView& envelope) {
   slowConnectionIntervalUnits_ = static_cast<uint16_t>((static_cast<uint32_t>(connectedIntervalMs) * 4u) / 5u);
   scheduleSlowConnection();
   const bool persisted = persistRadioPolicy();
-  if (persisted) refreshHomeIfVisible();
+  if (persisted && !deepSleepPreparing_) refreshHomeIfVisible();
   return persisted;
 }
 
@@ -1017,13 +1046,14 @@ void CompanionService::updateAdvertisingPolicy() {
   if (advertisingWindowExpired_) return;
   const uint32_t elapsed = millis() - advertisingWindowStartedAtMs_;
   if (elapsed >= companionSleepAfterMs_) {
-    runtime_trace::mark(runtime_trace::Checkpoint::COMPANION_ADVERTISING_STOP_ENTER);
-    advertising_->stop();
-    runtime_trace::mark(runtime_trace::Checkpoint::COMPANION_ADVERTISING_STOP_EXIT);
+    // The main loop enters the visible sleep lifecycle at the same deadline.
+    // Do not make a synchronous vendor stop call here before that frame renders;
+    // final sync and teardown are owned by finalizeForDeepSleep() behind its
+    // hard deadline.
     server_->advertiseOnDisconnect(false);
     standbyPulseActive_ = false;
     advertisingWindowExpired_ = true;
-    LOG_INF("CMP", "Companion advertising stopped at sleep deadline");
+    LOG_INF("CMP", "Companion sleep deadline reached; deferring radio teardown to visible sleep lifecycle");
     return;
   }
   if (!slowAdvertising_ && elapsed >= fastAdvertisingWindowMs_) {

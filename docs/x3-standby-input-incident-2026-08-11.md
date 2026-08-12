@@ -124,6 +124,36 @@ The sleep screen was not expected during the 155-second run: the saved policy
 is fast discovery 1 minute, standby every 30 seconds, and automatic sleep after
 5 minutes; any accepted button event restarts the inactivity deadline.
 
+## 2026-08-12 deep-sleep and instant-wake follow-up
+
+A later uninterrupted five-minute run advanced the main loop to the configured
+deadline, rendered the explicit **Sleeping** frame, logged bounded BLE shutdown,
+and closed USB serial as the chip entered deep sleep. The owner then physically
+woke the X3 with an approximately 500–600 ms Power press. This proves visible
+sleep entry and a held-enough wake, but not the configured instant wake.
+
+With the power policy set to zero seconds, a fast tap produced two Windows USB
+connect/disconnect sounds and did not remain awake. Source explains the exact
+boundary: GPIO3 already woke the ESP32-C3, but `verifyPowerButtonWakeup()` still
+waited for the debounced button level. A fast tap had ended before that boot-time
+sampling, so firmware treated it as an insufficient hold and deliberately
+entered deep sleep again. Zero duration must trust the hardware GPIO wake cause
+immediately; non-zero policies retain duration verification.
+
+The audit also found one synchronous `advertising_->stop()` still ran in the
+normal loop at the sleep deadline, before `SleepActivity` could render. The next
+candidate removes that call from the pre-render path. It renders Sleeping first,
+then runs one 1.2-second final-sync opportunity and BLE shutdown in one disposable
+worker behind a 2.1-second main-thread deadline. Commands may persist durable
+state during that window, but UI navigation and firmware application are
+suppressed so the visible off frame cannot be replaced.
+
+The complete dev25 source state is preserved at pushed commit `287c447` on
+`codex/x3-dev25-recovery`. Canonical builds now reject dirty, detached, untracked,
+unpushed, ahead/behind, or remote-mismatched source before starting a compiler.
+Per-build version text is generated into an ignored include so compiling cannot
+silently rewrite the pushed source identity.
+
 ## Regression rule
 
 Do not treat visible e-ink immobility as proof of an input-scan defect or sleep. Trace the entire loop, power transition, allocation/logging path, input state, activity dispatch, render request, controller teardown, sleep entry, and wake source. Any deterministic hardware-configuration rejection must be bounded. Every third-party teardown call on the power-off path must also be behind a deadline, and physical acceptance must cross the configured deep-sleep deadline. A failed manual Power hold with no render and no BLE disconnect must be diagnosed at the input/event boundary before changing downstream sleep code.

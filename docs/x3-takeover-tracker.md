@@ -52,7 +52,7 @@ the installed app subsequently restored a protocol-ready connection.
 - [x] Recorded firmware SHA-256: `6ADF74FAD2C2B12A1EA409FCDA0F84E07D8646C7B32D233E7FA25B628D5962E2`.
 - [x] Verified flashed data with esptool.
 - [x] Captured a normal boot, Home render, BLE advertising start, and approximately 55 KiB free heap.
-- [ ] Wake the sleeping X3 physically.
+- [x] Wake the sleeping X3 physically with an approximately 500–600 ms Power press; configured instant-tap wake remains separately open.
 - [ ] Complete a fresh Android bond.
 - [ ] Confirm full GATT/protocol readiness.
 
@@ -176,8 +176,8 @@ Measured failure: battery fell from 89% to 81% in one hour.
 - [ ] If protocol-connected, send revisioned `Sleeping / Off`.
 - [ ] Wait less than approximately one second for the exact acknowledgement.
 - [ ] Render the existing CrossPoint `SleepActivity`.
-- [ ] Enter true ESP32 deep sleep with BLE off.
-- [ ] Make long-press power sleep rather than reboot.
+- [x] Enter true ESP32 deep sleep with the explicit Sleeping frame visible and BLE teardown observed.
+- [x] Make the configured Power gesture enter sleep rather than reboot.
 - [ ] Sleep immediately even when no phone is connected.
 - [ ] When no phone confirmed sleep, show only the last confirmed state and last-seen time in Android.
 - [ ] Do not imply that opening Android can wake a sleeping X3.

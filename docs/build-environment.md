@@ -96,6 +96,8 @@ Use the repository workflow rather than opening COM7 manually:
 
 The script refuses to start unless the firmware artifact, one ADB phone, and the requested serial port are present. It sends the debug app an explicit reset-preparation intent, requires confirmation that GATT was disconnected and closed, then stops the process. Only after that handshake does it write the application partition at `0x10000` (preserving NVS, pairing, and books), require esptool success, wait for boot, and relaunch the app. A deployment is not complete until the subsequent capabilities/status handshake succeeds.
 
+Both canonical build wrappers run `scripts/assert-pushed-source.ps1` before the engineering-policy gate or compiler. A build requires a named branch, a clean working tree, a configured remote upstream, and exact equality between local HEAD, the remote-tracking HEAD, and a live `git ls-remote` result. Commit and push source before compiling; never use a generated binary as the only recovery point. `.codex-build`, `artifacts`, PlatformIO output, Gradle output, and the generated BuildVersion include are disposable and ignored.
+
 After flashing, verify recurrence rather than accepting one connection:
 
 ```powershell

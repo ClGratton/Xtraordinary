@@ -112,10 +112,6 @@ EpdFont ui12RegularFont(&ubuntu_12_regular);
 EpdFont ui12BoldFont(&ubuntu_12_bold);
 EpdFontFamily ui12FontFamily(&ui12RegularFont, &ui12BoldFont);
 
-// measurement of power button press duration calibration value
-unsigned long t1 = 0;
-unsigned long t2 = 0;
-
 // Definitions for SilentRestart.h. RTC_NOINIT survives ESP.restart() but not power loss.
 RTC_NOINIT_ATTR uint32_t silentRebootMagic;
 RTC_NOINIT_ATTR uint32_t silentRebootTarget;
@@ -164,49 +160,6 @@ void silentRestartToReader() {
   ESP.restart();
 }
 
-// Verify power button press duration on wake-up from deep sleep
-// Pre-condition: isWakeupByPowerButton() == true
-void verifyPowerButtonDuration() {
-  if (SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::SLEEP) {
-    // Fast path for short press
-    // Needed because inputManager.isPressed() may take up to ~500ms to return the correct state
-    return;
-  }
-
-  // Give the user up to 1000ms to start holding the power button, and must hold for SETTINGS.getPowerButtonDuration()
-  const auto start = millis();
-  bool abort = false;
-  // Subtract the current time, because inputManager only starts counting the HeldTime from the first update()
-  // This way, we remove the time we already took to reach here from the duration,
-  // assuming the button was held until now from millis()==0 (i.e. device start time).
-  const uint16_t calibration = start;
-  const uint16_t calibratedPressDuration =
-      (calibration < SETTINGS.getPowerButtonDuration()) ? SETTINGS.getPowerButtonDuration() - calibration : 1;
-
-  gpio.update();
-  // Needed because inputManager.isPressed() may take up to ~500ms to return the correct state
-  while (!gpio.isPressed(HalGPIO::BTN_POWER) && millis() - start < 1000) {
-    delay(10);  // only wait 10ms each iteration to not delay too much in case of short configured duration.
-    gpio.update();
-  }
-
-  t2 = millis();
-  if (gpio.isPressed(HalGPIO::BTN_POWER)) {
-    do {
-      delay(10);
-      gpio.update();
-    } while (gpio.isPressed(HalGPIO::BTN_POWER) && gpio.getPowerButtonHeldTime() < calibratedPressDuration);
-    abort = gpio.getPowerButtonHeldTime() < calibratedPressDuration;
-  } else {
-    abort = true;
-  }
-
-  if (abort) {
-    // Button released too early. Returning to sleep.
-    // IMPORTANT: Re-arm the wakeup trigger before sleeping again
-    powerManager.startDeepSleep(gpio);
-  }
-}
 void waitForPowerRelease() {
   gpio.update();
   while (gpio.isPressed(HalGPIO::BTN_POWER)) {
@@ -262,10 +215,11 @@ void enterDeepSleep(bool fromTimeout = false) {
   }
 
 #ifdef ENABLE_X3_COMPANION
-  // The sleep state must already be visible before touching fallible vendor
-  // teardown. The companion lifecycle bounds every BLE call internally, so a
-  // stuck host task can never strand the device awake with an obsolete frame.
-  companion::companionService.shutdownForDeepSleep(750);
+  // The sleep state is already visible. Give durable phone work one final
+  // discovery/sync opportunity, then stop the controller. The whole vendor
+  // lifecycle runs in a disposable worker behind one hard deadline, so neither
+  // advertising restart nor teardown can strand the old awake frame onscreen.
+  companion::companionService.finalizeForDeepSleep(1200, 2100);
 #endif
 
   // Tear down WiFi so the modem power domain isn't held alive across deep sleep.
@@ -316,8 +270,6 @@ void setupDisplayAndFonts(bool seamless = false) {
 }
 
 void setup() {
-  t1 = millis();
-
 #ifdef ENABLE_SERIAL_LOG
   // Earliest possible Serial setup. The 250 ms stall before begin() lets the
   // USB Serial/JTAG peripheral finish power-on and lets the host complete USB
@@ -553,9 +505,9 @@ void loop() {
           logSerial.printf("No crash report is available.\n");
         }
         logSerial.printf("\nCRASH_REPORT_END\n");
+#ifdef ENABLE_X3_COMPANION
       } else if (cmd == "RUNTIME_TRACE") {
         runtime_trace::dump(logSerial);
-#ifdef ENABLE_X3_COMPANION
       } else if (cmd.startsWith("USB_BOOK:")) {
         const String encoded = cmd.substring(9);
         uint8_t packet[companion::MAX_PACKET_BYTES];

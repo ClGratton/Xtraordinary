@@ -2,6 +2,27 @@
   "schemaVersion": 1,
   "rules": [
     {
+      "id": "android-wrapper-requires-pushed-source",
+      "type": "required_pattern",
+      "path": "scripts/build-xtraordinary-app.ps1",
+      "pattern": "assert-pushed-source\\.ps1[\\s\\S]*?& \\$sourceCheck[\\s\\S]*?& \\$policyCheck",
+      "message": "Android compilation must reject source that is not committed and pushed first."
+    },
+    {
+      "id": "firmware-wrapper-requires-pushed-source",
+      "type": "required_pattern",
+      "path": "scripts/build-x3-firmware.ps1",
+      "pattern": "assert-pushed-source\\.ps1[\\s\\S]*?& \\$sourceCheck[\\s\\S]*?& \\$policyCheck",
+      "message": "Firmware compilation must reject source that is not committed and pushed first."
+    },
+    {
+      "id": "pushed-source-gate-verifies-remote-head",
+      "type": "required_pattern",
+      "path": "scripts/assert-pushed-source.ps1",
+      "pattern": "status --porcelain=v1[\\s\\S]*?rev-parse '@\\{u\\}'[\\s\\S]*?ls-remote --exit-code[\\s\\S]*?Push before compiling",
+      "message": "The provenance gate must verify a clean tree and the exact local, upstream, and remote commit."
+    },
+    {
       "id": "canonical-android-build",
       "type": "required_pattern",
       "path": "AGENTS.md",
@@ -177,8 +198,8 @@
       "id": "companion-radio-stops-before-deep-sleep",
       "type": "required_pattern",
       "path": "firmware/src/main.cpp",
-      "pattern": "goToSleep\\(fromTimeout\\)[\\s\\S]*?shutdownForDeepSleep\\(750\\)",
-      "message": "The truthful sleep frame must render before bounded BLE controller teardown."
+      "pattern": "goToSleep\\(fromTimeout\\)[\\s\\S]*?finalizeForDeepSleep\\(1200, 2100\\)",
+      "message": "The truthful sleep frame must render before bounded final sync and BLE controller teardown."
     },
     {
       "id": "deep-sleep-does-not-reopen-radio",
@@ -191,8 +212,50 @@
       "id": "companion-radio-teardown-preserves-bonds",
       "type": "required_pattern",
       "path": "firmware/src/companion/CompanionService.cpp",
-      "pattern": "shutdownForDeepSleep\\(uint32_t timeoutMs\\)[\\s\\S]*?xTaskCreate[\\s\\S]*?NimBLEDevice::deinit\\(false\\)[\\s\\S]*?millis\\(\\) - startedAt\\) < timeoutMs",
-      "message": "Deep-sleep BLE teardown must preserve bonds and keep every vendor call behind a hard deadline."
+      "pattern": "finalizeForDeepSleep\\(uint32_t syncWindowMs, uint32_t timeoutMs\\)[\\s\\S]*?xTaskCreate[\\s\\S]*?resumeFastRadio\\(\\)[\\s\\S]*?NimBLEDevice::deinit\\(false\\)[\\s\\S]*?millis\\(\\) - startedAt\\) < timeoutMs",
+      "message": "Final sync and deep-sleep BLE teardown must preserve bonds and keep every vendor call behind a hard deadline."
+    },
+    {
+      "id": "final-sync-cannot-replace-sleep-frame",
+      "type": "required_pattern",
+      "path": "firmware/src/companion/CompanionService.cpp",
+      "pattern": "if \\(!deepSleepPreparing_ && ticketShowPending_[\\s\\S]*?if \\(persisted && !deepSleepPreparing_\\) refreshHomeIfVisible\\(\\)",
+      "message": "Commands accepted during final sync must not replace the already-rendered Sleeping frame."
+    },
+    {
+      "id": "sleep-deadline-does-not-stop-radio-before-render",
+      "type": "forbidden_pattern",
+      "path": "firmware/src/companion/CompanionService.cpp",
+      "pattern": "if \\(elapsed >= companionSleepAfterMs_\\)[\\s\\S]{0,500}?advertising_->stop\\(\\)",
+      "message": "The ordinary loop must not call synchronous BLE stop at the sleep deadline before the Sleeping frame renders."
+    },
+    {
+      "id": "instant-power-wake-bypasses-boot-debounce",
+      "type": "required_pattern",
+      "path": "firmware/lib/hal/HalGPIO.cpp",
+      "pattern": "shortPressAllowed \\|\\| requiredDurationMs == 0",
+      "message": "A zero-duration power policy must accept the GPIO wake cause even when a fast tap has ended before boot debounce."
+    },
+    {
+      "id": "runtime-trace-is-x3-only",
+      "type": "required_pattern",
+      "path": "firmware/src/RuntimeTrace.cpp",
+      "pattern": "#ifdef ENABLE_X3_COMPANION[\\s\\S]*?RTC_NOINIT_ATTR RetainedTrace",
+      "message": "X3 freeze tracing must not add retained state or per-loop writes to unrelated firmware environments."
+    },
+    {
+      "id": "build-version-git-uses-local-safe-directory",
+      "type": "required_pattern",
+      "path": "firmware/scripts/git_branch.py",
+      "pattern": "safe_directory = [\\s\\S]*?'git', '-c', f'safe.directory=\\{safe_directory\\}'",
+      "message": "Version generation must use a checkout-local Git ownership override rather than producing unknown or mutating global configuration."
+    },
+    {
+      "id": "build-version-generated-state-is-not-tracked-source",
+      "type": "required_pattern",
+      "path": "firmware/.gitignore",
+      "pattern": "lib/BuildVersion/BuildVersion\\.generated\\.inc",
+      "message": "Per-build version state must stay generated and must not overwrite the pushed source checkpoint."
     },
     {
       "id": "standby-advertising-restart-restores-full-clock",

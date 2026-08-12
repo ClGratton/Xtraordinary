@@ -1,5 +1,7 @@
 #include "RuntimeTrace.h"
 
+#ifdef ENABLE_X3_COMPANION
+
 #include <esp_attr.h>
 #include <esp_system.h>
 
@@ -125,3 +127,5 @@ void dump(Print& output) {
 }
 
 }  // namespace runtime_trace
+
+#endif  // ENABLE_X3_COMPANION
