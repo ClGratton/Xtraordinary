@@ -407,8 +407,8 @@
       "id": "canonical-android-build-validates-screenshots",
       "type": "required_pattern",
       "path": "scripts/build-xtraordinary-app.ps1",
-      "pattern": ":app:validateDebugScreenshotTest",
-      "message": "The canonical Android build must execute deterministic screenshot validation."
+      "pattern": ":app:validateCommunityDebugScreenshotTest[\\s\\S]*?:app:validatePlayDebugScreenshotTest",
+      "message": "The canonical Android build must execute deterministic Community and Play screenshot validation."
     },
     {
       "id": "settings-does-not-delegate-google-to-setup",

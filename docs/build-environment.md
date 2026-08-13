@@ -58,7 +58,7 @@ The Android app is built directly with the verified project-local Gradle distrib
 gradle --no-daemon :protocol:test :app:lintCommunityDebug :app:assembleCommunityDebug :app:lintPlayDebug :app:assemblePlayDebug
 ```
 
-The canonical wrapper also runs `:app:validateDebugScreenshotTest`; a visual regression now blocks every normal Android build instead of remaining an optional follow-up. The resulting APKs are `app/build/outputs/apk/community/debug/app-community-debug.apk` and `app/build/outputs/apk/play/debug/app-play-debug.apk`. The installer defaults to the ad-free community artifact. Compose reference images are updated only after visual review through an explicit update task; updating a baseline is never treated as proof that the new layout is correct.
+The canonical wrapper also runs `:app:validateCommunityDebugScreenshotTest` and `:app:validatePlayDebugScreenshotTest`; a visual regression in either distribution now blocks every normal Android build instead of remaining an optional follow-up. The resulting APKs are `app/build/outputs/apk/community/debug/app-community-debug.apk` and `app/build/outputs/apk/play/debug/app-play-debug.apk`. The installer defaults to the ad-free community artifact. Compose reference images are updated only after visual review through an explicit update task; updating a baseline is never treated as proof that the new layout is correct.
 
 Install replacement APKs through the repository workflow:
 
