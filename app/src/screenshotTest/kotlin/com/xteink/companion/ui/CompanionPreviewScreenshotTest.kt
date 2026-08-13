@@ -285,6 +285,27 @@ fun settingsThemesScreenshot() {
 }
 
 @PreviewTest
+@Preview(name = "Pass detail compact", widthDp = 360, heightDp = 800, showBackground = true)
+@Composable
+fun passDetailCompactScreenshot() {
+    ScreenshotApp(state = CompanionUiState(surface = CompanionSurface.Tools, toolDestination = ToolDestination.Passes, ticket = matrixPassPreviewState))
+}
+
+@PreviewTest
+@Preview(name = "Pass detail large text", widthDp = 412, heightDp = 915, fontScale = 1.3f, showBackground = true)
+@Composable
+fun passDetailLargeTextScreenshot() {
+    ScreenshotApp(state = CompanionUiState(surface = CompanionSurface.Tools, toolDestination = ToolDestination.Passes, ticket = matrixPassPreviewState))
+}
+
+@PreviewTest
+@Preview(name = "Pass detail huge text", widthDp = 412, heightDp = 915, fontScale = 2f, showBackground = true)
+@Composable
+fun passDetailHugeTextScreenshot() {
+    ScreenshotApp(state = CompanionUiState(surface = CompanionSurface.Tools, toolDestination = ToolDestination.Passes, ticket = matrixPassPreviewState))
+}
+
+@PreviewTest
 @Preview(name = "Settings Google disconnected", widthDp = 412, heightDp = 915, showBackground = true)
 @Composable
 fun settingsGoogleDisconnectedScreenshot() {

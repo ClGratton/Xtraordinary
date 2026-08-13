@@ -175,6 +175,13 @@
       "message": "Ticket transfer must use the reusable transaction-scoped transport primitive."
     },
     {
+      "id": "passes-visibility-does-not-own-transport",
+      "type": "forbidden_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/CompanionViewModel.kt",
+      "pattern": "passes-screen|syncPassesInteractiveOwner",
+      "message": "Opening, paging, or leaving Passes must not retain or renew an interactive transport lease."
+    },
+    {
       "id": "firmware-clears-session-lease",
       "type": "required_pattern",
       "path": "firmware/src/companion/CompanionService.cpp",

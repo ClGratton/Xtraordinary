@@ -10,5 +10,7 @@ internal fun reconcileTicketFromCapabilities(
     ticket.copy(
         isOnX3 = ticketPresent,
         removalPending = ticketPresent && ticket.removalPending,
+        deployedPassId = if (ticketPresent) ticket.deployedPassId else null,
+        deployedMode = if (ticketPresent) ticket.deployedMode else null,
     )
 }

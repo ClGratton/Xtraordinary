@@ -10,7 +10,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,12 +23,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
@@ -44,6 +45,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -53,14 +55,26 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
+import java.text.DateFormat
+import java.util.Date
 import com.xteink.companion.R
 import com.xteink.companion.data.BarcodeRasterizer
 import com.xteink.companion.data.FlightBarcodeFormat
@@ -91,6 +105,8 @@ fun PassesToolContent(
         initialPage = selectedIndex,
         pageCount = { ticket.passes.size },
     )
+    val pagerScope = rememberCoroutineScope()
+    val context = LocalContext.current
     LaunchedEffect(pagerState.settledPage) {
         ticket.passes.getOrNull(pagerState.settledPage)?.let { onSelectPass(it.id) }
     }
@@ -110,21 +126,19 @@ fun PassesToolContent(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             TextButton(onClick = onBack) { Text("←  ${stringResource(R.string.back_to_tools)}") }
-            Column(
-                modifier = Modifier.weight(1f),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    text = stringResource(R.string.passes_title),
-                    style = MaterialTheme.typography.titleLarge,
-                    maxLines = 1,
-                )
-                Text(
-                    pluralStringResource(R.plurals.passes_count, ticket.passes.size, ticket.passes.size),
-                    style = MaterialTheme.typography.labelMedium,
-                )
-            }
+            Spacer(modifier = Modifier.weight(1f))
             TextButton(onClick = { importChoiceVisible = true }) { Text(stringResource(R.string.import_flight)) }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(stringResource(R.string.passes_title), style = MaterialTheme.typography.headlineLarge, maxLines = 1)
+            Text(
+                pluralStringResource(R.plurals.passes_count, ticket.passes.size, ticket.passes.size),
+                style = MaterialTheme.typography.labelMedium,
+            )
         }
         MagneticHorizontalPager(
             state = pagerState,
@@ -136,7 +150,17 @@ fun PassesToolContent(
                 restingContent = MaterialTheme.colorScheme.onSurfaceVariant,
                 selectedContent = MaterialTheme.colorScheme.onSurface,
             ),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().semantics {
+                contentDescription = context.getString(R.string.pass_position, pagerState.settledPage + 1, ticket.passes.size)
+                customActions = buildList {
+                    if (pagerState.settledPage > 0) add(CustomAccessibilityAction(context.getString(R.string.pass_previous)) {
+                        pagerScope.launch { pagerState.animateScrollToPage(pagerState.settledPage - 1) }; true
+                    })
+                    if (pagerState.settledPage < ticket.passes.lastIndex) add(CustomAccessibilityAction(context.getString(R.string.pass_next)) {
+                        pagerScope.launch { pagerState.animateScrollToPage(pagerState.settledPage + 1) }; true
+                    })
+                }
+            },
         ) { page, containerColor, contentColor ->
             PassControlCard(
                 pass = ticket.passes[page],
@@ -144,12 +168,16 @@ fun PassesToolContent(
                 contentColor = contentColor,
             )
         }
+        DeploymentStatus(ticket = ticket, modifier = Modifier.padding(horizontal = 16.dp))
         PassModeChooser(
             mode = ticket.mode,
             onSetMode = onSetTicketMode,
             onSend = onSendTicket,
             onRemove = onRemoveTicket,
             isOnX3 = ticket.isOnX3,
+            deployedPassId = ticket.deployedPassId,
+            deployedMode = ticket.deployedMode,
+            selectedPass = selectedPass,
             sendPending = ticket.sendPending,
             removalPending = ticket.removalPending,
             modifier = Modifier.padding(horizontal = 16.dp),
@@ -228,33 +256,52 @@ private fun PassControlCard(
     contentColor: Color,
     modifier: Modifier = Modifier,
 ) {
+    var requestedCodeFace by remember(pass.id) { mutableStateOf(false) }
+    val cardHeight = PassCardLayoutPolicy.heightFor(LocalDensity.current.fontScale)
+    val turn by animateFloatAsState(
+        targetValue = if (requestedCodeFace) 1f else 0f,
+        // Compose's MotionDurationScale makes this immediately settle at a
+        // system duration scale of zero.
+        animationSpec = tween(durationMillis = 220),
+        label = "pass vertical turn",
+    )
+    val showCode = turn >= 0.5f
     Surface(
-        modifier = modifier,
+        modifier = modifier.height(cardHeight),
         color = containerColor,
         contentColor = contentColor,
         shape = MaterialTheme.shapes.large,
         shadowElevation = 2.dp,
     ) {
-        Row(modifier = Modifier.height(IntrinsicSize.Min)) {
+        Box(modifier = Modifier.fillMaxSize().graphicsLayer { rotationY = turn * 180f }) {
+            if (showCode) {
+                PassCodeBody(
+                    pass = pass,
+                    onShowDetails = { requestedCodeFace = false },
+                    modifier = Modifier.fillMaxSize().graphicsLayer { rotationY = 180f },
+                )
+            } else Row(modifier = Modifier.fillMaxSize()) {
             RouteRail(origin = pass.origin, destination = pass.destination)
             TicketPerforation()
-            UnifiedPassBody(
-                pass = pass,
-                modifier = Modifier.weight(1f),
-            )
+            UnifiedPassBody(pass = pass, onShowCode = { requestedCodeFace = true }, modifier = Modifier.weight(1f))
             TicketPerforation()
             RouteRail(origin = pass.origin, destination = pass.destination)
+            }
         }
     }
 }
 
 @Composable
-private fun UnifiedPassBody(pass: BoardingPassUiState, modifier: Modifier = Modifier) {
+private fun UnifiedPassBody(
+    pass: BoardingPassUiState,
+    onShowCode: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier = modifier
-            .heightIn(min = 340.dp)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(7.dp),
+            .fillMaxHeight()
+            .padding(horizontal = PassLayout.bodyInset, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -285,15 +332,6 @@ private fun UnifiedPassBody(pass: BoardingPassUiState, modifier: Modifier = Modi
             Text(
                 pass.flight,
                 style = MaterialTheme.typography.labelLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        if (pass.countdown.isNotBlank() && !pass.countdown.equals(pass.status, ignoreCase = true)) {
-            Text(
-                pass.countdown,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -349,8 +387,7 @@ private fun UnifiedPassBody(pass: BoardingPassUiState, modifier: Modifier = Modi
                 )
                 Text(
                     pass.passenger,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -362,32 +399,57 @@ private fun UnifiedPassBody(pass: BoardingPassUiState, modifier: Modifier = Modi
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Text(pass.boardingGroup, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                    Text(pass.boardingGroup, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
-        Spacer(modifier = Modifier.weight(1f))
-        Box(
-            modifier = Modifier.fillMaxWidth(),
-            contentAlignment = Alignment.Center,
-        ) {
-            BarcodePreviewPanel(
-                payload = pass.barcodePayload,
-                format = pass.barcodeFormat,
-                isSample = pass.isSample,
-                modifier = Modifier
-                    .then(
-                        if (pass.barcodeFormat.isLinear) {
-                            Modifier
-                                .fillMaxWidth()
-                                .height(104.dp)
-                        } else {
-                            Modifier.size(160.dp)
-                        },
-                    ),
-            )
+        Text(
+            text = passSourceText(pass),
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        TextButton(onClick = onShowCode, modifier = Modifier.fillMaxWidth().height(48.dp)) {
+            Text(stringResource(R.string.show_pass_code))
         }
     }
+}
+
+@Composable
+private fun PassCodeBody(pass: BoardingPassUiState, onShowDetails: () -> Unit, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.fillMaxHeight().padding(horizontal = PassLayout.codeInset, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text("${pass.origin} → ${pass.destination}  ·  ${pass.flight}", style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (pass.isSample) Text(stringResource(R.string.sample_not_valid_for_boarding), style = MaterialTheme.typography.labelSmall, maxLines = 1)
+        BarcodePreviewPanel(
+            payload = pass.barcodePayload,
+            format = pass.barcodeFormat,
+            isSample = pass.isSample,
+            modifier = if (pass.barcodeFormat.isLinear) Modifier.fillMaxWidth().height(160.dp) else Modifier.size(190.dp),
+        )
+        TextButton(onClick = onShowDetails, modifier = Modifier.height(48.dp)) { Text(stringResource(R.string.show_pass_details)) }
+    }
+}
+
+@Composable
+private fun passSourceText(pass: BoardingPassUiState): String = when {
+    pass.isSample -> stringResource(R.string.sample_not_valid_for_boarding)
+    pass.liveProvider.isBlank() -> pass.source
+    pass.liveUpdatedAtEpochMs != null -> stringResource(
+        R.string.pass_provider_last_confirmed,
+        pass.liveProvider,
+        DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(pass.liveUpdatedAtEpochMs)),
+    )
+    else -> stringResource(R.string.pass_provider_unavailable, pass.liveProvider)
+}
+
+/** Shared Passes geometry; card faces use the same stable outer bounds. */
+private object PassLayout {
+    val bodyInset = 12.dp
+    val codeInset = 12.dp
 }
 
 @Composable
@@ -466,12 +528,15 @@ private fun OperationalFact(
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
             value,
-            style = if (emphasized) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
+            style = if (emphasized) passTimeTypography() else MaterialTheme.typography.titleMedium,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
+
+@Composable
+private fun passTimeTypography() = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum")
 
 @Composable
 private fun HorizontalRouteArrow(modifier: Modifier = Modifier) {
@@ -488,15 +553,16 @@ private fun HorizontalRouteArrow(modifier: Modifier = Modifier) {
 @Composable
 private fun PassStatusBadge(status: String) {
     Surface(
-        color = MaterialTheme.colorScheme.primary,
-        contentColor = MaterialTheme.colorScheme.onPrimary,
-        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        shape = CircleShape,
     ) {
         Text(
             status,
             style = MaterialTheme.typography.labelMedium,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -507,7 +573,7 @@ private fun DelayBadge(delayMinutes: Int) {
     Surface(
         color = if (delayed) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.tertiaryContainer,
         contentColor = if (delayed) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onTertiaryContainer,
-        shape = RoundedCornerShape(50),
+        shape = CircleShape,
     ) {
         Text(
             text = when {
@@ -516,11 +582,31 @@ private fun DelayBadge(delayMinutes: Int) {
                 else -> stringResource(R.string.on_time)
             },
             style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
+}
+
+@Composable
+private fun DeploymentStatus(ticket: TicketUiState, modifier: Modifier = Modifier) {
+    val selected = ticket.selectedPass
+    val deployed = ticket.passes.firstOrNull { it.id == ticket.deployedPassId }
+    val text = when {
+        ticket.removalPending && deployed != null ->
+            stringResource(R.string.ticket_removing, deployed.flight)
+        ticket.sendPending -> stringResource(R.string.ticket_queued, selected.flight, ticket.mode.name)
+        deployed == null -> stringResource(R.string.ticket_not_on_x3)
+        deployed.id == selected.id -> stringResource(R.string.ticket_on_x3, deployed.flight, ticket.deployedMode?.name ?: "unknown mode")
+        else -> stringResource(R.string.ticket_other_on_x3, deployed.flight, ticket.deployedMode?.name ?: "unknown mode")
+    }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        modifier = modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable
@@ -530,13 +616,16 @@ private fun PassModeChooser(
     onSend: () -> Unit,
     onRemove: () -> Unit,
     isOnX3: Boolean,
+    deployedPassId: String?,
+    deployedMode: TicketMode?,
+    selectedPass: BoardingPassUiState,
     sendPending: Boolean,
     removalPending: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHapticFeedback.current
     val splitProgress by animateFloatAsState(
-        targetValue = if (isOnX3) 1f else 0f,
+        targetValue = if (isOnX3 && deployedPassId == selectedPass.id) 1f else 0f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessMediumLow,
@@ -544,34 +633,27 @@ private fun PassModeChooser(
         label = "ticket action mitosis",
     )
     val splitGap by animateDpAsState(
-        targetValue = if (isOnX3) 8.dp else 0.dp,
+        targetValue = if (isOnX3 && deployedPassId == selectedPass.id) 8.dp else 0.dp,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "ticket action gap",
     )
-    val staticKey = TicketMode.Static.name
-    val liveKey = TicketMode.Live.name
-    ExpandingChoiceRow(
-        choices = listOf(
-            ExpandingChoice(
-                key = staticKey,
-                title = stringResource(R.string.static_ticket),
-                body = stringResource(R.string.static_ticket_body_short),
-            ),
-            ExpandingChoice(
-                key = liveKey,
-                title = stringResource(R.string.live_ticket),
-                body = stringResource(R.string.live_ticket_body_short),
-            ),
-        ),
-        selectedKey = mode.name,
-        onSelect = { onSetMode(TicketMode.valueOf(it)) },
-        optionHeight = 136.dp,
-        selectedWeight = 1.25f,
-        unselectedWeight = 0.90f,
-        optionContentPadding = 14.dp,
-        optionContentSpacing = 4.dp,
-        modifier = modifier,
-    ) { key ->
+    val sendAvailable = !(isOnX3 && deployedPassId == selectedPass.id && deployedMode == mode) && !sendPending
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(R.string.mode_for_next_send), style = MaterialTheme.typography.labelLarge)
+        Row(
+            modifier = Modifier.fillMaxWidth().height(52.dp).selectableGroup(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            ModeSegment(TicketMode.Static, mode, onSetMode, Modifier.weight(1f))
+            ModeSegment(TicketMode.Live, mode, onSetMode, Modifier.weight(1f))
+        }
+        Text(
+            text = stringResource(if (mode == TicketMode.Static) R.string.static_ticket_body_short else R.string.live_ticket_body_short),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+        )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(splitGap),
@@ -581,14 +663,14 @@ private fun PassModeChooser(
                     haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                     onSend()
                 },
-                enabled = !isOnX3 && !sendPending,
+                enabled = sendAvailable,
                 modifier = Modifier
                     .weight(1f)
                     .height(48.dp),
                 shape = MaterialTheme.shapes.extraLarge,
                 contentPadding = PaddingValues(horizontal = 8.dp),
             ) {
-                if (!isOnX3) {
+                if (sendAvailable) {
                     SendToX3Icon(
                         modifier = Modifier.size(21.dp),
                         color = MaterialTheme.colorScheme.onPrimary,
@@ -597,13 +679,13 @@ private fun PassModeChooser(
                 Text(
                     text = stringResource(
                         if (sendPending) R.string.ticket_send_pending
-                        else if (isOnX3 && key == staticKey) R.string.static_ticket_on_x3
-                        else if (isOnX3) R.string.live_ticket_on_x3
-                        else if (key == staticKey) R.string.send_static_ticket
+                        else if (isOnX3 && deployedPassId == selectedPass.id && deployedMode == mode && mode == TicketMode.Static) R.string.static_ticket_on_x3
+                        else if (isOnX3 && deployedPassId == selectedPass.id && deployedMode == mode) R.string.live_ticket_on_x3
+                        else if (mode == TicketMode.Static) R.string.send_static_ticket
                         else R.string.start_live_and_send,
                     ),
                     style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(start = if (isOnX3) 0.dp else 6.dp),
+                    modifier = Modifier.padding(start = if (sendAvailable) 6.dp else 0.dp),
                     maxLines = 1,
                 )
             }
@@ -626,9 +708,9 @@ private fun PassModeChooser(
                 ) {
                     Text(
                         text = stringResource(
-                            if (removalPending && key == staticKey) R.string.ticket_static_removal_pending
+                            if (removalPending && deployedMode == TicketMode.Static) R.string.ticket_static_removal_pending
                             else if (removalPending) R.string.ticket_removal_pending
-                            else if (key == liveKey) R.string.stop_live_ticket
+                            else if (deployedMode == TicketMode.Live) R.string.stop_live_ticket
                             else R.string.remove_ticket_from_x3,
                         ),
                         style = MaterialTheme.typography.labelLarge,
@@ -636,6 +718,23 @@ private fun PassModeChooser(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ModeSegment(mode: TicketMode, selectedMode: TicketMode, onSetMode: (TicketMode) -> Unit, modifier: Modifier) {
+    val selected = mode == selectedMode
+    Surface(
+        onClick = { onSetMode(mode) },
+        modifier = modifier.fillMaxHeight().semantics { role = Role.RadioButton; this.selected = selected },
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+        shape = MaterialTheme.shapes.medium,
+        border = if (selected) null else androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(stringResource(if (mode == TicketMode.Static) R.string.static_ticket else R.string.live_ticket), style = MaterialTheme.typography.labelLarge)
         }
     }
 }
@@ -660,8 +759,8 @@ private fun BarcodePreviewPanel(
     }
     Box(
         modifier = modifier
-            .background(Color.White, RoundedCornerShape(12.dp))
-            .border(1.dp, Color.Black, RoundedCornerShape(12.dp))
+            .background(Color.White, MaterialTheme.shapes.small)
+            .border(1.dp, Color.Black, MaterialTheme.shapes.small)
             .padding(7.dp)
             .clearAndSetSemantics { contentDescription = description },
         contentAlignment = Alignment.Center,

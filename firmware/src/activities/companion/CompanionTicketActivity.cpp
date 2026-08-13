@@ -12,6 +12,7 @@
 #include <string>
 
 #include "companion/CompanionService.h"
+#include "activities/companion/TicketLayout.h"
 #include "fontIds.h"
 #include "util/QrUtils.h"
 
@@ -70,13 +71,14 @@ bool CompanionTicketActivity::renderScannerView() {
 
   const int width = renderer.getScreenWidth();
   const int height = renderer.getScreenHeight();
-  const int scale = std::max(1, std::min(2, std::min((width - 40) / barcode.getWidth(),
-                                                    (height - 80) / barcode.getHeight())));
-  const int barcodeWidth = barcode.getWidth() * scale;
-  const int barcodeHeight = barcode.getHeight() * scale;
-  renderer.drawBitmap1BitIntegerScaled(barcode, (width - barcodeWidth) / 2, (height - barcodeHeight) / 2, scale);
+  const TicketLayout layout = TicketLayout::create(width, height, true);
+  const TicketRect safe = layout.matrixChamber;
+  // 380 px codes cannot be doubled in the 752 px horizontal safe region.
+  const TicketScaledBarcode placement =
+      TicketLayout::integerScaledPlacement(safe, barcode.getWidth(), barcode.getHeight());
+  renderer.drawBitmap1BitIntegerScaled(barcode, placement.rect.x, placement.rect.y, placement.scale);
   barcodeFile.close();
-  drawMappedButtonHints(tr(STR_BACK), "Ticket");
+  drawMappedButtonHints(tr(STR_BACK), tr(STR_TICKET));
   renderer.displayBuffer(HalDisplay::FULL_REFRESH);
   return true;
 }
@@ -85,6 +87,7 @@ void CompanionTicketActivity::render(RenderLock&&) {
   renderer.setOrientation(scannerView_ ? GfxRenderer::LandscapeClockwise : GfxRenderer::Portrait);
   const int width = renderer.getScreenWidth();
   const int height = renderer.getScreenHeight();
+  const TicketLayout layout = TicketLayout::create(width, height, false);
   renderer.clearScreen();
 
   if (scannerView_) {
@@ -120,14 +123,14 @@ void CompanionTicketActivity::render(RenderLock&&) {
     else
       std::snprintf(delayText, sizeof(delayText), "%+d min", ticket_.delayMinutes);
   }
-  drawFact(92, 150, 184, tr(STR_DEPARTURE), ticket_.departureTime, NOTOSANS_18_FONT_ID);
-  drawFact(254, 150, 184, "Arrival", ticket_.arrivalTime[0] == '\0' ? "-" : ticket_.arrivalTime,
+  drawFact(layout.factCenters[0], 150, 184, tr(STR_DEPARTURE), ticket_.departureTime, NOTOSANS_18_FONT_ID);
+  drawFact(layout.factCenters[1], 150, 184, "Arrival", ticket_.arrivalTime[0] == '\0' ? "-" : ticket_.arrivalTime,
            NOTOSANS_18_FONT_ID);
-  drawFact(416, 150, 188, "Delay", delayText, NOTOSANS_14_FONT_ID);
-  drawFact(92, 232, 266, tr(STR_GATE_SHORT), ticket_.gate, NOTOSANS_16_FONT_ID);
-  drawFact(254, 232, 266, tr(STR_TERMINAL_SHORT), ticket_.terminal[0] == '\0' ? "-" : ticket_.terminal,
+  drawFact(layout.factCenters[2], 150, 188, "Delay", delayText, NOTOSANS_14_FONT_ID);
+  drawFact(layout.factCenters[0], 232, 266, tr(STR_GATE_SHORT), ticket_.gate, NOTOSANS_16_FONT_ID);
+  drawFact(layout.factCenters[1], 232, 266, tr(STR_TERMINAL_SHORT), ticket_.terminal[0] == '\0' ? "-" : ticket_.terminal,
            NOTOSANS_16_FONT_ID);
-  drawFact(416, 232, 266, tr(STR_SEAT_SHORT), ticket_.seat, NOTOSANS_16_FONT_ID);
+  drawFact(layout.factCenters[2], 232, 266, tr(STR_SEAT_SHORT), ticket_.seat, NOTOSANS_16_FONT_ID);
   renderer.drawCenteredText(NOTOSANS_14_FONT_ID, 316, ticket_.passenger, true, EpdFontFamily::BOLD);
   renderer.drawCenteredText(UI_10_FONT_ID, 346, ticket_.boardingGroup);
   renderer.drawLine(42, 374, width - 42, 374, 1, true);
@@ -142,13 +145,11 @@ void CompanionTicketActivity::render(RenderLock&&) {
     if (barcode.parseHeaders() == BmpReaderError::Ok && barcode.is1Bit() && barcode.getWidth() <= 380 &&
         barcode.getHeight() <= 340) {
       linearBarcode = barcode.getWidth() > barcode.getHeight();
-      const int barcodePanelY = linearBarcode ? 430 : 390;
-      const int barcodePanelHeight = linearBarcode ? 230 : 360;
-      const int barcodePanelInset = linearBarcode ? 18 : 40;
-      renderer.drawRoundedRect(barcodePanelInset, barcodePanelY, width - barcodePanelInset * 2, barcodePanelHeight, 2,
-                               18, true);
-      const int barcodeX = (width - barcode.getWidth()) / 2;
-      const int barcodeY = barcodePanelY + (barcodePanelHeight - barcode.getHeight()) / 2;
+       const TicketRect chamber = linearBarcode ? layout.linearChamber : layout.matrixChamber;
+       renderer.drawRoundedRect(chamber.x, chamber.y, chamber.width, chamber.height, 2,
+                                18, true);
+       const int barcodeX = (width - barcode.getWidth()) / 2;
+       const int barcodeY = chamber.y + (chamber.height - barcode.getHeight()) / 2;
       renderer.drawBitmap1Bit(barcode, barcodeX, barcodeY, 380, 340);
       barcodeDrawn = true;
     }
@@ -156,12 +157,16 @@ void CompanionTicketActivity::render(RenderLock&&) {
   }
   // Backward compatibility for tickets stored before bitmap transport existed.
   if (!barcodeDrawn) {
-    renderer.drawRoundedRect(40, 390, width - 80, 360, 2, 18, true);
-    QrUtils::drawQrCode(renderer, Rect{70, 420, width - 140, 300}, std::string(ticket_.barcodePayload));
+     renderer.drawRoundedRect(layout.matrixChamber.x, layout.matrixChamber.y, layout.matrixChamber.width, layout.matrixChamber.height, 2, 18, true);
+     const TicketRect chamber = layout.matrixChamber;
+     QrUtils::drawQrCode(renderer, Rect{chamber.x + 30, chamber.y + 30, chamber.width - 60, chamber.height - 60},
+                         std::string(ticket_.barcodePayload));
   }
   linearBarcode_ = linearBarcode;
-  renderer.drawCenteredText(SMALL_FONT_ID, height - 88,
-                            ticket_.mode == companion::TicketMode::LIVE ? tr(STR_LIVE_TICKET) : tr(STR_STATIC_TICKET));
+  // Keep tertiary mode metadata above the scanner chamber; it must not use
+  // barcode quiet-zone space or the mapped 40 px hint strip.
+  renderer.drawCenteredText(SMALL_FONT_ID, linearBarcode ? layout.linearFooterY : layout.matrixFooterY,
+                             ticket_.mode == companion::TicketMode::LIVE ? tr(STR_LIVE_TICKET) : tr(STR_STATIC_TICKET));
   drawMappedButtonHints(tr(STR_BACK), linearBarcode ? "Scan" : "");
   renderer.displayBuffer(HalDisplay::FULL_REFRESH);
 }

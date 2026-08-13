@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -22,8 +23,12 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -49,10 +54,11 @@ fun ExpandingChoiceRow(
     selectedContent: Color = MaterialTheme.colorScheme.onPrimaryContainer,
     restingContainer: Color = MaterialTheme.colorScheme.surfaceContainer,
     restingContent: Color = MaterialTheme.colorScheme.onSurface,
+    shape: Shape = MaterialTheme.shapes.large,
     actionContent: @Composable ColumnScope.(String) -> Unit,
 ) {
     Row(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().selectableGroup(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.Top,
     ) {
@@ -71,6 +77,7 @@ fun ExpandingChoiceRow(
                 selectedContent = selectedContent,
                 restingContainer = restingContainer,
                 restingContent = restingContent,
+                shape = shape,
                 contentPadding = optionContentPadding,
                 contentSpacing = optionContentSpacing,
                 modifier = Modifier.weight(weight.value),
@@ -90,6 +97,7 @@ private fun ExpandingChoiceOption(
     selectedContent: Color,
     restingContainer: Color,
     restingContent: Color,
+    shape: Shape,
     contentPadding: Dp,
     contentSpacing: Dp,
     modifier: Modifier = Modifier,
@@ -101,10 +109,13 @@ private fun ExpandingChoiceOption(
             if (!selected) haptics.performHapticFeedback(HapticFeedbackType.ToggleOn)
             onSelect()
         },
-        modifier = modifier.height(optionHeight),
+        modifier = modifier.height(optionHeight).semantics {
+            role = Role.RadioButton
+            this.selected = selected
+        },
         color = if (selected) selectedContainer else restingContainer,
         contentColor = if (selected) selectedContent else restingContent,
-        shape = MaterialTheme.shapes.large,
+        shape = shape,
         border = if (selected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
     ) {
         Column(

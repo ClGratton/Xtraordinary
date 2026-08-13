@@ -142,6 +142,8 @@ data class TicketUiState(
     val sendPending: Boolean = false,
     val removalPending: Boolean = false,
     val deployedPassId: String? = null,
+    /** Last mode confirmed by the X3, never the user's next-send selection. */
+    val deployedMode: TicketMode? = null,
 ) {
     val selectedPass: BoardingPassUiState
         get() = passes.firstOrNull { it.id == selectedPassId } ?: passes.first()

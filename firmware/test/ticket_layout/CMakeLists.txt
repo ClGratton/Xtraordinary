@@ -1,0 +1,3 @@
+add_executable(TicketLayoutTest TicketLayoutTest.cpp)
+target_link_libraries(TicketLayoutTest PRIVATE crosspoint_test_common GTest::gtest_main)
+gtest_discover_tests(TicketLayoutTest)

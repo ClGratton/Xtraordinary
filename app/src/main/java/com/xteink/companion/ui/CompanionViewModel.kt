@@ -60,12 +60,13 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         application.getSharedPreferences("xtraordinary_radio_policy", Application.MODE_PRIVATE)
     private val ticketPreferences =
         application.getSharedPreferences("xtraordinary_ticket_state", Application.MODE_PRIVATE)
-    private val initialTicketMode = runCatching {
-        TicketMode.valueOf(
-            ticketPreferences.getString("mode", TicketMode.Static.name) ?: TicketMode.Static.name,
-        )
-    }.getOrDefault(TicketMode.Static)
     private val initialTicketOnX3 = ticketPreferences.getBoolean("is_on_x3", false)
+    private val initialTicketModes = decodeTicketModes(
+        legacyMode = ticketPreferences.getString("mode", null),
+        selectedMode = ticketPreferences.getString("selected_mode", null),
+        deployedMode = ticketPreferences.getString("deployed_mode", null),
+        deployedPresent = initialTicketOnX3,
+    )
     private val initialTicketRemovalPending = ticketPreferences.getBoolean("removal_pending", false)
     private val initialDeployedPassId = ticketPreferences.getString("deployed_pass_id", null)
     private val initialImportedPasses = decodeStoredPasses(ticketPreferences.getString("passes_json", null))
@@ -96,13 +97,14 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 settingsSyncPending = initialRadioPolicySyncPending,
             ),
             ticket = TicketUiState(
-                mode = initialTicketMode,
+                mode = initialTicketModes.selected,
                 passes = initialImportedPasses.ifEmpty { TicketUiState().passes },
                 selectedPassId = initialImportedPasses.firstOrNull()?.id ?: TicketUiState().selectedPassId,
                 isOnX3 = initialTicketOnX3,
                 sendPending = initialPendingTicketPayload != null,
                 removalPending = initialTicketRemovalPending,
                 deployedPassId = initialDeployedPassId,
+                deployedMode = initialTicketModes.deployed,
             ),
             readingStats = ReadingStatsUiState(
                 sessions = readingStatsRepository.load(),
@@ -196,7 +198,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 if (hasFreshTicketSnapshot) {
                     val ticketPresent = capabilities.ticketPresent
                     val removalPending = ticketPresent && _uiState.value.ticket.removalPending
-                    persistTicketState(ticketPresent, _uiState.value.ticket.mode, removalPending)
+                    persistTicketState(ticketPresent, _uiState.value.ticket.deployedMode, removalPending)
                     if (!ticketPresent) {
                         liveTicketActive = false
                         flightUpdateJob?.cancel()
@@ -251,7 +253,6 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                         ),
                     )
                 }
-                syncPassesInteractiveOwner()
                 scheduleInteractiveLeaseForConnection(link.capabilitiesSequence)
                 if (transportConnected && capabilities != null) {
                     reconnectAttempt = 0
@@ -531,38 +532,33 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun showTools() {
         _uiState.update { it.copy(surface = CompanionSurface.Tools) }
-        syncPassesInteractiveOwner()
     }
 
     fun showRead() {
         _uiState.update { it.copy(surface = CompanionSurface.Read) }
-        syncPassesInteractiveOwner()
     }
 
     fun showFocus() {
         _uiState.update { it.copy(surface = CompanionSurface.Focus) }
-        syncPassesInteractiveOwner()
     }
 
     fun openPasses() {
         _uiState.update {
             it.copy(surface = CompanionSurface.Tools, toolDestination = ToolDestination.Passes)
         }
-        syncPassesInteractiveOwner()
     }
 
     fun showToolHub() {
         _uiState.update { it.copy(toolDestination = ToolDestination.Hub) }
-        syncPassesInteractiveOwner()
     }
 
     fun setTicketMode(mode: TicketMode) {
         _uiState.update { it.copy(ticket = it.ticket.copy(mode = mode)) }
+        ticketPreferences.edit().putString("selected_mode", mode.name).apply()
     }
 
     fun openStats() {
         _uiState.update { it.copy(surface = CompanionSurface.Tools, toolDestination = ToolDestination.Stats) }
-        syncPassesInteractiveOwner()
     }
 
     fun setReadingStatsView(view: ReadingStatsView) {
@@ -808,14 +804,12 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         backgroundDisconnectJob?.cancel()
         backgroundDisconnectJob = null
         ensureTransportConnected()
-        syncPassesInteractiveOwner()
         drainPendingUsbWork()
     }
 
     fun onAppBackgrounded() {
         appForeground = false
         foregroundProbePending = false
-        syncPassesInteractiveOwner()
         backgroundDisconnectJob?.cancel()
         backgroundDisconnectJob = viewModelScope.launch {
             delay(BackgroundDisconnectGraceMs)
@@ -1233,6 +1227,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                             sendPending = false,
                             removalPending = false,
                             deployedPassId = deployedPassId,
+                            deployedMode = mode,
                         ),
                     )
                 }
@@ -1269,7 +1264,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         }
         if (_uiState.value.ticket.removalPending || ticketDeleteJob?.isActive == true) return
         val ticket = _uiState.value.ticket
-        persistTicketState(true, ticket.mode, true)
+        persistTicketState(true, ticket.deployedMode, true)
         _uiState.update { it.copy(ticket = it.ticket.copy(removalPending = true)) }
         intentionalTransportIdle = false
         if (companionClient.isReady()) drainPendingTicketRemoval() else ensureTransportConnected()
@@ -1283,18 +1278,25 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         }
         ticketDeleteJob = viewModelScope.launch {
             val result = runCatching {
-                companionClient.clearTicket()
+                withInteractiveTransport(TicketTransferOwner) {
+                    companionClient.clearTicket()
+                }
             }
             if (result.isSuccess) {
                 liveTicketActive = false
                 flightUpdateJob?.cancel()
                 flightUpdateJob = null
-                persistTicketState(false, _uiState.value.ticket.mode, false)
+                persistTicketState(false, null, false)
                 intentionalTransportIdle = true
                 companionClient.disconnect()
                 _uiState.update {
                     it.copy(
-                        ticket = it.ticket.copy(isOnX3 = false, removalPending = false, deployedPassId = null),
+                        ticket = it.ticket.copy(
+                            isOnX3 = false,
+                            removalPending = false,
+                            deployedPassId = null,
+                            deployedMode = null,
+                        ),
                         isX3TransportConnected = false,
                         device = it.device.copy(reconnecting = false),
                     )
@@ -1308,14 +1310,14 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun showSettings(show: Boolean) {
         _uiState.update { it.copy(settingsVisible = show) }
-        syncPassesInteractiveOwner()
     }
 
-    private fun persistTicketState(present: Boolean, mode: TicketMode, removalPending: Boolean) {
+    private fun persistTicketState(present: Boolean, mode: TicketMode?, removalPending: Boolean) {
         val editor = ticketPreferences.edit()
             .putBoolean("is_on_x3", present)
-            .putString("mode", mode.name)
             .putBoolean("removal_pending", removalPending)
+        if (present && mode != null) editor.putString("deployed_mode", mode.name)
+        else if (!present) editor.remove("deployed_mode")
         val deployedPassId = _uiState.value.ticket.deployedPassId
         if (present && deployedPassId != null) editor.putString("deployed_pass_id", deployedPassId)
         else if (!present) editor.remove("deployed_pass_id")
@@ -1540,19 +1542,6 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private fun canMaintainTransport(): Boolean = foregroundProbePending || requiresPersistentTransport()
-
-    private fun syncPassesInteractiveOwner() {
-        val state = _uiState.value
-        val visible = appForeground &&
-            !state.settingsVisible &&
-            state.surface == CompanionSurface.Tools &&
-            state.toolDestination == ToolDestination.Passes
-        if (visible) {
-            acquireInteractiveTransport(PassesScreenOwner)
-        } else {
-            releaseInteractiveTransport(PassesScreenOwner)
-        }
-    }
 
     private fun acquireInteractiveTransport(owner: InteractiveTransportOwner) {
         if (!interactiveTransport.acquire(owner)) return
@@ -1798,7 +1787,6 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private companion object {
-        val PassesScreenOwner = InteractiveTransportOwner("passes-screen")
         val TicketTransferOwner = InteractiveTransportOwner("ticket-transfer")
         val FocusCommandOwner = InteractiveTransportOwner("focus-command")
         const val BackgroundDisconnectGraceMs = 1_500L

@@ -36,6 +36,14 @@ private val ExpressiveColors = lightColorScheme(
     surfaceVariant = ExpressiveSurfaceVariant,
     onSurfaceVariant = Color(0xFF5D4540),
     outline = ExpressiveOutline,
+    tertiary = ExpressiveTertiary,
+    onTertiary = ExpressiveOnTertiary,
+    tertiaryContainer = ExpressiveTertiaryContainer,
+    onTertiaryContainer = ExpressiveOnTertiaryContainer,
+    error = ExpressiveError,
+    onError = ExpressiveOnError,
+    errorContainer = ExpressiveErrorContainer,
+    onErrorContainer = ExpressiveOnErrorContainer,
 )
 
 private val QuietColors = darkColorScheme(
@@ -56,6 +64,14 @@ private val QuietColors = darkColorScheme(
     surfaceVariant = QuietSurfaceVariant,
     onSurfaceVariant = Color(0xFFC8C8C8),
     outline = QuietOutline,
+    tertiary = QuietTertiary,
+    onTertiary = QuietOnTertiary,
+    tertiaryContainer = QuietTertiaryContainer,
+    onTertiaryContainer = QuietOnTertiaryContainer,
+    error = QuietError,
+    onError = QuietOnError,
+    errorContainer = QuietErrorContainer,
+    onErrorContainer = QuietOnErrorContainer,
 )
 
 private val CompanionShapes = Shapes(

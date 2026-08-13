@@ -156,6 +156,14 @@ Measured failure: battery fell from 89% to 81% in one hour.
 
 ## Flight passes and tickets
 
+### 2026-08-13 Passes/X3 contract implementation
+
+- [x] Keep Passes visibility outside interactive-transport ownership; bounded send and clear retain the generic scoped owner.
+- [x] Keep selected next-send mode and acknowledged deployed mode as separate persisted Android state.
+- [x] Add a pure portrait/rotated X3 ticket layout owner with mapped-hint safe-area geometry and host-test coverage.
+- [ ] Render and inspect compact/large-text Passes screenshots and X3 ticket geometry on hardware.
+- [ ] Verify acknowledgement, deep-sleep retention, scanner readability, and Live provider freshness on physical devices.
+
 - [x] Add Android import for `.pkpass`, Google Wallet FlightObject JSON, and a shared Google Wallet save-JWT link.
 - [x] Render the actual imported symbology in Android instead of a decorative pattern.
 - [x] Add bounded protocol fields for flight, route, passenger, gate, seat, and barcode payload.
