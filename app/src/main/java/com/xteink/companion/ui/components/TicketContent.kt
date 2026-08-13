@@ -99,8 +99,8 @@ fun PassesToolContent(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(top = 2.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(top = 2.dp, bottom = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
             modifier = Modifier
@@ -110,23 +110,21 @@ fun PassesToolContent(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             TextButton(onClick = onBack) { Text("←  ${stringResource(R.string.back_to_tools)}") }
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = stringResource(R.string.passes_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 1,
+                )
+                Text(
+                    pluralStringResource(R.plurals.passes_count, ticket.passes.size, ticket.passes.size),
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
             TextButton(onClick = { importChoiceVisible = true }) { Text(stringResource(R.string.import_flight)) }
-        }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            Text(
-                text = stringResource(R.string.passes_title),
-                style = MaterialTheme.typography.headlineLarge,
-            )
-            Text(
-                pluralStringResource(R.plurals.passes_count, ticket.passes.size, ticket.passes.size),
-                style = MaterialTheme.typography.labelLarge,
-            )
         }
         MagneticHorizontalPager(
             state = pagerState,
@@ -254,9 +252,9 @@ private fun PassControlCard(
 private fun UnifiedPassBody(pass: BoardingPassUiState, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
-            .heightIn(min = 350.dp)
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .heightIn(min = 340.dp)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -384,7 +382,7 @@ private fun UnifiedPassBody(pass: BoardingPassUiState, modifier: Modifier = Modi
                                 .fillMaxWidth()
                                 .height(104.dp)
                         } else {
-                            Modifier.size(168.dp)
+                            Modifier.size(160.dp)
                         },
                     ),
             )
@@ -567,11 +565,11 @@ private fun PassModeChooser(
         ),
         selectedKey = mode.name,
         onSelect = { onSetMode(TicketMode.valueOf(it)) },
-        optionHeight = 126.dp,
+        optionHeight = 136.dp,
         selectedWeight = 1.25f,
         unselectedWeight = 0.90f,
-        optionContentPadding = 10.dp,
-        optionContentSpacing = 3.dp,
+        optionContentPadding = 14.dp,
+        optionContentSpacing = 4.dp,
         modifier = modifier,
     ) { key ->
         Row(

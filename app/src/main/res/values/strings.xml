@@ -123,8 +123,8 @@
     <string name="send_static_ticket">Send static</string>
     <string name="start_live_and_send">Start &amp; send</string>
     <string name="ticket_send_pending">Waiting for X3</string>
-    <string name="static_ticket_on_x3">Pinned on X3</string>
-    <string name="live_ticket_on_x3">Live on X3</string>
+    <string name="static_ticket_on_x3">On X3</string>
+    <string name="live_ticket_on_x3">On X3</string>
     <string name="remove_ticket_from_x3">Remove</string>
     <string name="ticket_removal_pending">Waiting for X3</string>
     <string name="ticket_static_removal_pending">Exit ticket on X3</string>
