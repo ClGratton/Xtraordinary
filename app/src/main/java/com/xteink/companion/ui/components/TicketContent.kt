@@ -508,7 +508,7 @@ private fun DelayBadge(delayMinutes: Int) {
             text = when {
                 delayMinutes > 0 -> "+$delayMinutes min"
                 delayMinutes < 0 -> "$delayMinutes min"
-                else -> stringResource(R.string.on_time),
+                else -> stringResource(R.string.on_time)
             },
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
