@@ -494,6 +494,13 @@
       "path": "firmware/src/companion/CompanionService.cpp",
       "pattern": "beginBookUpload\\(envelope, BookUploadOwner::Usb\\)[\\s\\S]*?bookUploadOwner_ == BookUploadOwner::Ble\\) abortBookUpload\\(false\\)[\\s\\S]*?beginBookUpload\\(envelope, BookUploadOwner::Ble\\)[\\s\\S]*?owner == BookUploadOwner::Ble\\) requestFastConnection\\(\\)[\\s\\S]*?bookUploadOwner_ != owner",
       "message": "Book transactions must be owned by their transport so a bounded BLE release cannot abort USB work or make USB request BLE-fast mode."
+    },
+    {
+      "id": "usb-command-replies-use-bounded-reliable-tx",
+      "type": "required_pattern",
+      "path": "firmware/src/main.cpp",
+      "pattern": "USB_COMMAND_REPLY_TX_TIMEOUT_MS = 50[\\s\\S]*?void writeUsbCommandReply[\\s\\S]*?logSerial\\.write[\\s\\S]*?logSerial\\.flush\\(\\)[\\s\\S]*?logSerial\\.setTxTimeoutMs\\(SERIAL_LOG_TX_TIMEOUT_MS\\)[\\s\\S]*?writeUsbCommandReply\\(accepted, messageId\\)",
+      "message": "CDC command replies must use a bounded reliable transmit path while ordinary unattended logs remain non-blocking."
     }
   ]
 }

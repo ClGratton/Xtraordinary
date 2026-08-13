@@ -153,6 +153,7 @@ Reader cleanup now has a dedicated `displayReaderCleanup()` path. It uses the X3
 - Durable USB work drains through one shared availability boundary. It runs when the Pixel first observes the X3 USB device, when the app returns to the foreground with USB already attached, and when a new USB queue is committed. This does not open BLE or acquire an X3 interactive radio lease.
 - Firmware flashing and setup reset acquire the shared exclusive USB-maintenance scope. The scope cancels and awaits any active book transaction without clearing its durable queue, blocks automatic drains while ROM maintenance owns the interfaces, and releases ownership for a later USB-availability event. Maintenance and book transfer never claim the CDC interfaces concurrently.
 - USB transfer diagnostics use the `XteinkUsbBook` log tag and record detect/permission/open/begin/chunk/commit/abort, the first failing phase and byte offset, and successful elapsed throughput. The lifecycle trigger and diagnostic phases apply to all USB book queues rather than one title or screen.
+- CDC ingress remains bounded and non-blocking. Ordinary serial logs retain their 1 ms non-blocking transmit policy, while command ACK/NACK replies alone use a bounded reliable transmit-and-drain primitive because the host must not advance until that specific reply has left the X3 queue.
 
 ## Static ticket
 

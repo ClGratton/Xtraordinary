@@ -17,6 +17,7 @@
 #include <WiFi.h>
 #include <builtinFonts/all.h>
 
+#include <cstdio>
 #include <cstring>
 
 #include "CrossPointSettings.h"
@@ -41,6 +42,30 @@
 // USB commands hex-encode one complete companion envelope. Reserve enough CDC
 // RX capacity for the largest protocol packet plus its prefix and terminator.
 constexpr size_t USB_COMMAND_RX_BUFFER_BYTES = companion::MAX_PACKET_BYTES * 2 + 64;
+constexpr uint32_t SERIAL_LOG_TX_TIMEOUT_MS = 1;
+constexpr uint32_t USB_COMMAND_REPLY_TX_TIMEOUT_MS = 50;
+
+// Ordinary diagnostic logs must never stall the device when no host is
+// listening. Protocol replies are different: the host cannot safely advance
+// until the matching ACK/NACK has left the CDC queue. Give only this bounded
+// reply path enough time to acquire/drain HWCDC, then restore non-blocking logs.
+void writeUsbCommandReply(bool accepted, uint32_t messageId) {
+  char reply[40] = {};
+  const int replyLength = std::snprintf(reply, sizeof(reply), "USB_BOOK_%s:%lu\n", accepted ? "ACK" : "NACK",
+                                        static_cast<unsigned long>(messageId));
+  if (replyLength <= 0 || static_cast<size_t>(replyLength) >= sizeof(reply)) return;
+
+  logSerial.setTxTimeoutMs(USB_COMMAND_REPLY_TX_TIMEOUT_MS);
+  size_t written = 0;
+  while (written < static_cast<size_t>(replyLength)) {
+    const size_t count = logSerial.write(reinterpret_cast<const uint8_t*>(reply) + written,
+                                         static_cast<size_t>(replyLength) - written);
+    if (count == 0) break;
+    written += count;
+  }
+  if (written == static_cast<size_t>(replyLength)) logSerial.flush();
+  logSerial.setTxTimeoutMs(SERIAL_LOG_TX_TIMEOUT_MS);
+}
 #endif
 
 GfxRenderer renderer(display);
@@ -391,7 +416,7 @@ void setup() {
   const size_t usbCommandRxBufferBytes = logSerial.setRxBufferSize(USB_COMMAND_RX_BUFFER_BYTES);
 #endif
   Serial.begin(115200);
-  logSerial.setTxTimeoutMs(1);  // This is a load-bearing 1. Do not modify.
+  logSerial.setTxTimeoutMs(SERIAL_LOG_TX_TIMEOUT_MS);  // Ordinary logs remain non-blocking without a host.
 #ifdef ENABLE_X3_COMPANION
   if (usbCommandRxBufferBytes != USB_COMMAND_RX_BUFFER_BYTES) {
     LOG_ERR("USB", "Could not allocate command RX buffer requested=%u actual=%u",
@@ -680,8 +705,7 @@ void loop() {
         uint32_t messageId = 0;
         const bool accepted = valid &&
                               companion::companionService.handleUsbBookPacket(packet, packetLength, messageId);
-        logSerial.printf("USB_BOOK_%s:%lu\n", accepted ? "ACK" : "NACK",
-                         static_cast<unsigned long>(messageId));
+        writeUsbCommandReply(accepted, messageId);
 #endif
       }
     }
