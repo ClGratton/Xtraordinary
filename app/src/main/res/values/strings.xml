@@ -118,8 +118,8 @@
     <string name="ticket_matrix_preview_description">Scannable preview of the original boarding-pass barcode.</string>
     <string name="static_ticket">Static</string>
     <string name="live_ticket">Live pane</string>
-    <string name="static_ticket_body_short">Pinned. X3 can sleep.</string>
-    <string name="live_ticket_body_short">Flight updates stay live.</string>
+    <string name="static_ticket_body_short">Pin once. X3 sleeps.</string>
+    <string name="live_ticket_body_short">Live flight updates.</string>
     <string name="send_static_ticket">Send static</string>
     <string name="start_live_and_send">Start &amp; send</string>
     <string name="ticket_send_pending">Waiting for X3</string>
