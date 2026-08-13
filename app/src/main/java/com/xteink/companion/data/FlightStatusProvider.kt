@@ -86,7 +86,7 @@ class ProxyFlightStatusProvider(private val endpoint: String) : FlightStatusProv
                 operatingDate = value.optString("operatingDate", requested.operatingDate),
                 origin = value.optString("origin", requested.origin),
             ).normalized()
-            if (returned != requested.normalized()) return null
+            if (!matchesIdentity(requested, returned)) return null
             val observedAt = value.optLong("observedAtEpochMs", 0L)
             if (observedAt <= 0L) return null
             return FlightStatusSnapshot(
@@ -105,6 +105,9 @@ class ProxyFlightStatusProvider(private val endpoint: String) : FlightStatusProv
                 providerName = value.optString("provider", "Flight status provider").take(40),
             )
         }
+
+        internal fun matchesIdentity(requested: FlightIdentity, returned: FlightIdentity): Boolean =
+            requested.normalized() == returned.normalized()
     }
 }
 
