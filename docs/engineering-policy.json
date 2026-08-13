@@ -444,6 +444,13 @@
       "path": "firmware/src/main.cpp",
       "pattern": "USB_COMMAND_RX_BUFFER_BYTES = companion::MAX_PACKET_BYTES \\* 2 \\+ 64[\\s\\S]*?setRxBufferSize\\(USB_COMMAND_RX_BUFFER_BYTES\\)[\\s\\S]*?usbCommandRxBufferBytes != USB_COMMAND_RX_BUFFER_BYTES",
       "message": "The X3 CDC RX queue must hold a full hex-expanded companion envelope and report allocation failure."
+    },
+    {
+      "id": "selected-firmware-card-does-not-intercept-action",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/components/DeviceConnectionSheet.kt",
+      "pattern": "onSelect = if \\(source == selectedSource\\)[\\s\\S]*?null[\\s\\S]*?else[\\s\\S]*?onSelectSource\\(source\\)",
+      "message": "A selected firmware card must delegate taps to its nested install action instead of reopening source selection."
     }
   ]
 }

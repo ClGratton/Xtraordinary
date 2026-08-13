@@ -677,7 +677,11 @@ private fun FirmwareSourcePicker(
                 source = source,
                 device = device,
                 selected = source == selectedSource,
-                onSelect = { onSelectSource(source) },
+                onSelect = if (source == selectedSource) {
+                    null
+                } else {
+                    { onSelectSource(source) }
+                },
                 onFlashFirmware = onFlashFirmware,
             )
             if (index != alternatives.lastIndex) Spacer(Modifier.height(12.dp))
