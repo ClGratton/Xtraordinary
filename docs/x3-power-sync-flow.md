@@ -215,6 +215,7 @@ The 2026-08-11 standby-input freeze, its disproved scan-cadence hypothesis, the 
 - A failure while durable work, Focus, Live, or transfer is pending shows **Reconnecting…** and retries after 1, 3, 8, then 15 seconds (15 seconds thereafter), with the scan/connect time in addition.
 - Expected radio silence in Reading/Static does not produce a destructive action or clear the queued desired state.
 - Every durable device mutation is removed from the pending set only after its matching ACK. Disconnects, timeouts, or process interruption leave durable commands pending and idempotently resend them.
+- The visible-sleep final-sync worker accepts bounded clock, policy, Focus, ticket, status, and reading-stat control messages. Library snapshots and bulk book/firmware transports are NACKed and replayed on the next normal protocol-ready link; the worker must not perform those SD scans or file streams from the BLE teardown task.
 - Pairing keys, service UUIDs, and bond data are not changed by these transitions or application-partition firmware flashes.
 
 ## 2026-08-08 Bluetooth reset acceptance

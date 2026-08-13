@@ -408,7 +408,9 @@ class MainActivity : ComponentActivity() {
                 if (diagnostics) viewModel.readUsbDiagnostics() else viewModel.readUsbCrashReport()
             }.onSuccess {
                 val label = if (diagnostics) "X3_DIAGNOSTICS" else "X3_CRASH_REPORT"
-                Log.i(DeployLogTag, "${label}_START\n$it\n${label}_END")
+                Log.i(DeployLogTag, "${label}_START")
+                it.lineSequence().forEach { line -> Log.i(DeployLogTag, line) }
+                Log.i(DeployLogTag, "${label}_END")
             }.onFailure {
                 val label = if (diagnostics) "X3_DIAGNOSTICS" else "X3_CRASH_REPORT"
                 Log.e(DeployLogTag, "${label}_FAILED", it)

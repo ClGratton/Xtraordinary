@@ -30,6 +30,20 @@
       "message": "A new physical Power press must interrupt the bounded final-sync lifecycle or request a safe restart after teardown begins."
     },
     {
+      "id": "sleep-final-sync-gates-command-work",
+      "type": "required_pattern",
+      "path": "firmware/src/companion/CompanionService.cpp",
+      "pattern": "deepSleepPreparing_ && !acceptsDuringFinalSync\\(envelope\\.type\\)[\\s\\S]*?sendNack",
+      "message": "The bounded sleep worker must apply the centralized final-sync command policy before dispatching protocol work."
+    },
+    {
+      "id": "sleep-final-sync-defers-snapshot-and-bulk-io",
+      "type": "required_pattern",
+      "path": "firmware/src/companion/FinalSyncPolicy.h",
+      "pattern": "acceptsDuringFinalSync[\\s\\S]*?!acceptsDuringFinalSync\\(MessageType::GET_LIBRARY\\)[\\s\\S]*?!acceptsDuringFinalSync\\(MessageType::BEGIN_BOOK_UPLOAD\\)[\\s\\S]*?!acceptsDuringFinalSync\\(MessageType::BEGIN_FIRMWARE\\)",
+      "message": "Final sync must defer library scans and bulk file/firmware transports to the normal main-loop lifecycle."
+    },
+    {
       "id": "sleep-transition-wake-is-edge-latched",
       "type": "required_pattern",
       "path": "firmware/src/main.cpp",

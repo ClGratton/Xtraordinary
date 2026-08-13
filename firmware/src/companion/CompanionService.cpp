@@ -1,6 +1,8 @@
 #ifdef ENABLE_X3_COMPANION
 
 #include "CompanionService.h"
+
+#include "FinalSyncPolicy.h"
 #include "RuntimeTrace.h"
 #include "RadioPolicy.h"
 
@@ -297,7 +299,9 @@ void CompanionService::loop() {
   }
   CommandPacket command;
   if (transportQueueAvailable && commandQueue_ && xQueueReceive(commandQueue_, &command, 0) == pdTRUE) {
+    runtime_trace::mark(runtime_trace::Checkpoint::COMPANION_PACKET_ENTER);
     handlePacket(command.bytes, command.length);
+    runtime_trace::mark(runtime_trace::Checkpoint::COMPANION_PACKET_EXIT);
   }
   if (transportQueueAvailable && !pendingResponse_ && statusNotifyPending_ && connected()) {
     if (sendDeviceStatus()) {
@@ -560,7 +564,7 @@ void CompanionService::onClientDisconnected() {
 void CompanionService::handlePacket(const uint8_t* bytes, size_t length) {
   EnvelopeView envelope{};
   if (!decodeEnvelope(bytes, length, envelope)) return;
-  if (deepSleepPreparing_ && envelope.type == MessageType::APPLY_FIRMWARE) {
+  if (deepSleepPreparing_ && !acceptsDuringFinalSync(envelope.type)) {
     sendNack(envelope.messageId, "Device is entering sleep");
     return;
   }
@@ -679,7 +683,9 @@ void CompanionService::handlePacket(const uint8_t* bytes, size_t length) {
       ok = applyReaderPolicy(envelope);
       break;
     case MessageType::GET_LIBRARY:
+      runtime_trace::mark(runtime_trace::Checkpoint::COMPANION_LIBRARY_SCAN_ENTER);
       ok = scanLibrary();
+      runtime_trace::mark(runtime_trace::Checkpoint::COMPANION_LIBRARY_SCAN_EXIT);
       break;
     case MessageType::DELETE_LIBRARY_ENTRIES:
       ok = deleteLibraryEntries(envelope);

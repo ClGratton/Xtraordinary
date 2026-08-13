@@ -432,7 +432,9 @@ class UsbEspFlasher(context: Context) : Closeable {
                 timeoutMs = timeoutMs,
                 maxBytes = MaxRuntimeTraceBytes,
             ) { candidate ->
-                candidate.lineSequence().any { it.startsWith(RuntimeTraceActive) }
+                candidate.lineSequence().any {
+                    it.startsWith(RuntimeTraceActive) && it.contains(RuntimeTraceCompleteField)
+                }
             }
             return text.lineSequence()
                 .filter { it.startsWith(RuntimeTracePrefix) }
@@ -609,6 +611,7 @@ class UsbEspFlasher(context: Context) : Closeable {
             private const val CrashReportEnd = "CRASH_REPORT_END"
             private const val RuntimeTracePrefix = "RUNTIME_TRACE_"
             private const val RuntimeTraceActive = "RUNTIME_TRACE_ACTIVE"
+            private const val RuntimeTraceCompleteField = "power_held_ms="
 
             fun open(manager: UsbManager, device: UsbDevice): RomConnection {
                 val control = (0 until device.interfaceCount)

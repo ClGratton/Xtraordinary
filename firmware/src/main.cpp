@@ -460,6 +460,14 @@ void setup() {
   }
 
   HalSystem::checkPanic();
+  if (HalSystem::isRebootFromPanic()) {
+    auto crashReport = Storage.open("/crash_report.txt", O_WRITE | O_APPEND);
+    if (crashReport) {
+      crashReport.print("\n\nRetained runtime checkpoints:\n");
+      runtime_trace::dump(crashReport);
+      crashReport.close();
+    }
+  }
 
   SETTINGS.loadFromFile();
   APP_STATE.loadFromFile();
