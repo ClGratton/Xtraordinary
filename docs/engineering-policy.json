@@ -30,6 +30,27 @@
       "message": "A new physical Power press must interrupt the bounded final-sync lifecycle or request a safe restart after teardown begins."
     },
     {
+      "id": "sleep-transition-wake-is-edge-latched",
+      "type": "required_pattern",
+      "path": "firmware/src/main.cpp",
+      "pattern": "sleepTransitionWakeLatched[\\s\\S]*?attachInterrupt[\\s\\S]*?FALLING[\\s\\S]*?finalizeForDeepSleep\\(1200, 2100, sleepTransitionWakeRequested\\)[\\s\\S]*?powerManager\\.startDeepSleep\\(gpio, sleepTransitionWakeRequested\\)",
+      "message": "Power wake must remain edge-latched from final sync through the hardware deep-sleep commit."
+    },
+    {
+      "id": "cancelled-sleep-consumes-wake-gesture",
+      "type": "required_pattern",
+      "path": "firmware/src/main.cpp",
+      "pattern": "restoreAfterCancelledSleep[\\s\\S]*?waitForPowerRelease\\(\\)[\\s\\S]*?gpio\\.update\\(\\)[\\s\\S]*?delay\\(10\\)[\\s\\S]*?gpio\\.update\\(\\)",
+      "message": "A wake tap that cancels sleep must be fully released and debounced before ordinary Power handling resumes."
+    },
+    {
+      "id": "cancelled-sleep-requests-clean-refresh",
+      "type": "required_pattern",
+      "path": "firmware/src/main.cpp",
+      "pattern": "restoreAfterCancelledSleep[\\s\\S]*?display\\.requestCleanRefresh\\(\\)[\\s\\S]*?activityManager\\.requestUpdateAndWait\\(\\)",
+      "message": "Cancelling a visible sleep frame must synchronously replace it with one clean destination render."
+    },
+    {
       "id": "instant-wake-skips-released-recovery-settle",
       "type": "required_pattern",
       "path": "firmware/src/main.cpp",
@@ -233,7 +254,7 @@
       "id": "companion-radio-stops-before-deep-sleep",
       "type": "required_pattern",
       "path": "firmware/src/main.cpp",
-      "pattern": "goToSleep\\(fromTimeout\\)[\\s\\S]*?finalizeForDeepSleep\\(1200, 2100, rawPowerButtonPressed\\)",
+      "pattern": "goToSleep\\(fromTimeout\\)[\\s\\S]*?finalizeForDeepSleep\\(1200, 2100, sleepTransitionWakeRequested\\)",
       "message": "The truthful sleep frame must render before bounded final sync and BLE controller teardown."
     },
     {

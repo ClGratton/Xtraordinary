@@ -67,12 +67,14 @@ void HalPowerManager::setPowerSaving(bool enabled, int minimumFrequencyMhz) {
   // Otherwise, no change needed
 }
 
-void HalPowerManager::startDeepSleep(HalGPIO& gpio) const {
+void HalPowerManager::startDeepSleep(HalGPIO& gpio, bool (*wakeRequested)()) const {
   // Ensure that the power button has been released to avoid immediately turning back on if you're holding it
   while (gpio.isPressed(HalGPIO::BTN_POWER)) {
+    if (wakeRequested && wakeRequested()) ESP.restart();
     delay(50);
     gpio.update();
   }
+  if (wakeRequested && wakeRequested()) ESP.restart();
 
 #ifdef ENABLE_SERIAL_LOG
   // Tear down HWCDC so the host sees a clean disconnect and the peripheral
@@ -97,6 +99,10 @@ void HalPowerManager::startDeepSleep(HalGPIO& gpio) const {
   // power button is hard-wired to briefly provide power to the MCU, waking it up regardless of the wakeup source
   // configuration
   esp_deep_sleep_enable_gpio_wakeup(1ULL << InputManager::POWER_BUTTON_PIN, ESP_GPIO_WAKEUP_GPIO_LOW);
+  // Keep the transition latch authoritative until the instruction that commits
+  // deep sleep. If Power is already low after this check, the armed GPIO wake
+  // source immediately brings the device back.
+  if (wakeRequested && wakeRequested()) ESP.restart();
   // Enter Deep Sleep
   esp_deep_sleep_start();
 }

@@ -59,12 +59,18 @@ EInkDisplay::RefreshMode convertRefreshMode(HalDisplay::RefreshMode mode) {
 }
 
 void HalDisplay::displayBuffer(HalDisplay::RefreshMode mode, bool turnOffScreen) {
+  if (cleanRefreshPending) {
+    mode = RefreshMode::FULL_REFRESH;
+    cleanRefreshPending = false;
+  }
   if (gpio.deviceIsX3() && mode == RefreshMode::HALF_REFRESH) {
     einkDisplay.requestResync(1);
   }
 
   einkDisplay.displayBuffer(convertRefreshMode(mode), turnOffScreen);
 }
+
+void HalDisplay::requestCleanRefresh() { cleanRefreshPending = true; }
 
 void HalDisplay::displayReaderCleanup(bool turnOffScreen) {
   const uint32_t startedAt = millis();
@@ -73,6 +79,10 @@ void HalDisplay::displayReaderCleanup(bool turnOffScreen) {
 }
 
 void HalDisplay::refreshDisplay(HalDisplay::RefreshMode mode, bool turnOffScreen) {
+  if (cleanRefreshPending) {
+    mode = RefreshMode::FULL_REFRESH;
+    cleanRefreshPending = false;
+  }
   if (gpio.deviceIsX3() && mode == RefreshMode::HALF_REFRESH) {
     einkDisplay.requestResync(1);
   }
@@ -89,6 +99,10 @@ void HalDisplay::copyGrayscaleBuffers(const uint8_t* lsbBuffer, const uint8_t* m
 }
 
 void HalDisplay::displayGrayscaleBase(RefreshMode fallback, bool turnOffScreen) {
+  if (cleanRefreshPending) {
+    fallback = RefreshMode::FULL_REFRESH;
+    cleanRefreshPending = false;
+  }
   // X3: a HALF fallback means the caller wants a clean base (e.g. the sleep
   // cover, a full-screen swap from arbitrary prior content). Without this, the
   // X3 grayscale base takes its gentle differential happy path and the prior

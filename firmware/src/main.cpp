@@ -176,19 +176,45 @@ constexpr char SLEEP_FRAME_FILE[] = "/.crosspoint/sleep_frame.bin";
 
 static bool rawPowerButtonPressed() { return digitalRead(InputManager::POWER_BUTTON_PIN) == LOW; }
 
+static volatile bool sleepTransitionWakeLatched = false;
+
+static void ARDUINO_ISR_ATTR latchSleepTransitionWake() { sleepTransitionWakeLatched = true; }
+
+static void armSleepTransitionWake() {
+  sleepTransitionWakeLatched = false;
+  attachInterrupt(digitalPinToInterrupt(InputManager::POWER_BUTTON_PIN), latchSleepTransitionWake, FALLING);
+}
+
+static void disarmSleepTransitionWake() {
+  detachInterrupt(digitalPinToInterrupt(InputManager::POWER_BUTTON_PIN));
+}
+
+static bool sleepTransitionWakeRequested() {
+  return sleepTransitionWakeLatched || rawPowerButtonPressed();
+}
+
 static void restoreAfterCancelledSleep(bool resumeReader, bool previousShowBootScreen) {
   deepSleepInProgress = false;
   APP_STATE.showBootScreen = previousShowBootScreen;
   APP_STATE.saveToFile();
   Storage.remove(SLEEP_FRAME_FILE);
-  lastActivityAtMs = millis();
-  allowSleepAt = millis() + 500;
+  // Consume the complete wake gesture before normal input resumes. Otherwise
+  // the same physical tap can be debounced as a new Power command and put the
+  // freshly restored activity straight back to sleep.
+  waitForPowerRelease();
+  gpio.update();
+  delay(10);
+  gpio.update();
+  display.requestCleanRefresh();
   if (resumeReader && !APP_STATE.openEpubPath.empty()) {
     activityManager.goToReader(APP_STATE.openEpubPath);
   } else {
     activityManager.goHome();
   }
   activityManager.loop();
+  activityManager.requestUpdateAndWait();
+  lastActivityAtMs = millis();
+  allowSleepAt = millis() + 500;
 #ifdef ENABLE_X3_COMPANION
   companion::companionService.wakeFastAdvertising();
 #endif
@@ -239,6 +265,7 @@ void enterDeepSleep(bool fromTimeout = false) {
   // after that initiating press is released, so a second press means "wake"
   // instead of cancelling every normal sleep request.
   if (!fromTimeout) waitForPowerRelease();
+  armSleepTransitionWake();
 
   if (isQuickResumeSleep) {
     saveSleepFrameBuffer();
@@ -250,14 +277,31 @@ void enterDeepSleep(bool fromTimeout = false) {
   // lifecycle runs in a disposable worker behind one hard deadline, so neither
   // advertising restart nor teardown can strand the old awake frame onscreen.
   const auto finalizeResult =
-      companion::companionService.finalizeForDeepSleep(1200, 2100, rawPowerButtonPressed);
+      companion::companionService.finalizeForDeepSleep(1200, 2100, sleepTransitionWakeRequested);
   if (finalizeResult == companion::DeepSleepFinalizeResult::WakeCancelled) {
     LOG_INF("MAIN", "Power pressed during final sync; cancelling sleep");
+    disarmSleepTransitionWake();
     restoreAfterCancelledSleep(APP_STATE.lastSleepFromReader, previousShowBootScreen);
     return;
   }
   if (finalizeResult == companion::DeepSleepFinalizeResult::WakeRequiresRestart) {
     LOG_INF("MAIN", "Power pressed after BLE shutdown began; restarting awake safely");
+    disarmSleepTransitionWake();
+    deepSleepInProgress = false;
+    APP_STATE.showBootScreen = previousShowBootScreen;
+    APP_STATE.saveToFile();
+    if (APP_STATE.lastSleepFromReader && !APP_STATE.openEpubPath.empty()) {
+      silentRestartToReader();
+    } else {
+      silentRestart();
+    }
+    return;
+  }
+  // Final sync may finish between two callback samples. The ISR latch remains
+  // authoritative across the remaining WiFi/display shutdown interval.
+  if (sleepTransitionWakeRequested()) {
+    LOG_INF("MAIN", "Power pressed after final sync; restarting awake safely");
+    disarmSleepTransitionWake();
     deepSleepInProgress = false;
     APP_STATE.showBootScreen = previousShowBootScreen;
     APP_STATE.saveToFile();
@@ -278,10 +322,16 @@ void enterDeepSleep(bool fromTimeout = false) {
   }
 
   halTiltSensor.deepSleep();
+  if (sleepTransitionWakeRequested()) {
+    disarmSleepTransitionWake();
+    ESP.restart();
+  }
   display.deepSleep();
   LOG_DBG("MAIN", "Entering deep sleep");
 
-  powerManager.startDeepSleep(gpio);
+  // The latch stays armed through the final hardware commit. PowerManager
+  // reboots if it observes the request after the panel has already slept.
+  powerManager.startDeepSleep(gpio, sleepTransitionWakeRequested);
 }
 
 void setupDisplayAndFonts(bool seamless = false) {

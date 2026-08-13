@@ -199,6 +199,16 @@ already-released instant wake. Hardware acceptance must measure the resulting
 press-to-first-visible-change time; source inspection alone cannot establish the
 e-ink result.
 
+The first dev27 physical attempt proved the cancellation branch could win, but
+a repeated attempt still failed and the restored activity retained visible
+Sleeping-frame ghosting. That narrowed two remaining boundaries: the wake level
+was sampled only during finalization, and a still-held/debouncing wake tap could
+return to the ordinary Power handler as a fresh sleep command. The dev28
+candidate therefore latches the falling edge from immediately after the
+initiating press is released through the final hardware sleep commit, consumes
+the entire wake gesture before normal input resumes, and requests a reusable
+one-shot full refresh for the first restored Home/Reader render.
+
 ## Regression rule
 
 Do not treat visible e-ink immobility as proof of an input-scan defect or sleep. Trace the entire loop, power transition, allocation/logging path, input state, activity dispatch, render request, controller teardown, sleep entry, and wake source. Any deterministic hardware-configuration rejection must be bounded. Every third-party teardown call on the power-off path must also be behind a deadline, and physical acceptance must cross the configured deep-sleep deadline. A failed manual Power hold with no render and no BLE disconnect must be diagnosed at the input/event boundary before changing downstream sleep code.

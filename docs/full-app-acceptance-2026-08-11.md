@@ -53,7 +53,7 @@ This is the evidence ledger for the current reset-first acceptance run. A check 
 
 ## Next executable sequence
 
-1. Build/deploy the pushed dev27/dev34 candidate, retrieve the retained crash report, and accept immediate Power cancellation during final sync plus established-deep-sleep instant wake and boot-feedback timing.
-2. Run USB book success, cancellation, stale-host retry, and multi-file queueing; rerun BLE/process-death transfer and Focus regressions only where the final-sync path could affect them.
+1. Accept immediate Power cancellation during final sync plus established-deep-sleep instant wake and boot-feedback timing on the deployed dev27/dev34 pair.
+2. Run USB book success, cancellation, stale-host retry, and multi-file queueing; rerun BLE/process-death transfer and Focus regressions only where the final-sync path could affect them. The pre-flash retained dev26 report was recovered over PC serial: it has an empty panic string (consistent with the recorded CPU-lockup reset class), ends around final-sync radio restore with `PWR Lock already held`, and contains SD read addresses without a usable exception backtrace, so no SD causality is claimed.
 3. Finish Static/Live pass removal and persistence, Settings ACK truth, firmware-source flashing, accessibility, and automated regression coverage.
 4. Configure valid Android OAuth before Drive create/restore/delete/revoke; resolve the external product/backend decisions before trial expiry, ads, upgrade, recovery, and community ad-free build acceptance can be claimed.

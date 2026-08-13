@@ -451,9 +451,10 @@ Measured failure: battery fell from 89% to 81% in one hour.
 - [x] Diagnose dev26's immediate re-wake failure: the second tap lands after the Sleeping render but before final sync/BLE shutdown returns and before deep-sleep GPIO wake is armed, so the blocked main loop loses it.
 - [x] Make the reusable final-sync lifecycle Power-interruptible after the initiating sleep press is released. Cancel before teardown; use a controlled awake restart if teardown already began.
 - [x] Preserve **UP + POWER** recovery but skip its 500 ms settle when an instant wake tap is already physically released.
-- [ ] Commit and push the complete dev27/dev34 candidate, then run both canonical wrappers; compilation is forbidden before the upstream source checkpoint matches.
-- [ ] Install dev34 without clearing app data, invoke its debug-only USB crash-report action, and record the retained X3 crash report before another reset can replace it.
-- [ ] Flash dev27 application-only with write-hash verification; preserve NVS, bond, app data, and SD.
-- [ ] Physical acceptance: request sleep, wait only until **Sleeping** is visible, immediately fast-tap Power, and confirm it returns awake rather than finishing sleep.
+- [x] Commit and push the complete dev27/dev34 candidate at `7a9264c`, then run both canonical wrappers: provenance and 54 policies passed; Android unit tests/lint/assembly passed; firmware RV32IMC verification and release build passed.
+- [x] Install dev34 without clearing app data and recover the retained dev26 crash report before flashing. Pixel USB host correctly reported no attached X3 because the cable was on PC `COM7`; the identical read-only command succeeded over PC serial. The report has no panic text, ends around final-sync radio restore with `PWR Lock already held`, and includes SD read addresses but no usable exception backtrace, so it does not prove an SD cause.
+- [x] Flash dev27 application-only with write-hash verification; preserve NVS, bond, app data, and SD. Firmware SHA-256 is `343C4275A6755B8CDFDD393319A12873F98C48FEC81C142B9E8A304201F45198`; APK SHA-256 is `F68C9A27EB726F4CD66D8431E16A3E0E7D69EDF6C933B03B59D32BAF56CD3793`.
+- [ ] Physical acceptance: request sleep, wait only until **Sleeping** is visible, immediately fast-tap Power, and confirm it returns awake rather than finishing sleep. Dev27 succeeded once but failed on repeat and left Sleeping-frame ghosting; dev28 must prove repeated cancellation after adding a transition-wide edge latch, wake-gesture consumption, and a clean destination refresh.
 - [ ] Physical acceptance: enter established deep sleep, fast-tap Power, measure press-to-first-visible-change and confirm the X3 remains awake.
-- [ ] Verify a fresh post-wake protocol-ready chain and then resume USB book success/cancel/stale-host retry/multi-file queueing.
+- [x] Verify the immediate post-flash protocol-ready chain without deleting the bond: status-0 GATT, three services, MTU 256, notification subscription, Capabilities, StatusChanged, LibraryPage, and policy ACKs.
+- [ ] After physical sleep/wake acceptance, resume USB book success/cancel/stale-host retry/multi-file queueing.

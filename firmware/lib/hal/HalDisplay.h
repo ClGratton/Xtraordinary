@@ -39,6 +39,10 @@ class HalDisplay {
                             bool fromProgmem = false) const;
 
   void displayBuffer(RefreshMode mode = RefreshMode::FAST_REFRESH, bool turnOffScreen = false);
+  // Upgrade the next rendered frame to a full clean refresh. This is a
+  // feature-agnostic transition primitive for replacing an unrelated retained
+  // e-ink frame without teaching each destination activity about its source.
+  void requestCleanRefresh();
   // Periodic reader cleanup using the X3 half waveform without promoting it
   // to the multi-pass full resync used for arbitrary screen transitions.
   void displayReaderCleanup(bool turnOffScreen = false);
@@ -84,6 +88,7 @@ class HalDisplay {
 
  private:
   EInkDisplay einkDisplay;
+  bool cleanRefreshPending = false;
 };
 
 extern HalDisplay display;
