@@ -167,6 +167,7 @@ fun X3CompanionApp(
                 isX3Reconnecting = state.device.reconnecting,
                 isX3Connecting = state.device.linkPhase == "Scanning" || state.device.linkPhase == "Connecting",
                 requiresBluetoothReset = state.device.requiresBluetoothReset,
+                transportBlocker = state.device.transportBlocker,
                 connectedDeviceModel = state.connectedDeviceModel,
                 batteryPercentage = state.device.batteryPercentage,
                 charging = state.device.charging,

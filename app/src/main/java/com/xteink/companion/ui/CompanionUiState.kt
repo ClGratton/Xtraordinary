@@ -200,6 +200,7 @@ data class DeviceUiState(
     val linkPhase: String = "Disconnected",
     val reconnecting: Boolean = false,
     val requiresBluetoothReset: Boolean = false,
+    val transportBlocker: com.xteink.companion.data.LinkBlocker? = null,
     val message: String? = null,
     val usbConnected: Boolean = false,
     val usbPhase: String = "Disconnected",

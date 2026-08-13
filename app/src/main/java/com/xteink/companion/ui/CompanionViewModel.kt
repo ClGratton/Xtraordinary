@@ -167,7 +167,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 }
                 val managedModel = managedDeviceModel()
                 val transportConnected = link.phase == LinkPhase.Connected
-                val connectionBlocked = link.requiresBluetoothReset
+                val connectionBlocked = link.requiresBluetoothReset || link.blocker != null
                 val unexpectedDisconnect = link.phase == LinkPhase.Error && !intentionalTransportIdle && !connectionBlocked
                 val reconnectRequired = unexpectedDisconnect && requiresPersistentTransport()
                 if (connectionBlocked) {
@@ -214,8 +214,9 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                                 phase = link.phase,
                                 intentionalTransportIdle = intentionalTransportIdle,
                             ),
-                            requiresBluetoothReset = connectionBlocked,
-                            message = if (reconnectRequired) null else link.message,
+                            requiresBluetoothReset = link.requiresBluetoothReset,
+                            transportBlocker = link.blocker,
+                            message = if (reconnectRequired && !connectionBlocked) null else link.message,
                             firmwareVersion = capabilities?.firmwareVersion ?: state.device.firmwareVersion,
                             libraryRevision = capabilities?.libraryRevision ?: state.device.libraryRevision,
                             firmwareProgress = link.transferProgress ?: state.device.firmwareProgress,
@@ -1505,7 +1506,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             _uiState.value.device.requiresBluetoothReset
         ) return
         _uiState.update { it.copy(device = it.device.copy(reconnecting = true)) }
-        val delayMs = ReconnectBackoffMs[reconnectAttempt.coerceAtMost(ReconnectBackoffMs.lastIndex)]
+        val delayMs = reconnectDelayMs(reconnectAttempt, appForeground)
         reconnectAttempt++
         reconnectJob = viewModelScope.launch {
             delay(delayMs)
@@ -1657,6 +1658,5 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         const val PendingDeletePathsKey = "pending_delete_paths"
         const val PendingBookUploadIdsKey = "pending_book_upload_ids"
         const val PendingBookUploadMethodKey = "pending_book_upload_method"
-        val ReconnectBackoffMs = longArrayOf(1_000L, 3_000L, 8_000L, 15_000L)
     }
 }

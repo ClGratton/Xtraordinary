@@ -193,6 +193,7 @@ fun DeviceConnectionSheetContent(
                             reconnecting = device.reconnecting,
                             requiresBluetoothReset = device.requiresBluetoothReset,
                             connecting = device.linkPhase == "Scanning" || device.linkPhase == "Connecting",
+                            blocker = device.transportBlocker,
                         ),
                         onFirmware = {
                             selectedModelName = XteinkModel.X3.name
@@ -282,6 +283,9 @@ private fun ManagedDeviceState(
         when (presence) {
             DevicePresence.Connected -> R.string.device_connected
             DevicePresence.NeedsBluetoothReset -> R.string.settings_device_bluetooth_reset
+            DevicePresence.BluetoothOff -> R.string.settings_device_bluetooth_off
+            DevicePresence.PermissionRequired -> R.string.settings_device_permission_required
+            DevicePresence.BluetoothUnavailable -> R.string.settings_device_bluetooth_unavailable
             DevicePresence.Reconnecting -> R.string.settings_device_reconnecting
             DevicePresence.Connecting -> R.string.settings_device_connecting
             DevicePresence.Available -> R.string.device_available
@@ -321,6 +325,9 @@ private fun ManagedDeviceState(
                         color = when (presence) {
                             DevicePresence.Connected -> MaterialTheme.colorScheme.primary
                             DevicePresence.NeedsBluetoothReset -> MaterialTheme.colorScheme.error
+                            DevicePresence.BluetoothOff,
+                            DevicePresence.PermissionRequired,
+                            DevicePresence.BluetoothUnavailable -> MaterialTheme.colorScheme.error
                             else -> MaterialTheme.colorScheme.onSurfaceVariant
                         },
                     )

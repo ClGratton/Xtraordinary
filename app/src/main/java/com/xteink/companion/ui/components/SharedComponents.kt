@@ -70,6 +70,7 @@ fun CompanionTopBar(
     isX3Reconnecting: Boolean,
     isX3Connecting: Boolean,
     requiresBluetoothReset: Boolean,
+    transportBlocker: com.xteink.companion.data.LinkBlocker?,
     connectedDeviceModel: String?,
     batteryPercentage: Int?,
     charging: Boolean,
@@ -83,6 +84,7 @@ fun CompanionTopBar(
         isX3Reconnecting,
         requiresBluetoothReset,
         isX3Connecting,
+        transportBlocker,
     )
     val settingsDescription = stringResource(R.string.open_settings)
     val devicesDescription = stringResource(
@@ -124,6 +126,9 @@ fun CompanionTopBar(
                             when {
                                 presence == DevicePresence.Connected -> R.string.settings_device_connected
                                 presence == DevicePresence.NeedsBluetoothReset -> R.string.settings_device_bluetooth_reset
+                                presence == DevicePresence.BluetoothOff -> R.string.settings_device_bluetooth_off
+                                presence == DevicePresence.PermissionRequired -> R.string.settings_device_permission_required
+                                presence == DevicePresence.BluetoothUnavailable -> R.string.settings_device_bluetooth_unavailable
                                 presence == DevicePresence.Reconnecting -> R.string.settings_device_reconnecting
                                 presence == DevicePresence.Connecting -> R.string.settings_device_connecting
                                 presence == DevicePresence.Available -> R.string.settings_device_available
@@ -131,7 +136,12 @@ fun CompanionTopBar(
                             },
                         ),
                         style = MaterialTheme.typography.labelMedium,
-                        color = if (presence == DevicePresence.NeedsBluetoothReset) {
+                        color = if (presence in setOf(
+                                DevicePresence.NeedsBluetoothReset,
+                                DevicePresence.BluetoothOff,
+                                DevicePresence.PermissionRequired,
+                                DevicePresence.BluetoothUnavailable,
+                            )) {
                             MaterialTheme.colorScheme.error
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant

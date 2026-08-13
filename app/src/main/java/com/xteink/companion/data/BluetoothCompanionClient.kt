@@ -73,6 +73,12 @@ import java.util.concurrent.atomic.AtomicInteger
 
 enum class LinkPhase { Disconnected, Scanning, Connecting, Connected, Error }
 
+enum class LinkBlocker {
+    BluetoothOff,
+    NearbyPermissionRequired,
+    BluetoothUnavailable,
+}
+
 data class CompanionLinkState(
     val phase: LinkPhase = LinkPhase.Disconnected,
     val requestedModel: String? = null,
@@ -82,6 +88,7 @@ data class CompanionLinkState(
     val message: String? = null,
     val transferProgress: Float? = null,
     val requiresBluetoothReset: Boolean = false,
+    val blocker: LinkBlocker? = null,
 )
 
 data class DeviceLibrarySnapshot(val revision: UInt, val entries: List<LibraryEntry>)
@@ -120,14 +127,23 @@ class BluetoothCompanionClient(private val context: Context) {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(receiverContext: Context, intent: Intent) {
                 when (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)) {
-                    BluetoothAdapter.STATE_TURNING_OFF, BluetoothAdapter.STATE_OFF -> preferAutoConnect = false
+                    BluetoothAdapter.STATE_TURNING_OFF, BluetoothAdapter.STATE_OFF -> {
+                        preferAutoConnect = false
+                        _state.value = _state.value.copy(
+                            phase = LinkPhase.Error,
+                            message = BluetoothOffMessage,
+                            requiresBluetoothReset = false,
+                            blocker = LinkBlocker.BluetoothOff,
+                        )
+                    }
                     BluetoothAdapter.STATE_ON -> {
                         preferAutoConnect = false
-                        if (_state.value.requiresBluetoothReset) {
+                        if (_state.value.requiresBluetoothReset || _state.value.blocker == LinkBlocker.BluetoothOff) {
                             _state.value = _state.value.copy(
                                 phase = LinkPhase.Disconnected,
                                 message = null,
                                 requiresBluetoothReset = false,
+                                blocker = null,
                             )
                         }
                     }
@@ -150,14 +166,24 @@ class BluetoothCompanionClient(private val context: Context) {
     @SuppressLint("MissingPermission")
     fun connect(model: String) {
         if (!hasPermissions()) {
-            _state.value = CompanionLinkState(LinkPhase.Error, model, message = "Nearby devices permission is required")
+            _state.value = CompanionLinkState(
+                LinkPhase.Error,
+                model,
+                message = "Nearby devices permission is required",
+                blocker = LinkBlocker.NearbyPermissionRequired,
+            )
             return
         }
         Log.i(LogTag, "connect requested model=$model phase=${_state.value.phase}")
         disconnect()
         val adapter = bluetoothManager.adapter
         if (adapter == null || !adapter.isEnabled) {
-            _state.value = CompanionLinkState(LinkPhase.Error, model, message = "Bluetooth is turned off")
+            _state.value = CompanionLinkState(
+                LinkPhase.Error,
+                model,
+                message = BluetoothOffMessage,
+                blocker = LinkBlocker.BluetoothOff,
+            )
             return
         }
         _state.value = CompanionLinkState(LinkPhase.Scanning, model, message = "Searching nearby")
@@ -192,7 +218,12 @@ class BluetoothCompanionClient(private val context: Context) {
         }
         scanCallback = callback
         val scanner = adapter.bluetoothLeScanner ?: run {
-            _state.value = CompanionLinkState(LinkPhase.Error, model, message = "Bluetooth LE is unavailable")
+            _state.value = CompanionLinkState(
+                LinkPhase.Error,
+                model,
+                message = "Bluetooth LE is unavailable",
+                blocker = LinkBlocker.BluetoothUnavailable,
+            )
             return
         }
         scanner.startScan(
@@ -286,6 +317,7 @@ class BluetoothCompanionClient(private val context: Context) {
             phase = LinkPhase.Disconnected,
             requiresBluetoothReset = false,
             message = null,
+            blocker = null,
         )
     }
 
@@ -883,8 +915,10 @@ class BluetoothCompanionClient(private val context: Context) {
 
     @SuppressLint("MissingPermission")
     private fun failLink(message: String, requiresBluetoothReset: Boolean = false) {
-        Log.w(LogTag, "link failed: $message")
-        val failure = IllegalStateException(message)
+        val bluetoothOff = bluetoothManager.adapter?.isEnabled != true
+        val effectiveMessage = if (bluetoothOff) BluetoothOffMessage else message
+        Log.w(LogTag, "link failed: $effectiveMessage")
+        val failure = IllegalStateException(effectiveMessage)
         pendingAcks.values.forEach { it.completeExceptionally(failure) }
         pendingAcks.clear()
         writes.clear()
@@ -894,9 +928,10 @@ class BluetoothCompanionClient(private val context: Context) {
         service = null
         _state.value = _state.value.copy(
             phase = LinkPhase.Error,
-            message = message,
+            message = effectiveMessage,
             transferProgress = null,
-            requiresBluetoothReset = requiresBluetoothReset,
+            requiresBluetoothReset = requiresBluetoothReset && !bluetoothOff,
+            blocker = if (bluetoothOff) LinkBlocker.BluetoothOff else null,
         )
     }
 
@@ -904,6 +939,7 @@ class BluetoothCompanionClient(private val context: Context) {
     companion object {
         private val CLIENT_CONFIG_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
         private const val CompanionDeviceName = "XTEINK Companion"
+        private const val BluetoothOffMessage = "Bluetooth is turned off"
         private const val LogTag = "XteinkBle"
         private const val DefaultAttMtu = 23
         private const val RequestedAttMtu = 517

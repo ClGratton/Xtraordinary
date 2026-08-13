@@ -1,6 +1,6 @@
 # X3 power, Bluetooth, synchronization, and app-state flow
 
-**Canonical source candidate for:** Android `0.2.0-dev20` and X3 firmware `xtraordinary-v0.2.6-dev16-local`. These artifacts are built but not deployed; the installed versions remain recorded in `HANDOFF.md`.
+**Canonical behavior for:** the current Android companion and X3 firmware. Exact installed and source candidates remain recorded in `HANDOFF.md`; this document owns the reusable power, connection, and synchronization contract.
 **Defaults:** 5-minute fast discovery, a 1.5-second advertising pulse every 30 seconds in low-power standby, a separate 2-second connected-background interval, 10-minute inactivity sleep, full reader cleanup every 15 pages, and a 1-second power-button hold.
 
 ## Terms and sources of truth
@@ -20,7 +20,10 @@ The X3 is a BLE peripheral. It cannot initiate a GATT connection or relaunch an 
 |---|---|
 | **No device** / **None connected** | No managed X3 is stored in the app. |
 | **Paired** | The app remembers the bonded X3, but no GATT transport is open and no retry has failed into the pending-work loop. This does not mean Bluetooth is currently connected. |
-| **Reconnecting…** | The app has work that still requires the X3 and is scanning/retrying after a failed attempt. Reading, a static ticket, or deep sleep can make this expected. It is not presented as a command failure. |
+| **Reconnecting…** | The app has work that still requires the X3 and is scanning/retrying after a failed attempt. Reading, a static ticket, or deep sleep can make this expected. This label is never allowed to hide a known phone-side blocker. |
+| **Bluetooth off** | Android reports that its Bluetooth adapter is off. Scanning/retry is paused; any durable command remains queued and resumes when Android reports Bluetooth on. |
+| **Permission needed** | Android has not granted the Nearby devices permission required for BLE. Durable work remains queued, but the app cannot scan until permission is available. |
+| **Bluetooth unavailable** | Android exposes no usable BLE scanner. This is a transport blocker, not an X3 availability claim. |
 | **Connected** | An encrypted GATT transport is open and event notifications are subscribed; capabilities/status follow immediately in the handshake. |
 | **Saved on phone · waiting for X3** | At least one phone-managed setting has not yet received both required X3 acknowledgements. |
 | **Synced to X3** | The exact current radio policy and reader refresh value were ACKed in this GATT session. |
@@ -54,7 +57,7 @@ If the user changes another setting while an older write is in flight, the older
 
 | Time/state | BLE behavior | CPU/power behavior | App behavior |
 |---|---|---|---|
-| Boot or Home, 0–5 minutes | Fast legacy advertising every 500 ms. Any Home button activity restarts this window. | Full speed while the radio is being restarted and for five seconds after BLE traffic; otherwise the BLE-safe 80 MHz floor. | App foreground performs one status probe, then disconnects unless work or an interactive surface holds a lease. Pending work keeps retrying. |
+| Boot or Home, 0–5 minutes | Fast legacy advertising every 500 ms. Any Home button activity restarts this window. | Full speed while the radio is being restarted and for five seconds after BLE traffic; otherwise the BLE-safe 80 MHz floor. | App foreground performs one status probe, then disconnects unless work or an interactive surface holds a lease. Pending work keeps retrying; a visible app limits the no-scan gap to 500 ms. |
 | Home, 5–10 minutes | A 1.5-second advertising pulse every 30 seconds by default. Home formats **Bluetooth standby · up to N s** from the policy actually applied on X3, where N is the selected 30, 60, or 120 seconds, and redraws Home after that policy is persisted. | The BLE-safe clock is required only during each pulse; between pulses X3 may return to the ESP32-C3's supported 20 MHz XTAL/2 idle floor. A rejected clock target is cached rather than retried from the main loop. | Connection can take up to the selected standby check-in plus Android scan/connect time. |
 | Home, 10 minutes without activity | Advertising stops and X3 enters its normal deep-sleep path. | Hardware deep sleep/power latch behavior from CrossPoint. | App shows **Paired** if idle, or continues to hold durable pending work for the next wake. |
 | Connected background traffic | GATT is active; after three seconds X3 requests the separately configured connection interval (2 seconds by default). | 160 MHz for five seconds after traffic, then 80 MHz while BLE remains required. | **Connected**. Commands and status are revisioned/ACKed; an idle app releases GATT. |
@@ -78,6 +81,14 @@ Configurable app choices:
 - At the inactivity deadline, Home sleeps.
 - A phone connection does not alter pairing. Foreground alone no longer retains GATT: after the one-shot status probe or an ACKed command, Android disconnects unless durable work, a transfer, or a visible interactive owner still needs it. A running Focus session or displayed Live ticket keeps X3 awake and pulse-discoverable; it does not by itself justify a permanent GATT connection.
 
+## Foreground reconnect and battery boundary
+
+- Android transport blockers outrank generic retry state. **Bluetooth off**, missing Nearby-device permission, and BLE-unavailable are shown directly instead of **Reconnecting…**.
+- A blocker pauses reconnect attempts; desired commands remain durable. Bluetooth-on clears the blocker and makes the normal recovery policy eligible again without deleting or recreating the bond.
+- A foreground app with real unacknowledged work scans for the existing 15-second window and leaves at most a 500 ms gap before its next scan. This lets an X3 Home-button wake/fast-advertising window be noticed without the previous 15-second blind backoff.
+- Background recovery retains the bounded 1/3/8/15-second backoff. Merely leaving the app open is not persistent work: after its one-shot status probe, or after the final matching ACK, Android releases GATT.
+- These retry timings govern the phone scanner only. They do not renew the X3 interactive lease, create extra X3 advertisements, reset X3 inactivity, or keep the X3 awake. X3 battery behavior remains governed by its applied fast-window, standby-pulse, activity, and sleep policy.
+
 ## Reusable interactive transport lease
 
 - Any workflow that knows it will exchange data in both directions acquires an opaque owner from the shared `InteractiveTransportCoordinator`; the coordinator contains no Passes, ticket, Focus, Settings, firmware, or navigation rules.
@@ -94,7 +105,7 @@ Configurable app choices:
 - Entering Reading with no connected phone stops advertising immediately. Page buttons do not wake BLE.
 - If GATT was already connected, X3 sends the Reading/Slow status. Android lets already-queued desired-state commands finish and then releases GATT; X3 remains radio-quiet.
 - A phone setting, ticket send, ticket clear, Focus command, or library deletion made while Reading is saved/queued and does not produce an error toast merely because X3 is silent.
-- The running app retries with backoff while work exists. When the user exits Reading, X3 changes to Awake/Fast and advertises; Android connects and drains the pending work.
+- The running app retries while work exists: visible foreground recovery has at most a 500 ms no-scan gap, while background recovery uses the bounded 1/3/8/15-second backoff. When the user exits Reading, X3 changes to Awake/Fast and advertises; Android connects and drains the pending work.
 - Reading still follows the configured inactivity sleep timeout. Page/button/tilt activity resets that timeout.
 - Reader cleanup uses the last value ACKed and persisted on X3. A phone choice of 30 made while Reading continues affects the X3 only after exit/direct-sleep synchronization and ACK; the app clearly remains **waiting for X3** until then.
 

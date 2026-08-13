@@ -402,6 +402,27 @@
       "path": "app/src/main/java/com/xteink/companion/ui/components/SetupScreen.kt",
       "pattern": "onboarding_welcome[\\s\\S]*?onboarding_library[\\s\\S]*?onboarding_device",
       "message": "The three onboarding pages must keep the coordinated finished illustration set."
+    },
+    {
+      "id": "transport-blockers-outrank-reconnecting",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/ConnectionPolicy.kt",
+      "pattern": "blocker == LinkBlocker\\.BluetoothOff[\\s\\S]*?blocker == LinkBlocker\\.NearbyPermissionRequired[\\s\\S]*?blocker == LinkBlocker\\.BluetoothUnavailable[\\s\\S]*?reconnecting",
+      "message": "Known Android transport blockers must be presented before the generic reconnecting state."
+    },
+    {
+      "id": "foreground-reconnect-gap-is-bounded",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/ConnectionPolicy.kt",
+      "pattern": "if \\(appForeground\\) return ForegroundReconnectGapMs[\\s\\S]*?ForegroundReconnectGapMs = 500L[\\s\\S]*?BackgroundReconnectBackoffMs",
+      "message": "Foreground pending-work recovery must avoid a long no-scan gap while retaining bounded background backoff."
+    },
+    {
+      "id": "foreground-retry-power-boundary-is-documented",
+      "type": "required_pattern",
+      "path": "docs/x3-power-sync-flow.md",
+      "pattern": "## Foreground reconnect and battery boundary[\\s\\S]*?Merely leaving the app open is not persistent work[\\s\\S]*?do not renew the X3 interactive lease",
+      "message": "The canonical power policy must keep faster phone recovery separate from X3 power ownership."
     }
   ]
 }

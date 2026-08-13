@@ -1,6 +1,8 @@
 package com.xteink.companion.ui
 
 import com.xteink.companion.data.LinkPhase
+import com.xteink.companion.data.LinkBlocker
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -14,6 +16,30 @@ class ConnectionPolicyTest {
         assertTrue(devicePresence(true, false, false, false, true) == DevicePresence.Connecting)
         assertTrue(devicePresence(true, true, false) == DevicePresence.Connected)
         assertTrue(devicePresence(false, false, false) == DevicePresence.None)
+    }
+
+    @Test
+    fun `transport blockers outrank reconnecting`() {
+        assertEquals(
+            DevicePresence.BluetoothOff,
+            devicePresence(true, false, true, blocker = LinkBlocker.BluetoothOff),
+        )
+        assertEquals(
+            DevicePresence.PermissionRequired,
+            devicePresence(true, false, true, blocker = LinkBlocker.NearbyPermissionRequired),
+        )
+        assertEquals(
+            DevicePresence.BluetoothUnavailable,
+            devicePresence(true, false, true, blocker = LinkBlocker.BluetoothUnavailable),
+        )
+    }
+
+    @Test
+    fun `foreground pending work has no long blind retry gap`() {
+        assertEquals(500L, reconnectDelayMs(attempt = 0, appForeground = true))
+        assertEquals(500L, reconnectDelayMs(attempt = 20, appForeground = true))
+        assertEquals(1_000L, reconnectDelayMs(attempt = 0, appForeground = false))
+        assertEquals(15_000L, reconnectDelayMs(attempt = 20, appForeground = false))
     }
 
     @Test
