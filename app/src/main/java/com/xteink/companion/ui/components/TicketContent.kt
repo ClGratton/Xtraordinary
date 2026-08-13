@@ -588,10 +588,12 @@ private fun PassModeChooser(
                 shape = MaterialTheme.shapes.extraLarge,
                 contentPadding = PaddingValues(horizontal = 8.dp),
             ) {
-                SendToX3Icon(
-                    modifier = Modifier.size(21.dp),
-                    color = MaterialTheme.colorScheme.onPrimary,
-                )
+                if (!isOnX3) {
+                    SendToX3Icon(
+                        modifier = Modifier.size(21.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                }
                 Text(
                     text = stringResource(
                         if (sendPending) R.string.ticket_send_pending
@@ -601,7 +603,7 @@ private fun PassModeChooser(
                         else R.string.start_live_and_send,
                     ),
                     style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(start = 6.dp),
+                    modifier = Modifier.padding(start = if (isOnX3) 0.dp else 6.dp),
                     maxLines = 1,
                 )
             }
