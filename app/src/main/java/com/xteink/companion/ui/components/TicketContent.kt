@@ -281,13 +281,21 @@ private fun UnifiedPassBody(pass: BoardingPassUiState, modifier: Modifier = Modi
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 PassStatusBadge(pass.status)
-                if (pass.countdown.isNotBlank() && !pass.countdown.equals(pass.status, ignoreCase = true)) {
-                    Text(pass.countdown, style = MaterialTheme.typography.labelMedium, maxLines = 1)
-                }
+                pass.delayMinutes?.takeIf { it != 0 }?.let { DelayBadge(it) }
             }
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
                 pass.flight,
                 style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (pass.countdown.isNotBlank() && !pass.countdown.equals(pass.status, ignoreCase = true)) {
+            Text(
+                pass.countdown,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -309,7 +317,6 @@ private fun UnifiedPassBody(pass: BoardingPassUiState, modifier: Modifier = Modi
                 emphasized = true,
                 modifier = Modifier.weight(1f),
             )
-            pass.delayMinutes?.let { DelayBadge(it) }
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
