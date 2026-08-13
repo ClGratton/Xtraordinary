@@ -12,7 +12,7 @@ This is the evidence ledger for the current reset-first acceptance run. A check 
 ## Current state
 
 - Android: `0.2.0-dev42` / code 43 installed with app data and bond retained; APK SHA-256 `8A255255093EB8C2E6860297C05C4DF87C6DB531B470E2AAA63F7116AB50191E`.
-- X3: `xtraordinary-v0.2.6-dev32-usb-owner-local`, production-phone-flashed application-only with write verification; SHA-256 `7F28384C7C41798EDF09A3BDA9CCA20D6D0196EAF215D05D52E151A16F7A25EF`.
+- X3: `xtraordinary-v0.2.6-dev33-usb-reply-local`, production-phone-flashed application-only with write verification; SHA-256 `09CFA412462129697839F889B0682CB89060B19AC6C6AD595934104F29BE9E84`.
 - X3 NVS reset and Android bond removal: complete.
 - Bluetooth bond: fresh Secure Connections bond to `XTEINK Companion`; 16-byte AES key recorded.
 - Linked test folder: `/Documents/XtraordinaryTest`, containing two repository EPUB fixtures.
@@ -54,7 +54,8 @@ This is the evidence ledger for the current reset-first acceptance run. A check 
 ## 2026-08-13 USB and external-service update
 
 - USB success and stale-host recovery now pass on dev42/dev32: the retained 68,277-byte `test_tables.epub` queue resumed from a fresh Begin after firmware replacement, completed, cleared its durable queue, and produced exact X3 path `/Books/test_tables.epub`.
-- USB-specific cancel/abort and sequential two-file queueing remain open. Earlier BLE cancellation and BLE process-death evidence do not substitute for these USB cases.
+- USB-specific cancel/abort passes: Begin ACKed, cancellation occurred during chunks at offset 480/68,277, Abort ACKed, the explicit cancel cleared its durable entry, and no partial X3 library entry appeared.
+- Sequential two-file USB queueing passes on dev33 by durable end state: both queued IDs cleared and exact paths `/Books/RTL_test.epub` and `/Books/test_tables.epub` returned. The post-restart frame log started after completion, so no individual frame timing is claimed.
 - Google reading-history production acceptance remains blocked by the production OAuth client. Wallet-format import exists, but consumer Wallet enumeration does not; live flight status still requires the documented provider/proxy boundary.
 - Trial, entitlement, ads, purchase, and the SDK-free community build remain unimplemented pending the external identity, Play Billing, product, AdMob, and UMP contracts recorded in `monetization-entitlement-design.md`.
 
