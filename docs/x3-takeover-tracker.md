@@ -502,3 +502,14 @@ Measured failure: battery fell from 89% to 81% in one hour.
 - [x] Isolate the unsafe lifecycle: Android bootstraps every GATT link with `GET_LIBRARY`, and final sync dispatched that SD snapshot scan from its bounded BLE teardown worker. Centralize the final-sync command policy so state/control updates remain accepted while library snapshots and bulk book/firmware I/O are NACKed for durable replay on the next normal link.
 - [x] Append retained runtime checkpoints to the persistent crash file on every future panic and mark packet/library-scan entry and exit, so a later sleep cannot overwrite the evidence.
 - [ ] Canonically build and production-flash the corrected firmware application partition only, preserving NVS, bond, app data, and SD; then hold Home past the configured sleep deadline with the phone reconnecting and prove repeated clean sleep/wake without a new crash report.
+
+## 2026-08-13 Passes design and UX hardening
+
+- [x] Complete separate read-only specialist reviews for UX, information hierarchy, spacing, margins/alignment, typography/fonts, color/contrast, and shape/affordance; do not treat a generic visual detector as sufficient evidence.
+- [x] Reconcile the reports into `docs/passes-design-ux-contract.md`, separating machine-blocking invariants from human visual, usability, accessibility, phone, protocol, X3, and scanner acceptance.
+- [x] Restore the accepted two-row header contract; preserve magnetic/haptic paging and route-edge traffic; specify a compact operational front plus equal-bounds full-code back with an explicit turn action.
+- [x] Document selected pass, desired next-send mode, pending intent, acknowledged X3 pass/mode, and fresh reconciliation as distinct truths. Opening or paging Passes must not retain an interactive Bluetooth lease.
+- [ ] Implement the reconciled Android/X3 contract through reusable layout, type, color, shape, interaction, state, and ticket-rendering primitives.
+- [ ] Add the mandatory geometry, semantics, state, contrast, large-text, haptic, X3 safe-area, UTF-8, and scanner-containment checks, then pass the canonical build without accepting an unreviewed screenshot baseline.
+- [ ] Inspect default, compact, large-text, Quiet, delayed, pending, acknowledged, stale, sample, matrix, linear, front, and full-code renders before installing or flashing.
+- [ ] Physically accept phone gestures/semantics, X3 matrix and linear tickets, rotated Scan/Ticket mapping, ghosting refresh, real acknowledgement/power behavior, and barcode scanning without resetting app data, NVS, SD, or Bluetooth bonds.

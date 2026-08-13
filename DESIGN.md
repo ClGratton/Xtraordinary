@@ -102,10 +102,15 @@ Opening a tool is nested navigation. Android Back and `Back to Tools` return to 
 - There is no duplicate selector row. Swipe the card itself to change pass.
 - The next card edge is visible on the first item; previous and next edges are visible in the middle of a longer collection.
 - Each perforated side rail shows the complete departure → arrival route, so either exposed carousel edge identifies its pass.
-- The selected card contains code, route, flight/status, departure/countdown, gate, terminal, seat, Start live pane, and Send to X3.
-- Details below the carousel update with the settled card.
-- Static and Live pane are presentation/power choices, not navigation destinations.
+- Back and Import flight share the first row. A separate row restores the large left-aligned title and right-aligned pass count.
+- The selected card has a compact operational front and an equal-bounds full-code back. A labelled **Show code / Show details** control turns it in place; horizontal drag remains exclusively pass paging and retains its haptics.
+- The front prioritizes route, signed delay/status, departure/arrival, and gate/terminal/seat. Flight, passenger/group, source/freshness, and the turn action are supporting information.
+- The back prioritizes one scanner-safe code with only a thin route/flight identity line and the turn action.
+- Static and Live are presentation/power choices for the next send, not navigation destinations and not the acknowledged X3 state.
+- Selected pass, desired next-send mode, pending intent, and acknowledged X3 pass/mode remain distinct. Applied UI requires the matching device acknowledgement or fresh authoritative reconciliation.
+- Opening or paging Passes does not retain an interactive Bluetooth lease. Bounded send, remove, and refresh work uses the generic scoped lease.
 - Sample codes are visibly marked and intentionally non-scannable.
+- `docs/passes-design-ux-contract.md` owns the detailed hierarchy, geometry, semantics, color, type, shape, X3, and evidence rules.
 
 ## Color, shape, and type
 

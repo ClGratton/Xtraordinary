@@ -100,5 +100,6 @@ A UI change is complete only when:
 - `PRODUCT.md`: product purpose, user, principles, accessibility intent.
 - `DESIGN.md`: current navigation, theme, hierarchy, motion, and component decisions.
 - `docs/ui-audit-2026-08-11.md`: dated evidence and prioritized findings.
+- `docs/passes-design-ux-contract.md`: mandatory reconciled UX and visual contract for Android Passes and the X3 ticket renderer.
 - `docs/ui-surface-evidence.json`: machine-checked render coverage contract.
 - `docs/engineering-policy.json`: build-blocking repository rules.

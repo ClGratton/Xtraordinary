@@ -398,6 +398,13 @@
       "message": "UI work must retain the structured research, hierarchy, state, and render-verification workflow."
     },
     {
+      "id": "passes-design-ux-contract-is-durable",
+      "type": "required_pattern",
+      "path": "docs/passes-design-ux-contract.md",
+      "pattern": "## User tasks and truth model[\\s\\S]*?## Phone information architecture[\\s\\S]*?## Android visual system[\\s\\S]*?## X3 ticket contract[\\s\\S]*?## Mandatory machine evidence[\\s\\S]*?## Mandatory human evidence",
+      "message": "Passes work must retain the reconciled UX, visual-system, X3, and evidence contract."
+    },
+    {
       "id": "ui-surfaces-have-render-evidence",
       "type": "ui_surface_evidence",
       "path": "docs/ui-surface-evidence.json",
