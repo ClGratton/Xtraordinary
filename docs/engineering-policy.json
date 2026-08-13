@@ -37,6 +37,13 @@
       "message": "Power wake must remain edge-latched from final sync through the hardware deep-sleep commit."
     },
     {
+      "id": "sleep-frame-completes-before-final-sync",
+      "type": "required_pattern",
+      "path": "firmware/src/activities/ActivityManager.cpp",
+      "pattern": "goToSleep\\(bool fromTimeout\\)[\\s\\S]*?loop\\(false\\)[\\s\\S]*?requestUpdateAndWait\\(\\)[\\s\\S]*?requestUpdateAndWait\\(\\)[\\s\\S]*?requestedUpdate = false",
+      "message": "The Sleeping frame must physically complete before its visible cancellation and final-sync window begins."
+    },
+    {
       "id": "cancelled-sleep-consumes-wake-gesture",
       "type": "required_pattern",
       "path": "firmware/src/main.cpp",

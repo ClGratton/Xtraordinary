@@ -81,7 +81,7 @@ class ActivityManager {
   ~ActivityManager() { assert(false); /* should never be called */ };
 
   void begin();
-  void loop();
+  void loop(bool dispatchRender = true);
 
   // Will replace currentActivity and drop all activities on stack
   void replaceActivity(std::unique_ptr<Activity>&& newActivity);

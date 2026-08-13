@@ -60,7 +60,7 @@ void ActivityManager::renderTaskLoop() {
   }
 }
 
-void ActivityManager::loop() {
+void ActivityManager::loop(bool dispatchRender) {
   if (currentActivity) {
     // Note: do not hold a lock here, the loop() method must be responsible for acquire one if needed
     currentActivity->loop();
@@ -141,7 +141,7 @@ void ActivityManager::loop() {
     }
   }
 
-  if (requestedUpdate) {
+  if (requestedUpdate && dispatchRender) {
     requestedUpdate = false;
     // Using direct notification to signal the render task to update
     // Increment counter so multiple rapid calls won't be lost
@@ -203,7 +203,14 @@ void ActivityManager::goToReader(std::string path) {
 
 void ActivityManager::goToSleep(bool fromTimeout) {
   replaceActivity(std::make_unique<SleepActivity>(renderer, mappedInput, fromTimeout));
-  loop();  // Important: sleep screen must be rendered immediately, the caller will go to sleep right after this returns
+  // Resolve the pending activity without dispatching its deferred update. The
+  // synchronous request below consumes that update and emits exactly one
+  // physical render instead of racing two panel refreshes.
+  loop(false);
+  // Sleeping is a user-visible lifecycle boundary, not a queued intention.
+  // Do not let final phone sync or radio teardown consume its cancellation
+  // window while the e-ink panel is still physically drawing the frame.
+  requestUpdateAndWait();
 }
 
 void ActivityManager::goToBoot() { replaceActivity(std::make_unique<BootActivity>(renderer, mappedInput)); }
@@ -328,6 +335,10 @@ void ActivityManager::requestUpdateAndWait() {
   bool holdingRenderLock = (mutexHolder == currTaskHandler);
   if (!alreadyWaiting && !isRenderTask && !holdingRenderLock) {
     waitingTaskHandle = currTaskHandler;
+    // A synchronous render fulfills any deferred request already owned by the
+    // current activity. Leaving it set would dispatch a duplicate render on
+    // the next main-loop iteration.
+    requestedUpdate = false;
   }
   taskEXIT_CRITICAL(nullptr);
 

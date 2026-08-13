@@ -259,13 +259,20 @@ void enterDeepSleep(bool fromTimeout = false) {
   // Commit to sleeping before goToSleep() runs the outgoing activity's onExit():
   // a WiFi activity would otherwise silentRestart() here and reboot instead.
   deepSleepInProgress = true;
-  activityManager.goToSleep(fromTimeout);
-
-  // A manual sleep begins while Power is still held. Arm transition wake only
-  // after that initiating press is released, so a second press means "wake"
-  // instead of cancelling every normal sleep request.
+  // A manual sleep may begin while Power is still held. Arm transition wake
+  // only after that initiating press is released, so a later falling edge is
+  // unambiguously a wake request. Keep the latch active while the truthful
+  // Sleeping frame is rendered to physical completion.
   if (!fromTimeout) waitForPowerRelease();
   armSleepTransitionWake();
+  activityManager.goToSleep(fromTimeout);
+
+  if (sleepTransitionWakeRequested()) {
+    LOG_INF("MAIN", "Power pressed while the Sleeping frame rendered; cancelling sleep");
+    disarmSleepTransitionWake();
+    restoreAfterCancelledSleep(APP_STATE.lastSleepFromReader, previousShowBootScreen);
+    return;
+  }
 
   if (isQuickResumeSleep) {
     saveSleepFrameBuffer();

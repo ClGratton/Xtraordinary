@@ -209,6 +209,16 @@ initiating press is released through the final hardware sleep commit, consumes
 the entire wake gesture before normal input resumes, and requests a reusable
 one-shot full refresh for the first restored Home/Reader render.
 
+Dev28 then captured all three repeated wake taps, but all three still appeared
+to fail. Retained trace evidence separated input from presentation: the prior
+boot recorded raw, debounced, and pressed Power `0x40` with a 2 ms hold and the
+next boot reported reset reason 3 (software restart). The late-recovery branch
+was therefore running exactly as written. The actual contract error was
+`ActivityManager::goToSleep()`: it queued the e-ink render and returned, allowing
+the 1.2-second reversible final-sync window to expire while the panel was still
+drawing **Sleeping**. Dev29 waits for that render to physically complete before
+starting final sync, while keeping the transition edge latch armed throughout.
+
 ## Regression rule
 
 Do not treat visible e-ink immobility as proof of an input-scan defect or sleep. Trace the entire loop, power transition, allocation/logging path, input state, activity dispatch, render request, controller teardown, sleep entry, and wake source. Any deterministic hardware-configuration rejection must be bounded. Every third-party teardown call on the power-off path must also be behind a deadline, and physical acceptance must cross the configured deep-sleep deadline. A failed manual Power hold with no render and no BLE disconnect must be diagnosed at the input/event boundary before changing downstream sleep code.
