@@ -265,3 +265,49 @@ There should be no `app/src/androidTest` test harness left. Review `git status -
 - Ticket payload v2 adds arrival time and signed delay. Capabilities gate Android encoding, X3 migrates saved v1 tickets, and both app/X3 keep those facts above the scanner code. The external HTTPS proxy endpoint is intentionally unset until provisioned; no provider key belongs in either APK.
 - The monetization core is centralized in `MonetizationPolicy.kt`: server-evidence states, injected clock, offline grace, and surface/operation-aware banner decisions. `community` and `play` are separate build variants; community contains no billing/ad/consent SDK. Production billing/backend/UMP/AdMob acceptance remains blocked on external accounts and identifiers.
 - Canonical Android tasks now compile/test/lint/assemble both distributions. Default installation uses `app-community-debug.apk`.
+# 2026-08-13 Passes design/UX contract and implementation handoff
+
+Branch `codex/x3-dev25-recovery` is pushed through `69efd5f`. The worktree was clean when the last canonical build started. Do not reset app data, X3 NVS/SD, or Bluetooth bonds.
+
+Authoritative design/UX knowledge is now `docs/passes-design-ux-contract.md` (commit `e8f3bb8`). It reconciles separate UX, hierarchy, spacing, margins/alignment, typography, color, and shape/affordance reviews; `DESIGN.md`, the tracker, and the 85-rule engineering gate point to it. Reuse the same contract-owner pattern; do not invent a Passes-specific transport lifecycle.
+
+Implementation commits:
+
+- `c3aea0e` — redesigned Passes and hardened the X3 ticket layout.
+- `69efd5f` — fixed Compose selection/Kotlin compilation.
+
+Implemented source boundary:
+
+- two-row Back/Import then title/count header;
+- magnetic/haptic pager preserved, with resource-backed position and Previous/Next accessibility actions;
+- compact details face and equal-bounds full-code face with explicit, reduced-motion-aware vertical turn;
+- selected pass/next-send mode separated from acknowledged deployed pass/mode;
+- selected/deployed modes persisted under separate keys with legacy migration tests;
+- no Passes-visibility Bluetooth owner; send/remove use generic `TicketTransferOwner` only;
+- compact radio mode selector plus separate explanation and Start-timer-style send/remove action transformation;
+- deployment truth uses a polite live region, names pass/mode, and sample/source/provider freshness is explicit;
+- Quiet missing roles are grayscale, fallback primary AA test added, semantic type/shape hierarchy corrected;
+- pure native `TicketLayout` owns portrait/rotated safe geometry, centers facts at 108/264/420, excludes mapped hints, and shares integer barcode placement with host tests.
+
+Canonical Android retry at pushed `69efd5f` reached this exact boundary:
+
+- pushed-source provenance passed;
+- engineering policy passed (85 rules);
+- Community and Play Kotlin/Java compilation passed;
+- Community and Play unit tests passed;
+- both debug APKs assembled;
+- lint analysis ran;
+- screenshot validation failed: 21 of 23 previews differ in each flavor, and the three new Passes compact/1.3x/2x fixtures have no reference images.
+
+The broad screenshot diff is not approval evidence. Darkening the global Expressive primary for small-text AA changed many unrelated screens. Next work must first scope the Passes/status color fix without silently redesigning Focus/setup/settings/read, rerun the canonical wrapper, inspect the actual rendered Passes default/compact/1.3x/2x/Quiet images, and update only deliberately accepted references. Reports are under `app/build/reports/screenshotTest/preview/debug/{community,play}/index.html`; renders are under `app/build/outputs/screenshotTest-results/preview/debug/{community,play}/rendered/`.
+
+Still incomplete:
+
+- real Compose bounds/semantics execution assertions beyond screenshot fixtures;
+- measured UTF-8 width/truncation helper for X3 dynamic ticket text;
+- execution of the new firmware host `TicketLayoutTest`;
+- canonical firmware build/production flash of the earlier final-sync crash correction plus this ticket layout;
+- phone install and visual/gesture/accessibility acceptance;
+- X3 matrix/linear/rotated Scan-Ticket, ghosting, acknowledgement, sleep/pulse, and real scanner acceptance.
+
+Required order: inspect/scoped-fix screenshot blast radius -> commit/push -> canonical Android wrapper -> inspect and deliberately approve Passes evidence -> install/phone acceptance -> commit/push any firmware follow-up -> canonical firmware wrapper outside sandbox and never alongside Gradle -> application-only flash preserving NVS/bond/SD -> physical acceptance.
