@@ -11,6 +11,8 @@ import android.hardware.usb.UsbDeviceConnection
 import android.hardware.usb.UsbEndpoint
 import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
+import android.os.SystemClock
+import android.util.Log
 import androidx.core.content.ContextCompat
 import com.xteink.companion.protocol.BOOK_UPLOAD_CHUNK_BYTES
 import com.xteink.companion.protocol.BookUploadBegin
@@ -66,50 +68,78 @@ class UsbBookTransfer(context: Context) : Closeable {
         input: InputStream,
         onProgress: (Float) -> Unit = {},
     ) = withContext(Dispatchers.IO) {
-        val device = awaitPermission(findDevice() ?: error("Connect the X3 with a USB data cable"))
-        UsbSerialConnection.open(usbManager, device).use { connection ->
-            connection.prepare()
-            var begun = false
-            try {
-                connection.send(
-                    nextEnvelope(
+        val startedAtMs = SystemClock.elapsedRealtime()
+        var phase = "detect"
+        var offset = 0L
+        try {
+            val detected = findDevice() ?: error("Connect the X3 with a USB data cable")
+            Log.i(LogTag, "detected file=$fileName bytes=$sizeBytes device=${detected.deviceName}")
+            phase = "permission"
+            val device = awaitPermission(detected)
+            phase = "open"
+            UsbSerialConnection.open(usbManager, device).use { connection ->
+                connection.prepare()
+                Log.i(LogTag, "opened file=$fileName device=${device.deviceName}")
+                var begun = false
+                try {
+                    phase = "begin"
+                    val begin = nextEnvelope(
                         MessageType.BeginBookUpload,
                         PayloadCodec.encodeBookUploadBegin(BookUploadBegin(fileName, sizeBytes, sha256)),
-                    ),
-                    BeginTimeoutMs,
-                )
-                begun = true
-                val buffer = ByteArray(BOOK_UPLOAD_CHUNK_BYTES)
-                var offset = 0L
-                while (true) {
-                    currentCoroutineContext().ensureActive()
-                    val count = input.read(buffer)
-                    if (count < 0) break
-                    if (count == 0) continue
-                    check(offset + count <= sizeBytes) { "Book source grew while it was uploading" }
-                    connection.send(
-                        nextEnvelope(
-                            MessageType.BookUploadChunk,
-                            PayloadCodec.encodeBookUploadChunk(offset.toInt(), buffer.copyOf(count)),
-                        ),
-                        ChunkTimeoutMs,
                     )
-                    offset += count
-                    onProgress((offset.toFloat() / sizeBytes).coerceIn(0f, 1f))
-                }
-                check(offset == sizeBytes) { "Book source changed before upload completed" }
-                connection.send(nextEnvelope(MessageType.CommitBookUpload), CommitTimeoutMs)
-                onProgress(1f)
-            } catch (error: Throwable) {
-                if (begun) {
-                    withContext(NonCancellable) {
-                        runCatching {
-                            connection.send(nextEnvelope(MessageType.AbortBookUpload), AbortTimeoutMs)
+                    connection.send(begin, BeginTimeoutMs)
+                    Log.i(LogTag, "begin ack file=$fileName messageId=${begin.messageId}")
+                    begun = true
+                    phase = "chunk"
+                    val buffer = ByteArray(BOOK_UPLOAD_CHUNK_BYTES)
+                    var nextProgressLogAt = ProgressLogBytes
+                    while (true) {
+                        currentCoroutineContext().ensureActive()
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        if (count == 0) continue
+                        check(offset + count <= sizeBytes) { "Book source grew while it was uploading" }
+                        connection.send(
+                            nextEnvelope(
+                                MessageType.BookUploadChunk,
+                                PayloadCodec.encodeBookUploadChunk(offset.toInt(), buffer.copyOf(count)),
+                            ),
+                            ChunkTimeoutMs,
+                        )
+                        offset += count
+                        onProgress((offset.toFloat() / sizeBytes).coerceIn(0f, 1f))
+                        if (offset >= nextProgressLogAt || offset == sizeBytes) {
+                            Log.i(LogTag, "progress file=$fileName bytes=$offset/$sizeBytes")
+                            while (nextProgressLogAt <= offset) nextProgressLogAt += ProgressLogBytes
                         }
                     }
+                    check(offset == sizeBytes) { "Book source changed before upload completed" }
+                    phase = "commit"
+                    val commit = nextEnvelope(MessageType.CommitBookUpload)
+                    connection.send(commit, CommitTimeoutMs)
+                    Log.i(LogTag, "commit ack file=$fileName messageId=${commit.messageId}")
+                    onProgress(1f)
+                } catch (error: Throwable) {
+                    if (begun) {
+                        withContext(NonCancellable) {
+                            runCatching {
+                                val abort = nextEnvelope(MessageType.AbortBookUpload)
+                                connection.send(abort, AbortTimeoutMs)
+                                Log.i(LogTag, "abort ack file=$fileName messageId=${abort.messageId}")
+                            }.onFailure { abortError ->
+                                Log.w(LogTag, "abort failed file=$fileName", abortError)
+                            }
+                        }
+                    }
+                    throw error
                 }
-                throw error
             }
+            val elapsedMs = (SystemClock.elapsedRealtime() - startedAtMs).coerceAtLeast(1L)
+            val bytesPerSecond = sizeBytes * 1_000L / elapsedMs
+            Log.i(LogTag, "complete file=$fileName elapsedMs=$elapsedMs bytesPerSecond=$bytesPerSecond")
+        } catch (error: Throwable) {
+            Log.e(LogTag, "failed phase=$phase file=$fileName offset=$offset/$sizeBytes", error)
+            throw error
         }
     }
 
@@ -120,7 +150,10 @@ class UsbBookTransfer(context: Context) : Closeable {
     )
 
     private suspend fun awaitPermission(device: UsbDevice): UsbDevice {
-        if (usbManager.hasPermission(device)) return device
+        if (usbManager.hasPermission(device)) {
+            Log.i(LogTag, "permission already granted device=${device.deviceName}")
+            return device
+        }
         val deferred = CompletableDeferred<Boolean>()
         permissionResult = deferred
         val intent = Intent(PermissionAction).setPackage(appContext.packageName)
@@ -130,9 +163,11 @@ class UsbBookTransfer(context: Context) : Closeable {
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
         )
+        Log.i(LogTag, "permission requested device=${device.deviceName}")
         usbManager.requestPermission(device, pendingIntent)
         val granted = withTimeout(PermissionTimeoutMs) { deferred.await() }
         require(granted && usbManager.hasPermission(device)) { "USB access to the X3 was not granted" }
+        Log.i(LogTag, "permission granted device=${device.deviceName}")
         return device
     }
 
@@ -293,5 +328,7 @@ class UsbBookTransfer(context: Context) : Closeable {
         private const val CdcSetLineCoding = 0x20
         private const val CommandPrefix = "CMD:USB_BOOK:"
         private const val MaxLineBytes = 4 * 1024
+        private const val ProgressLogBytes = 64L * 1024L
+        private const val LogTag = "XteinkUsbBook"
     }
 }

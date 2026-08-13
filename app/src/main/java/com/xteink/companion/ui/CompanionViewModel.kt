@@ -278,7 +278,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         }
         viewModelScope.launch {
             usbFlasher.state.collect { usb ->
-                    _uiState.update { state ->
+                _uiState.update { state ->
                     val firmwarePhase = when (usb.phase) {
                         UsbFlashPhase.EnteringBootloader,
                         UsbFlashPhase.ResettingSetup,
@@ -303,6 +303,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                         ),
                     )
                 }
+                if (usb.deviceDetected) drainPendingUsbWork()
             }
         }
         viewModelScope.launch {
@@ -766,7 +767,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 device = it.device.copy(reconnecting = false, message = "X3 is ready to restart"),
             )
         }
-        resumePendingBookUploadIfPossible()
+        drainPendingUsbWork()
     }
 
     fun onAppForegrounded() {
@@ -777,6 +778,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         backgroundDisconnectJob = null
         ensureTransportConnected()
         syncPassesInteractiveOwner()
+        drainPendingUsbWork()
     }
 
     fun onAppBackgrounded() {
@@ -983,7 +985,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         pendingBookUploadIds.addAll(books.map { it.id })
         pendingBookUploadMethod = method
         persistPendingBookUpload()
-        resumePendingBookUploadIfPossible()
+        drainPendingUsbWork()
     }
 
     fun cancelBookUpload() {
@@ -1105,6 +1107,11 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             bookUploadJob = null
             releaseTransportIfIdle()
         }
+    }
+
+    /** Drains durable work whenever the shared USB-availability lifecycle permits it. */
+    private fun drainPendingUsbWork() {
+        resumePendingBookUploadIfPossible()
     }
 
     private fun persistPendingBookUpload() {
