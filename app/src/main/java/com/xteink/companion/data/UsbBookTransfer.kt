@@ -23,6 +23,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -219,6 +220,12 @@ class UsbBookTransfer(context: Context) : Closeable {
             }.toByteArray(Charsets.US_ASCII)
             writeAll(line)
             awaitReply(envelope.messageId, timeoutMs)
+            // The ESP32-C3 USB Serial/JTAG endpoint ACKs through its TX ISR. An
+            // immediate host OUT after that ACK can arrive during the endpoint
+            // turnaround and disappear even though the prior command completed.
+            // Keep this at the request/ACK transport boundary so Begin, chunks,
+            // Commit, and Abort all share the same pacing contract.
+            delay(UsbReplyTurnaroundGuardMs)
         }
 
         private suspend fun awaitReply(messageId: UInt, timeoutMs: Long) {
@@ -323,6 +330,7 @@ class UsbBookTransfer(context: Context) : Closeable {
         private const val AbortTimeoutMs = 5_000L
         private const val UsbIoTimeoutMs = 5_000
         private const val UsbReadSliceMs = 250L
+        private const val UsbReplyTurnaroundGuardMs = 20L
         private const val UsbRecipientInterface = 0x01
         private const val CdcSetLineCoding = 0x20
         private const val CommandPrefix = "CMD:USB_BOOK:"

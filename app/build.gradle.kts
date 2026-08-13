@@ -18,8 +18,8 @@ android {
         applicationId = "com.xteink.companion"
         minSdk = 26
         targetSdk = 36
-        versionCode = 41
-        versionName = "0.2.0-dev40"
+        versionCode = 42
+        versionName = "0.2.0-dev41"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
