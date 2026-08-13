@@ -465,6 +465,13 @@
       "path": "app/src/main/java/com/xteink/companion/ui/CompanionViewModel.kt",
       "pattern": "private fun drainPendingUsbWork\\(\\)[\\s\\S]*?if \\(usbMaintenanceActive\\) return[\\s\\S]*?resumePendingBookUploadIfPossible\\(\\)",
       "message": "Automatic durable USB drains must not race an active maintenance owner."
+    },
+    {
+      "id": "usb-book-chunk-retains-cdc-headroom",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/data/UsbBookTransfer.kt",
+      "pattern": "ByteArray\\(UsbBookChunkBytes\\)[\\s\\S]*?UsbBookChunkBytes = 240",
+      "message": "Hex-over-CDC book chunks must retain sustained-frame headroom instead of reusing the BLE maximum."
     }
   ]
 }

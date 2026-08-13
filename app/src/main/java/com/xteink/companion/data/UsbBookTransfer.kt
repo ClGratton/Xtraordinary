@@ -14,7 +14,6 @@ import android.hardware.usb.UsbManager
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
-import com.xteink.companion.protocol.BOOK_UPLOAD_CHUNK_BYTES
 import com.xteink.companion.protocol.BookUploadBegin
 import com.xteink.companion.protocol.Envelope
 import com.xteink.companion.protocol.EnvelopeCodec
@@ -91,7 +90,7 @@ class UsbBookTransfer(context: Context) : Closeable {
                     Log.i(LogTag, "begin ack file=$fileName messageId=${begin.messageId}")
                     begun = true
                     phase = "chunk"
-                    val buffer = ByteArray(BOOK_UPLOAD_CHUNK_BYTES)
+                    val buffer = ByteArray(UsbBookChunkBytes)
                     var nextProgressLogAt = ProgressLogBytes
                     while (true) {
                         currentCoroutineContext().ensureActive()
@@ -328,6 +327,9 @@ class UsbBookTransfer(context: Context) : Closeable {
         private const val CdcSetLineCoding = 0x20
         private const val CommandPrefix = "CMD:USB_BOOK:"
         private const val MaxLineBytes = 4 * 1024
+        // BLE can carry the protocol maximum directly. CDC hex expansion doubles
+        // each byte, so retain ample RX-queue headroom across sustained frames.
+        private const val UsbBookChunkBytes = 240
         private const val ProgressLogBytes = 64L * 1024L
         private const val LogTag = "XteinkUsbBook"
     }
