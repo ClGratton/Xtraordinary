@@ -6,6 +6,7 @@ import android.util.Base64
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.xteink.companion.BuildConfig
 import com.xteink.companion.data.BluetoothCompanionClient
 import com.xteink.companion.data.BarcodeRasterizer
 import com.xteink.companion.data.BookLibraryRepository
@@ -13,6 +14,10 @@ import com.xteink.companion.data.FirmwareRelease
 import com.xteink.companion.data.FirmwareReleaseRepository
 import com.xteink.companion.data.FirmwareSource
 import com.xteink.companion.data.FlightBarcodeFormat
+import com.xteink.companion.data.FlightIdentity
+import com.xteink.companion.data.FlightStatusRefreshPolicy
+import com.xteink.companion.data.FlightStatusSnapshot
+import com.xteink.companion.data.ProxyFlightStatusProvider
 import com.xteink.companion.data.ImportedFlightPass
 import com.xteink.companion.data.InteractiveTransportCoordinator
 import com.xteink.companion.data.InteractiveTransportContract
@@ -62,6 +67,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     }.getOrDefault(TicketMode.Static)
     private val initialTicketOnX3 = ticketPreferences.getBoolean("is_on_x3", false)
     private val initialTicketRemovalPending = ticketPreferences.getBoolean("removal_pending", false)
+    private val initialDeployedPassId = ticketPreferences.getString("deployed_pass_id", null)
     private val initialImportedPasses = decodeStoredPasses(ticketPreferences.getString("passes_json", null))
     private val initialPendingTicketPayload = ticketPreferences.getString("pending_show_payload", null)?.let { encoded ->
         runCatching { PayloadCodec.decodeBoardingPass(Base64.decode(encoded, Base64.DEFAULT)) }.getOrNull()
@@ -96,6 +102,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 isOnX3 = initialTicketOnX3,
                 sendPending = initialPendingTicketPayload != null,
                 removalPending = initialTicketRemovalPending,
+                deployedPassId = initialDeployedPassId,
             ),
             readingStats = ReadingStatsUiState(
                 sessions = readingStatsRepository.load(),
@@ -105,6 +112,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     )
     val uiState: StateFlow<CompanionUiState> = _uiState.asStateFlow()
     private val companionClient = BluetoothCompanionClient(application)
+    private val flightStatusProvider = ProxyFlightStatusProvider(BuildConfig.FLIGHT_STATUS_PROXY_ENDPOINT)
     private val usbFlasher = UsbEspFlasher(application)
     private val usbBookTransfer = UsbBookTransfer(application)
     private val firmwareReleases = FirmwareReleaseRepository(application)
@@ -118,6 +126,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     private var deleteSyncJob: Job? = null
     private var ticketSendJob: Job? = null
     private var ticketDeleteJob: Job? = null
+    private var flightUpdateJob: Job? = null
     private var radioPolicySyncJob: Job? = null
     private var readingQuietJob: Job? = null
     private var bookUploadJob: Job? = null
@@ -137,6 +146,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         initialFocus.phase == FocusPhase.Running || initialFocus.phase == FocusPhase.Paused
     private var liveTicketActive = initialTicketOnX3 && initialTicketMode == TicketMode.Live
     private var pendingTicketPayload: BoardingPassPayload? = initialPendingTicketPayload
+    private var pendingTicketPassId: String? = ticketPreferences.getString("pending_show_pass_id", null)
     private val pendingDeletePaths = connectionPreferences
         .getStringSet(PendingDeletePathsKey, emptySet())
         .orEmpty()
@@ -187,7 +197,11 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                     val ticketPresent = capabilities.ticketPresent
                     val removalPending = ticketPresent && _uiState.value.ticket.removalPending
                     persistTicketState(ticketPresent, _uiState.value.ticket.mode, removalPending)
-                    if (!ticketPresent) liveTicketActive = false
+                    if (!ticketPresent) {
+                        liveTicketActive = false
+                        flightUpdateJob?.cancel()
+                        flightUpdateJob = null
+                    }
                 }
                 if (transportConnected && capabilities != null && !radioPolicyValidatedForConnection) {
                     // The phone policy is authoritative. Re-apply it once per
@@ -260,6 +274,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 reconcileDeviceLibrary(snapshot.revision, snapshot.entries.map { it.path to it.sizeBytes })
             }
         }
+        ensureLiveFlightUpdateLoop()
         viewModelScope.launch {
             companionClient.readingStats.collect { chunk ->
                 _uiState.update { it.copy(readingStats = it.readingStats.copy(syncing = true)) }
@@ -636,6 +651,8 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             flight = pass.flight,
             status = pass.status,
             departureTime = pass.departureTime,
+            arrivalTime = pass.arrivalTime,
+            operatingDate = pass.operatingDate,
             countdown = "",
             gate = pass.gate,
             terminal = pass.terminal,
@@ -1160,13 +1177,24 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         val ticket = _uiState.value.ticket
         val pass = ticket.selectedPass
         val displayMode = if (ticket.mode == TicketMode.Static) TicketDisplayMode.Static else TicketDisplayMode.Live
-        pendingTicketPayload = BoardingPassPayload(
+        pendingTicketPayload = boardingPassPayload(pass, displayMode)
+        pendingTicketPassId = pass.id
+        persistPendingTicketPayload()
+        _uiState.update { it.copy(ticket = it.ticket.copy(sendPending = true)) }
+        intentionalTransportIdle = false
+        if (companionClient.isReady()) drainPendingTicketSend() else ensureTransportConnected()
+    }
+
+    private fun boardingPassPayload(pass: BoardingPassUiState, displayMode: TicketDisplayMode) =
+        BoardingPassPayload(
             mode = displayMode,
             origin = pass.origin,
             destination = pass.destination,
             flight = pass.flight,
             status = pass.status,
             departureTime = pass.departureTime,
+            arrivalTime = pass.arrivalTime,
+            delayMinutes = pass.delayMinutes,
             gate = pass.gate,
             terminal = pass.terminal,
             seat = pass.seat,
@@ -1175,11 +1203,6 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             barcodePayload = pass.barcodePayload,
             barcodeFormat = pass.barcodeFormat.name,
         )
-        persistPendingTicketPayload()
-        _uiState.update { it.copy(ticket = it.ticket.copy(sendPending = true)) }
-        intentionalTransportIdle = false
-        if (companionClient.isReady()) drainPendingTicketSend() else ensureTransportConnected()
-    }
 
     private fun drainPendingTicketSend() {
         val payload = pendingTicketPayload ?: return
@@ -1194,14 +1217,25 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             }
             if (result.isSuccess) {
+                val deployedPassId = pendingTicketPassId ?: _uiState.value.ticket.selectedPassId
                 pendingTicketPayload = null
+                pendingTicketPassId = null
                 persistPendingTicketPayload()
                 val mode = if (payload.mode == TicketDisplayMode.Static) TicketMode.Static else TicketMode.Live
                 liveTicketActive = payload.mode == TicketDisplayMode.Live
-                persistTicketState(true, mode, false)
                 _uiState.update {
-                    it.copy(ticket = it.ticket.copy(mode = mode, isOnX3 = true, sendPending = false, removalPending = false))
+                    it.copy(
+                        ticket = it.ticket.copy(
+                            mode = mode,
+                            isOnX3 = true,
+                            sendPending = false,
+                            removalPending = false,
+                            deployedPassId = deployedPassId,
+                        ),
+                    )
                 }
+                persistTicketState(true, mode, false)
+                ensureLiveFlightUpdateLoop()
                 if (!liveTicketActive) {
                     // Keep the first bonded GATT session alive long enough for
                     // Android's own post-bond service discovery to finish. If we
@@ -1251,12 +1285,14 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             }
             if (result.isSuccess) {
                 liveTicketActive = false
+                flightUpdateJob?.cancel()
+                flightUpdateJob = null
                 persistTicketState(false, _uiState.value.ticket.mode, false)
                 intentionalTransportIdle = true
                 companionClient.disconnect()
                 _uiState.update {
                     it.copy(
-                        ticket = it.ticket.copy(isOnX3 = false, removalPending = false),
+                        ticket = it.ticket.copy(isOnX3 = false, removalPending = false, deployedPassId = null),
                         isX3TransportConnected = false,
                         device = it.device.copy(reconnecting = false),
                     )
@@ -1274,11 +1310,14 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private fun persistTicketState(present: Boolean, mode: TicketMode, removalPending: Boolean) {
-        ticketPreferences.edit()
+        val editor = ticketPreferences.edit()
             .putBoolean("is_on_x3", present)
             .putString("mode", mode.name)
             .putBoolean("removal_pending", removalPending)
-            .apply()
+        val deployedPassId = _uiState.value.ticket.deployedPassId
+        if (present && deployedPassId != null) editor.putString("deployed_pass_id", deployedPassId)
+        else if (!present) editor.remove("deployed_pass_id")
+        editor.apply()
     }
 
     private fun persistImportedPasses() {
@@ -1293,6 +1332,11 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                     .put("flight", pass.flight)
                     .put("status", pass.status)
                     .put("departureTime", pass.departureTime)
+                    .put("arrivalTime", pass.arrivalTime)
+                    .put("delayMinutes", pass.delayMinutes)
+                    .put("operatingDate", pass.operatingDate)
+                    .put("liveUpdatedAtEpochMs", pass.liveUpdatedAtEpochMs)
+                    .put("liveProvider", pass.liveProvider)
                     .put("gate", pass.gate)
                     .put("terminal", pass.terminal)
                     .put("seat", pass.seat)
@@ -1321,6 +1365,11 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                         flight = value.optString("flight", "Flight"),
                         status = value.optString("status", "Imported"),
                         departureTime = value.optString("departureTime"),
+                        arrivalTime = value.optString("arrivalTime"),
+                        delayMinutes = if (value.has("delayMinutes") && !value.isNull("delayMinutes")) value.optInt("delayMinutes") else null,
+                        operatingDate = value.optString("operatingDate"),
+                        liveUpdatedAtEpochMs = if (value.has("liveUpdatedAtEpochMs") && !value.isNull("liveUpdatedAtEpochMs")) value.optLong("liveUpdatedAtEpochMs") else null,
+                        liveProvider = value.optString("liveProvider"),
                         countdown = "",
                         gate = value.optString("gate", "TBD"),
                         terminal = value.optString("terminal"),
@@ -1340,11 +1389,88 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun persistPendingTicketPayload() {
         val encoded = pendingTicketPayload?.let {
-            Base64.encodeToString(PayloadCodec.encodeBoardingPass(it), Base64.NO_WRAP)
+            Base64.encodeToString(PayloadCodec.encodeBoardingPass(it, payloadVersion = 2), Base64.NO_WRAP)
         }
         ticketPreferences.edit().apply {
             if (encoded == null) remove("pending_show_payload") else putString("pending_show_payload", encoded)
+            if (pendingTicketPassId == null) remove("pending_show_pass_id")
+            else putString("pending_show_pass_id", pendingTicketPassId)
         }.apply()
+    }
+
+    private fun ensureLiveFlightUpdateLoop() {
+        if (!liveTicketActive || !flightStatusProvider.isConfigured) {
+            flightUpdateJob?.cancel()
+            flightUpdateJob = null
+            return
+        }
+        if (flightUpdateJob?.isActive == true) return
+        flightUpdateJob = viewModelScope.launch {
+            var consecutiveFailures = 0
+            while (isActive && liveTicketActive) {
+                val ticket = _uiState.value.ticket
+                val pass = ticket.passes.firstOrNull { it.id == ticket.deployedPassId }
+                val identity = pass?.let {
+                    FlightIdentity(
+                        flightNumber = it.flight,
+                        operatingDate = it.operatingDate,
+                        origin = it.origin,
+                    )
+                }
+                val result = if (identity?.isComplete == true) {
+                    runCatching { flightStatusProvider.latest(identity) }
+                } else {
+                    Result.success(null)
+                }
+                val snapshot = result.getOrNull()
+                if (snapshot != null && pass != null) {
+                    applyFlightStatusSnapshot(pass.id, snapshot)
+                    consecutiveFailures = 0
+                } else if (result.isFailure) {
+                    consecutiveFailures++
+                }
+                delay(
+                    if (result.isFailure) FlightStatusRefreshPolicy.delayAfterFailure(consecutiveFailures)
+                    else FlightStatusRefreshPolicy.NormalIntervalMs,
+                )
+            }
+        }
+    }
+
+    private fun applyFlightStatusSnapshot(passId: String, snapshot: FlightStatusSnapshot) {
+        var updatedPass: BoardingPassUiState? = null
+        _uiState.update { state ->
+            val existing = state.ticket.passes.firstOrNull { it.id == passId } ?: return@update state
+            if ((existing.liveUpdatedAtEpochMs ?: 0L) >= snapshot.observedAtEpochMs) return@update state
+            val candidate = existing.copy(
+                status = snapshot.status.ifBlank { existing.status },
+                departureTime = snapshot.departureTime.ifBlank { existing.departureTime },
+                arrivalTime = snapshot.arrivalTime.ifBlank { existing.arrivalTime },
+                gate = snapshot.gate.ifBlank { existing.gate },
+                terminal = snapshot.terminal.ifBlank { existing.terminal },
+                delayMinutes = snapshot.delayMinutes,
+                source = "Live via ${snapshot.providerName}",
+                liveUpdatedAtEpochMs = snapshot.observedAtEpochMs,
+                liveProvider = snapshot.providerName,
+            )
+            updatedPass = candidate
+            state.copy(
+                ticket = state.ticket.copy(
+                    passes = state.ticket.passes.map { if (it.id == passId) candidate else it },
+                ),
+            )
+        }
+        val pass = updatedPass ?: return
+        persistImportedPasses()
+        if (!liveTicketActive || _uiState.value.ticket.removalPending || pendingTicketPayload != null ||
+            ticketSendJob?.isActive == true
+        ) return
+        pendingTicketPayload = boardingPassPayload(pass, TicketDisplayMode.Live)
+        pendingTicketPassId = pass.id
+        persistPendingTicketPayload()
+        _uiState.update { it.copy(ticket = it.ticket.copy(sendPending = true)) }
+        intentionalTransportIdle = false
+        if (companionClient.isReady()) drainPendingTicketSend() else ensureTransportConnected()
     }
 
     fun dismissNotice() {

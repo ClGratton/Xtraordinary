@@ -540,7 +540,12 @@ class BluetoothCompanionClient(private val context: Context) {
                 withTimeout(BookUploadAckTimeoutMs) { acknowledgements.awaitAll() }
             }
             sendAwaitingAck(MessageType.CommitTicketBarcode, timeoutMillis = 20_000)
-            sendAwaitingAck(MessageType.ShowTicket, PayloadCodec.encodeBoardingPass(ticket), timeoutMillis = 20_000)
+            val ticketPayloadVersion = _state.value.capabilities?.ticketPayloadVersion ?: 0
+            sendAwaitingAck(
+                MessageType.ShowTicket,
+                PayloadCodec.encodeBoardingPass(ticket, payloadVersion = ticketPayloadVersion),
+                timeoutMillis = 20_000,
+            )
             Log.i(
                 LogTag,
                 "ticket transfer ACKed elapsedMs=${(System.nanoTime() - startedAtNanos) / 1_000_000L}",

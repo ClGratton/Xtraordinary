@@ -1,6 +1,6 @@
 # Trial, ads, and ad-free entitlement design
 
-- Status: Proposed; product and external-service decisions are still required
+- Status: Core policy implemented; production identity, billing, consent, and ad services remain external
 - Date: 2026-08-11
 
 ## Product requirements
@@ -14,9 +14,11 @@
 
 ## Current repository truth
 
-The Android app currently has no billing client, entitlement model, trial clock, ad SDK, consent-management SDK, AdMob identifiers, Play product identifiers, or entitlement backend. Google Drive backup is optional and is not an Xtraordinary account. Its production OAuth client is also still pending.
+The Android app now has a pure centralized `EntitlementState`, injected `EntitlementClock`, server-snapshot reducer, offline grace state, surface-aware `MonetizationPolicy`, and compile-time `community`/`play` variants. The canonical build compiles and tests both variants. The community variant has no billing, consent, or ad SDK and is always ad-free; future dependencies are allowed only as `playImplementation`.
 
-It would therefore be false to claim that trial recovery prevention, purchase restoration, or live ads can already be verified.
+The repository still has no billing client, ad SDK, consent-management SDK, AdMob identifiers, Play product identifiers, authenticated entitlement backend, or production Google OAuth client. No banner placeholder is shown and no ad request is made until those production contracts exist.
+
+It would therefore be false to claim that trial recovery prevention, purchase restoration, consent, or live ads can already be verified. The implemented reducer deliberately consumes server evidence; it does not use a resettable local install timestamp as entitlement truth.
 
 ## Recommended product model
 

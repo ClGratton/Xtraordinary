@@ -1,5 +1,5 @@
 param(
-    [string]$ApkPath = "app\build\outputs\apk\debug\app-debug.apk",
+    [string]$ApkPath = "app\build\outputs\apk\community\debug\app-community-debug.apk",
     [string]$AndroidPackage = "com.xteink.companion",
     [switch]$NoLaunch
 )

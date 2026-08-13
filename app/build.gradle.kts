@@ -18,8 +18,8 @@ android {
         applicationId = "com.xteink.companion"
         minSdk = 26
         targetSdk = 36
-        versionCode = 43
-        versionName = "0.2.0-dev42"
+        versionCode = 44
+        versionName = "0.2.0-dev43"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -42,9 +42,22 @@ android {
 
     buildFeatures {
         compose = true
-        // The app has no Java sources and never references BuildConfig.
-        // Avoid generating a lone Java class that needlessly invokes javac.
-        buildConfig = false
+        buildConfig = true
+    }
+
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("community") {
+            dimension = "distribution"
+            buildConfigField("String", "DISTRIBUTION_CHANNEL", "\"community\"")
+            buildConfigField("String", "FLIGHT_STATUS_PROXY_ENDPOINT", "\"\"")
+        }
+        create("play") {
+            dimension = "distribution"
+            buildConfigField("String", "DISTRIBUTION_CHANNEL", "\"play\"")
+            val flightStatusEndpoint = providers.gradleProperty("xtraordinaryFlightStatusProxy").orNull.orEmpty()
+            buildConfigField("String", "FLIGHT_STATUS_PROXY_ENDPOINT", "\"$flightStatusEndpoint\"")
+        }
     }
 
     packaging {
@@ -81,3 +94,7 @@ dependencies {
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
 }
+
+// Billing, consent, and advertising libraries must be added as
+// playImplementation only. The community variant intentionally has no such
+// classes, manifest components, identifiers, or network requests.

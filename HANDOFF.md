@@ -257,3 +257,9 @@ Expected uncommitted scope is approximately 28 tracked files plus:
 - this `HANDOFF.md`
 
 There should be no `app/src/androidTest` test harness left. Review `git status --short` before staging. Do not discard unrelated user work or reset the worktree.
+# 2026-08-13 flight status and monetization core candidate
+
+- Live-flight updates now enter through `FlightStatusProvider`, never a pass-specific Bluetooth path. The proxy request identity is flight number + operating date + origin; responses need a matching identity and `observedAtEpochMs`. Live polling is five minutes with bounded backoff to thirty minutes. Static never polls.
+- Ticket payload v2 adds arrival time and signed delay. Capabilities gate Android encoding, X3 migrates saved v1 tickets, and both app/X3 keep those facts above the scanner code. The external HTTPS proxy endpoint is intentionally unset until provisioned; no provider key belongs in either APK.
+- The monetization core is centralized in `MonetizationPolicy.kt`: server-evidence states, injected clock, offline grace, and surface/operation-aware banner decisions. `community` and `play` are separate build variants; community contains no billing/ad/consent SDK. Production billing/backend/UMP/AdMob acceptance remains blocked on external accounts and identifiers.
+- Canonical Android tasks now compile/test/lint/assemble both distributions. Default installation uses `app-community-debug.apk`.

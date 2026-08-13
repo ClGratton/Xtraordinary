@@ -1,9 +1,12 @@
 param(
     [string[]]$Tasks = @(
         ':protocol:test',
-        ':app:testDebugUnitTest',
-        ':app:lintDebug',
-        ':app:assembleDebug'
+        ':app:testCommunityDebugUnitTest',
+        ':app:lintCommunityDebug',
+        ':app:assembleCommunityDebug',
+        ':app:testPlayDebugUnitTest',
+        ':app:lintPlayDebug',
+        ':app:assemblePlayDebug'
     )
 )
 

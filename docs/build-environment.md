@@ -55,10 +55,10 @@ pio run --project-dir .\firmware
 The Android app is built directly with the verified project-local Gradle distribution:
 
 ```powershell
-gradle --no-daemon :protocol:test :app:lintDebug :app:validateDebugScreenshotTest :app:assembleDebug
+gradle --no-daemon :protocol:test :app:lintCommunityDebug :app:assembleCommunityDebug :app:lintPlayDebug :app:assemblePlayDebug
 ```
 
-The resulting APK is `app/build/outputs/apk/debug/app-debug.apk`. Compose reference images are updated only after visual review with `gradle :app:updateDebugScreenshotTest`.
+The resulting APKs are `app/build/outputs/apk/community/debug/app-community-debug.apk` and `app/build/outputs/apk/play/debug/app-play-debug.apk`. The installer defaults to the ad-free community artifact. Compose reference images are updated only after visual review of the distribution-specific screenshot task exposed by Gradle.
 
 Install replacement APKs through the repository workflow:
 

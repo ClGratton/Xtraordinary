@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="arrival">Arrival</string>
+    <string name="on_time">On time</string>
     <string name="app_name">Xtraordinary</string>
     <string name="demo_status">X3</string>
     <string name="devices_title">Devices</string>

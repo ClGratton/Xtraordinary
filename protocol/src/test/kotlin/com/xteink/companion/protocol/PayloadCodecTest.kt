@@ -113,6 +113,32 @@ class PayloadCodecTest {
     }
 
     @Test
+    fun boardingPassV2AddsArrivalAndSignedDelayWithoutBreakingV1() {
+        val expected = BoardingPassPayload(
+            mode = TicketDisplayMode.Live,
+            origin = "AHO",
+            destination = "VCE",
+            flight = "W4 6762",
+            status = "Delayed",
+            departureTime = "13:35",
+            arrivalTime = "15:10",
+            delayMinutes = 25,
+            gate = "7",
+            terminal = "1",
+            seat = "17B",
+            passenger = "CLAUDIO GRATTON",
+            boardingGroup = "Front",
+            barcodePayload = "REAL-BARCODE-DATA",
+            barcodeFormat = "PDF417",
+        )
+
+        assertEquals(expected, PayloadCodec.decodeBoardingPass(PayloadCodec.encodeBoardingPass(expected, payloadVersion = 2)))
+        val legacy = PayloadCodec.decodeBoardingPass(PayloadCodec.encodeBoardingPass(expected, payloadVersion = 1))
+        assertEquals("", legacy.arrivalTime)
+        assertEquals(null, legacy.delayMinutes)
+    }
+
+    @Test
     fun sessionRoundTrips() {
         val expected = SessionStart(1_800_000_000, 1_500, "Deep work")
         assertEquals(expected, PayloadCodec.decodeSessionStart(PayloadCodec.encodeSessionStart(expected)))

@@ -45,7 +45,7 @@ constexpr char RADIO_POLICY_PATH[] = "/.crosspoint/companion/radio.bin";
 constexpr char BOOK_UPLOAD_TEMP_PATH[] = "/.crosspoint/companion/book-upload.tmp";
 constexpr uint32_t BOOK_UPLOAD_IDLE_TIMEOUT_MS = 15000;
 constexpr uint32_t TICKET_MAGIC = 0x544b5431;  // TKT1
-constexpr uint16_t TICKET_STORAGE_VERSION = 1;
+constexpr uint16_t TICKET_STORAGE_VERSION = 2;
 constexpr uint16_t ADVERTISING_INTERVAL = 800;  // 500 ms in 0.625 ms units
 constexpr uint32_t STANDBY_PULSE_DURATION_MS = 1500;
 constexpr uint32_t FULL_CLOCK_AFTER_BLE_ACTIVITY_MS = 5000;
@@ -122,6 +122,13 @@ struct TicketStorageRecord {
   uint16_t version = TICKET_STORAGE_VERSION;
   uint16_t size = sizeof(TicketState);
   TicketState ticket{};
+};
+
+struct LegacyTicketStorageRecordV1 {
+  uint32_t magic = TICKET_MAGIC;
+  uint16_t version = 1;
+  uint16_t size = sizeof(LegacyTicketStateV1);
+  LegacyTicketStateV1 ticket{};
 };
 
 struct LegacyRadioPolicyStorageRecord {
@@ -762,6 +769,16 @@ bool CompanionService::decodeTicket(const EnvelopeView& envelope) {
     char barcodeFormat[17] = {};
     decoded = readBoundedString(envelope, cursor, barcodeFormat, sizeof(barcodeFormat));
   }
+  const bool carriesOperationalFields = decoded && cursor < envelope.payloadLength;
+  if (carriesOperationalFields) {
+    decoded = readBoundedString(envelope, cursor, decodedTicket.arrivalTime, sizeof(decodedTicket.arrivalTime));
+    if (decoded && cursor + 2 <= envelope.payloadLength) {
+      decodedTicket.delayMinutes = static_cast<int16_t>(readU16(envelope.payload + cursor));
+      cursor += 2;
+    } else {
+      decoded = false;
+    }
+  }
   if (decoded && carriesBarcodeFormat && !ticketBarcodeCommitted_) return false;
   if (!decoded || cursor != envelope.payloadLength || decodedTicket.barcodePayload[0] == '\0') return false;
   if (!carriesBarcodeFormat && Storage.ready()) Storage.remove(TICKET_BARCODE_PATH);
@@ -771,7 +788,38 @@ bool CompanionService::decodeTicket(const EnvelopeView& envelope) {
 
 bool CompanionService::loadTicket() {
   HalFile input = Storage.open(TICKET_PATH, O_RDONLY);
-  if (!input || input.fileSize() != sizeof(TicketStorageRecord)) return false;
+  if (!input) return false;
+  if (input.fileSize() == sizeof(LegacyTicketStorageRecordV1)) {
+    LegacyTicketStorageRecordV1 legacy{};
+    if (input.read(&legacy, sizeof(legacy)) == sizeof(legacy) && legacy.magic == TICKET_MAGIC &&
+        legacy.version == 1 && legacy.size == sizeof(LegacyTicketStateV1) && legacy.ticket.barcodePayload[0] != '\0') {
+      ticket_.mode = legacy.ticket.mode;
+      std::memcpy(ticket_.origin, legacy.ticket.origin, sizeof(legacy.ticket.origin));
+      std::memcpy(ticket_.destination, legacy.ticket.destination, sizeof(legacy.ticket.destination));
+      std::memcpy(ticket_.flight, legacy.ticket.flight, sizeof(legacy.ticket.flight));
+      std::memcpy(ticket_.status, legacy.ticket.status, sizeof(legacy.ticket.status));
+      std::memcpy(ticket_.departureTime, legacy.ticket.departureTime, sizeof(legacy.ticket.departureTime));
+      std::memcpy(ticket_.gate, legacy.ticket.gate, sizeof(legacy.ticket.gate));
+      std::memcpy(ticket_.terminal, legacy.ticket.terminal, sizeof(legacy.ticket.terminal));
+      std::memcpy(ticket_.seat, legacy.ticket.seat, sizeof(legacy.ticket.seat));
+      std::memcpy(ticket_.passenger, legacy.ticket.passenger, sizeof(legacy.ticket.passenger));
+      std::memcpy(ticket_.boardingGroup, legacy.ticket.boardingGroup, sizeof(legacy.ticket.boardingGroup));
+      std::memcpy(ticket_.barcodePayload, legacy.ticket.barcodePayload, sizeof(legacy.ticket.barcodePayload));
+      ticketPresent_ = true;
+      input.close();
+      persistTicket();
+      LOG_INF("CMP", "Migrated saved ticket %s", ticket_.flight);
+      return true;
+    }
+    input.close();
+    Storage.remove(TICKET_PATH);
+    return false;
+  }
+  if (input.fileSize() != sizeof(TicketStorageRecord)) {
+    input.close();
+    Storage.remove(TICKET_PATH);
+    return false;
+  }
   TicketStorageRecord record{};
   if (input.read(&record, sizeof(record)) != sizeof(record) || record.magic != TICKET_MAGIC ||
       record.version != TICKET_STORAGE_VERSION || record.size != sizeof(TicketState) ||
@@ -1134,6 +1182,7 @@ void CompanionService::sendCapabilities(MessageType type) {
   payload[cursor++] = ticketPresent_ ? 1 : 0;
   payload[cursor++] = 2;  // SET_READER_POLICY v2 also carries the power-button hold duration.
   payload[cursor++] = 2;  // SET_RADIO_POLICY v2 separates standby discovery and connected cadence.
+  payload[cursor++] = 2;  // SHOW_TICKET v2 adds arrival time and signed delay minutes.
   notify(type, payload, cursor);
 }
 

@@ -25,6 +25,7 @@ data class DeviceCapabilities(
     val supportsReaderPolicy: Boolean = false,
     val readerPolicyVersion: Int = if (supportsReaderPolicy) 1 else 0,
     val radioPolicyVersion: Int = 0,
+    val ticketPayloadVersion: Int = 0,
 )
 
 enum class DeviceActivity(val wireValue: UByte) {
@@ -91,6 +92,8 @@ data class BoardingPassPayload(
     val flight: String,
     val status: String,
     val departureTime: String,
+    val arrivalTime: String = "",
+    val delayMinutes: Int? = null,
     val gate: String,
     val terminal: String,
     val seat: String,
@@ -218,7 +221,7 @@ object PayloadCodec {
         put(data)
     }
 
-    fun encodeBoardingPass(value: BoardingPassPayload): ByteArray = writer(472) {
+    fun encodeBoardingPass(value: BoardingPassPayload, payloadVersion: Int = 1): ByteArray = writer(496) {
         put(value.mode.wireValue.toByte())
         putUtf8(value.origin, 3)
         putUtf8(value.destination, 3)
@@ -232,6 +235,10 @@ object PayloadCodec {
         putUtf8(value.boardingGroup, 24)
         putUtf8(value.barcodePayload, 256)
         putUtf8(value.barcodeFormat, 16)
+        if (payloadVersion >= 2) {
+            putUtf8(value.arrivalTime, 16)
+            putShort((value.delayMinutes ?: Short.MIN_VALUE.toInt()).coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort())
+        }
     }
 
     fun decodeBoardingPass(bytes: ByteArray): BoardingPassPayload = reader(bytes) {
@@ -249,6 +256,8 @@ object PayloadCodec {
             boardingGroup = utf8(24),
             barcodePayload = utf8(256),
             barcodeFormat = if (remaining() > 0) utf8(16) else "QR",
+            arrivalTime = if (remaining() > 0) utf8(16) else "",
+            delayMinutes = if (remaining() >= 2) short.toInt().takeUnless { it == Short.MIN_VALUE.toInt() } else null,
         )
     }
 
@@ -270,6 +279,7 @@ object PayloadCodec {
         put(if (value.ticketPresent) 1 else 0)
         put(value.readerPolicyVersion.coerceIn(0, 255).toByte())
         put(value.radioPolicyVersion.coerceIn(0, 255).toByte())
+        put(value.ticketPayloadVersion.coerceIn(0, 255).toByte())
     }
 
     fun decodeCapabilities(bytes: ByteArray): DeviceCapabilities = reader(bytes) {
@@ -280,6 +290,7 @@ object PayloadCodec {
         val ticketPresent = remaining() > 0 && get().toInt() != 0
         val readerPolicyVersion = if (remaining() > 0) get().toInt() and 0xff else 0
         val radioPolicyVersion = if (remaining() > 0) get().toInt() and 0xff else 0
+        val ticketPayloadVersion = if (remaining() > 0) get().toInt() and 0xff else 0
         DeviceCapabilities(
             model = model,
             firmwareVersion = firmwareVersion,
@@ -289,6 +300,7 @@ object PayloadCodec {
             supportsReaderPolicy = readerPolicyVersion > 0,
             readerPolicyVersion = readerPolicyVersion,
             radioPolicyVersion = radioPolicyVersion,
+            ticketPayloadVersion = ticketPayloadVersion,
         )
     }
 

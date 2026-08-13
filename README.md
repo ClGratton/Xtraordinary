@@ -24,10 +24,10 @@ The product model is simple: the phone owns integrations and intelligence; XTEIN
 ```powershell
 & .\scripts\setup-toolchains.ps1 -SkipFirmwareBuild
 . .\scripts\use-toolchains.ps1
-gradle :protocol:test :app:lintDebug :app:validateDebugScreenshotTest :app:assembleDebug
+gradle :protocol:test :app:lintCommunityDebug :app:assembleCommunityDebug :app:lintPlayDebug :app:assemblePlayDebug
 ```
 
-The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`. Install it with the data-preserving GATT-release workflow:
+The ad-free community debug APK is written to `app/build/outputs/apk/community/debug/app-community-debug.apk`; the Play-capability build is `app/build/outputs/apk/play/debug/app-play-debug.apk`. Install the community artifact with the data-preserving GATT-release workflow:
 
 ```powershell
 & .\scripts\install-xtraordinary-app.ps1

@@ -15,6 +15,8 @@ data class ImportedFlightPass(
     val flight: String,
     val status: String,
     val departureTime: String,
+    val arrivalTime: String = "",
+    val operatingDate: String = "",
     val gate: String,
     val terminal: String,
     val seat: String,
@@ -111,6 +113,10 @@ object FlightPassImporter {
         val flightNumber = header.optString("flightNumber").ifBlank { value.optString("flightNumber") }
         val carrierCode = carrier.optString("carrierIataCode")
         val barcodePayload = barcode.optString("value").ifBlank { barcode.optString("alternateText") }
+        val scheduledDeparture = classReference.optString("localScheduledDepartureDateTime")
+            .ifBlank { value.optString("localScheduledDepartureDateTime") }
+        val scheduledArrival = classReference.optString("localScheduledArrivalDateTime")
+            .ifBlank { value.optString("localScheduledArrivalDateTime") }
         require(barcodePayload.isNotBlank()) { "This Wallet object has no barcode payload" }
 
         return ImportedFlightPass(
@@ -119,9 +125,9 @@ object FlightPassImporter {
             destination = destination.optString("airportIataCode").ifBlank { "---" }.uppercase().take(3),
             flight = listOf(carrierCode, flightNumber).filter { it.isNotBlank() }.joinToString(" ").ifBlank { "Flight" }.take(16),
             status = classReference.optString("flightStatus").ifBlank { value.optString("state", "Imported") }.take(24),
-            departureTime = classReference.optString("localScheduledDepartureDateTime")
-                .ifBlank { value.optString("localScheduledDepartureDateTime") }
-                .takeLast(16),
+            departureTime = scheduledDeparture.substringAfter('T', scheduledDeparture).take(16),
+            arrivalTime = scheduledArrival.substringAfter('T', scheduledArrival).take(16),
+            operatingDate = scheduledDeparture.substringBefore('T').takeIf { it.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) }.orEmpty(),
             gate = boarding.optString("gate")
                 .ifBlank { boarding.optString("boardingGate") }
                 .ifBlank { header.optString("gate") }
@@ -159,6 +165,7 @@ object FlightPassImporter {
         require(barcodePayload.isNotBlank()) { "This .pkpass has no barcode message" }
 
         fun field(vararg keys: String): String = keys.firstNotNullOfOrNull { fields[it] }.orEmpty()
+        val operatingDate = value.optString("relevantDate").substringBefore('T')
         return ImportedFlightPass(
             id = value.optString("serialNumber").ifBlank { "pkpass-${barcodePayload.hashCode()}" },
             origin = field("origin", "from", "departure").ifBlank { "---" }.uppercase().take(3),
@@ -166,6 +173,8 @@ object FlightPassImporter {
             flight = field("flight", "flightnumber", "flight_number").ifBlank { value.optString("description", "Flight") }.take(16),
             status = field("status").ifBlank { "Imported" }.take(24),
             departureTime = field("departure", "departuretime", "boardingtime", "date").take(16),
+            arrivalTime = field("arrival", "arrivaltime", "landingtime", "landtime").take(16),
+            operatingDate = operatingDate.takeIf { it.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) }.orEmpty(),
             gate = field("gate").ifBlank { "TBD" }.take(8),
             terminal = field("terminal").take(8),
             seat = field("seat").ifBlank { "TBD" }.take(8),

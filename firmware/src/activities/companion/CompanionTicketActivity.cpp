@@ -107,20 +107,30 @@ void CompanionTicketActivity::render(RenderLock&&) {
   renderer.drawText(UI_10_FONT_ID, width - 30 - statusWidth, 88, ticket_.status);
   renderer.drawLine(30, 122, width - 30, 122, 2, true);
 
-  const auto drawFact = [&](int centerX, const char* label, const char* value, int valueFont) {
+  const auto drawFact = [&](int centerX, int labelY, int valueY, const char* label, const char* value, int valueFont) {
     const int labelWidth = renderer.getTextWidth(UI_10_FONT_ID, label);
-    renderer.drawText(UI_10_FONT_ID, centerX - labelWidth / 2, 154, label);
+    renderer.drawText(UI_10_FONT_ID, centerX - labelWidth / 2, labelY, label);
     const int valueWidth = renderer.getTextWidth(valueFont, value, EpdFontFamily::BOLD);
-    renderer.drawText(valueFont, centerX - valueWidth / 2, 188, value, true, EpdFontFamily::BOLD);
+    renderer.drawText(valueFont, centerX - valueWidth / 2, valueY, value, true, EpdFontFamily::BOLD);
   };
-  drawFact(66, tr(STR_DEPARTURE), ticket_.departureTime, NOTOSANS_18_FONT_ID);
-  drawFact(188, tr(STR_GATE_SHORT), ticket_.gate, NOTOSANS_16_FONT_ID);
-  drawFact(300, tr(STR_TERMINAL_SHORT), ticket_.terminal[0] == '\0' ? "-" : ticket_.terminal,
+  char delayText[16] = "-";
+  if (ticket_.delayMinutes != companion::TICKET_DELAY_UNKNOWN) {
+    if (ticket_.delayMinutes == 0)
+      std::snprintf(delayText, sizeof(delayText), "On time");
+    else
+      std::snprintf(delayText, sizeof(delayText), "%+d min", ticket_.delayMinutes);
+  }
+  drawFact(92, 150, 184, tr(STR_DEPARTURE), ticket_.departureTime, NOTOSANS_18_FONT_ID);
+  drawFact(254, 150, 184, "Arrival", ticket_.arrivalTime[0] == '\0' ? "-" : ticket_.arrivalTime,
+           NOTOSANS_18_FONT_ID);
+  drawFact(416, 150, 188, "Delay", delayText, NOTOSANS_14_FONT_ID);
+  drawFact(92, 232, 266, tr(STR_GATE_SHORT), ticket_.gate, NOTOSANS_16_FONT_ID);
+  drawFact(254, 232, 266, tr(STR_TERMINAL_SHORT), ticket_.terminal[0] == '\0' ? "-" : ticket_.terminal,
            NOTOSANS_16_FONT_ID);
-  drawFact(414, tr(STR_SEAT_SHORT), ticket_.seat, NOTOSANS_16_FONT_ID);
-  renderer.drawCenteredText(NOTOSANS_14_FONT_ID, 254, ticket_.passenger, true, EpdFontFamily::BOLD);
-  renderer.drawCenteredText(UI_10_FONT_ID, 294, ticket_.boardingGroup);
-  renderer.drawLine(42, 326, width - 42, 326, 1, true);
+  drawFact(416, 232, 266, tr(STR_SEAT_SHORT), ticket_.seat, NOTOSANS_16_FONT_ID);
+  renderer.drawCenteredText(NOTOSANS_14_FONT_ID, 316, ticket_.passenger, true, EpdFontFamily::BOLD);
+  renderer.drawCenteredText(UI_10_FONT_ID, 346, ticket_.boardingGroup);
+  renderer.drawLine(42, 374, width - 42, 374, 1, true);
 
   // QR/Aztec/PDF417 and linear codes share one hierarchy. Only the scanner
   // chamber changes shape, and both chambers are anchored low on the pass.
@@ -132,7 +142,7 @@ void CompanionTicketActivity::render(RenderLock&&) {
     if (barcode.parseHeaders() == BmpReaderError::Ok && barcode.is1Bit() && barcode.getWidth() <= 380 &&
         barcode.getHeight() <= 340) {
       linearBarcode = barcode.getWidth() > barcode.getHeight();
-      const int barcodePanelY = linearBarcode ? 404 : 334;
+      const int barcodePanelY = linearBarcode ? 430 : 390;
       const int barcodePanelHeight = linearBarcode ? 230 : 360;
       const int barcodePanelInset = linearBarcode ? 18 : 40;
       renderer.drawRoundedRect(barcodePanelInset, barcodePanelY, width - barcodePanelInset * 2, barcodePanelHeight, 2,
@@ -146,8 +156,8 @@ void CompanionTicketActivity::render(RenderLock&&) {
   }
   // Backward compatibility for tickets stored before bitmap transport existed.
   if (!barcodeDrawn) {
-    renderer.drawRoundedRect(40, 334, width - 80, 360, 2, 18, true);
-    QrUtils::drawQrCode(renderer, Rect{70, 364, width - 140, 300}, std::string(ticket_.barcodePayload));
+    renderer.drawRoundedRect(40, 390, width - 80, 360, 2, 18, true);
+    QrUtils::drawQrCode(renderer, Rect{70, 420, width - 140, 300}, std::string(ticket_.barcodePayload));
   }
   linearBarcode_ = linearBarcode;
   renderer.drawCenteredText(SMALL_FONT_ID, height - 88,

@@ -292,11 +292,25 @@ private fun UnifiedPassBody(pass: BoardingPassUiState, modifier: Modifier = Modi
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        OperationalFact(
-            label = stringResource(R.string.departure),
-            value = pass.departureTime,
-            emphasized = true,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            OperationalFact(
+                label = stringResource(R.string.departure),
+                value = pass.departureTime,
+                emphasized = true,
+                modifier = Modifier.weight(1f),
+            )
+            OperationalFact(
+                label = stringResource(R.string.arrival),
+                value = pass.arrivalTime.ifBlank { "—" },
+                emphasized = true,
+                modifier = Modifier.weight(1f),
+            )
+            pass.delayMinutes?.let { DelayBadge(it) }
+        }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -477,6 +491,28 @@ private fun PassStatusBadge(status: String) {
             status,
             style = MaterialTheme.typography.labelMedium,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun DelayBadge(delayMinutes: Int) {
+    val delayed = delayMinutes > 0
+    Surface(
+        color = if (delayed) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.tertiaryContainer,
+        contentColor = if (delayed) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onTertiaryContainer,
+        shape = RoundedCornerShape(50),
+    ) {
+        Text(
+            text = when {
+                delayMinutes > 0 -> "+$delayMinutes min"
+                delayMinutes < 0 -> "$delayMinutes min"
+                else -> stringResource(R.string.on_time),
+            },
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
             maxLines = 1,
         )
     }

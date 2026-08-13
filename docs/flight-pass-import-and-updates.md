@@ -12,7 +12,7 @@ The Android **Import flight** action accepts:
 - a Google Wallet `FlightObject` JSON export;
 - a Google Wallet save link shared directly to Xtraordinary, or a text file containing its save JWT.
 
-The importer extracts route, flight, time, gate, seat, passenger, boarding group, and the barcode value. It does not place issuer credentials in the app. A decoded save JWT is user-selected input, not proof that the issuer signature is trusted.
+The importer extracts route, flight, departure/arrival time, operating date when exposed, gate, seat, passenger, boarding group, and the barcode value. It does not place issuer credentials in the app. A decoded save JWT is user-selected input, not proof that the issuer signature is trusted.
 
 Imported passes are stored in the app's private local preferences so a process restart cannot bring the demo cards back over a real import. Android backup is disabled for this app data, and the optional Google reading-history backup explicitly excludes boarding passes.
 
@@ -27,9 +27,13 @@ QR/Aztec-style matrix codes and PDF417/linear barcodes are variants of the same 
 ## Static and Live modes
 
 - **Static** sends the ticket, waits for the exact protocol acknowledgement, disconnects Android, stops X3 advertising, and retains the rendered e-ink image.
-- **Live** keeps the companion connection available. Android can resend the same bounded ticket payload when status, time, terminal, or gate changes.
+- **Live** keeps X3 awake and pulse-discoverable, but does not retain GATT merely because the mode is active. Android reconnects only when a fresh update creates durable pending work, then resends the same bounded ticket payload and releases the link after acknowledgement.
 
-No external status provider is polled in this change.
+`FlightStatusProvider` is the reusable update boundary. `ProxyFlightStatusProvider` calls only a project-owned HTTPS proxy with flight number, operating date, and origin; it rejects mismatched identities and snapshots without an observation timestamp. The live loop polls at most every five minutes and backs failures off to thirty minutes. Static tickets never start it. A materially newer snapshot is persisted and replayed to X3 through the same acknowledged ticket transfer and generic interactive-transport lease used for a manual send.
+
+The endpoint is injected only into the Play build through the `xtraordinaryFlightStatusProxy` Gradle property. It is empty by default and always empty in the community build, so the repository does not pretend that a provider is active before the proxy exists.
+
+Ticket payload v2 adds arrival time and signed delay minutes. X3 advertises support in capabilities; Android sends the legacy payload to older firmware. New firmware explicitly migrates a persisted v1 ticket rather than deleting it. Both app and X3 place arrival and delay with the operational facts above the scanner code. Delay is never inferred from ticket text.
 
 ## Google Wallet limitation
 
@@ -51,6 +55,6 @@ FlightAware AeroAPI is the quickest documented REST candidate for live flight st
 1. an API key kept outside the Android package, ideally behind a small proxy;
 2. flight identity plus operating date and origin to avoid ambiguous flight numbers;
 3. polling only while a Live ticket is active, with a conservative interval and backoff;
-4. a field mapping into the existing ticket payload followed by a resend to X3.
+4. the proxy response contract documented by `ProxyFlightStatusProvider`, followed by the existing acknowledged resend to X3.
 
 Reference: <https://www.flightaware.com/commercial/aeroapi>

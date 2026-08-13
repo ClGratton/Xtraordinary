@@ -501,6 +501,62 @@
       "path": "firmware/src/main.cpp",
       "pattern": "USB_COMMAND_REPLY_TX_TIMEOUT_MS = 50[\\s\\S]*?void writeUsbCommandReply[\\s\\S]*?logSerial\\.write[\\s\\S]*?logSerial\\.flush\\(\\)[\\s\\S]*?logSerial\\.setTxTimeoutMs\\(SERIAL_LOG_TX_TIMEOUT_MS\\)[\\s\\S]*?writeUsbCommandReply\\(accepted, messageId\\)",
       "message": "CDC command replies must use a bounded reliable transmit path while ordinary unattended logs remain non-blocking."
+    },
+    {
+      "id": "live-flight-provider-is-reusable",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/data/FlightStatusProvider.kt",
+      "pattern": "interface FlightStatusProvider[\\s\\S]*?FlightIdentity[\\s\\S]*?operatingDate[\\s\\S]*?origin[\\s\\S]*?FlightStatusRefreshPolicy",
+      "message": "Live-flight updates must use one provider boundary with an unambiguous flight identity and centralized polling policy."
+    },
+    {
+      "id": "flight-provider-credentials-stay-off-device",
+      "type": "forbidden_pattern",
+      "path": "app/src/main/java/com/xteink/companion/data/FlightStatusProvider.kt",
+      "pattern": "(?i)x-apikey|aeroapi.*key|authorization.*bearer",
+      "message": "Flight-provider credentials must remain behind the project-owned proxy, never in the APK."
+    },
+    {
+      "id": "ticket-v2-is-capability-gated",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/data/BluetoothCompanionClient.kt",
+      "pattern": "ticketPayloadVersion[\\s\\S]*?encodeBoardingPass\\(ticket, payloadVersion = ticketPayloadVersion\\)",
+      "message": "Android must send arrival and delay only after X3 advertises ticket payload v2."
+    },
+    {
+      "id": "ticket-v1-storage-is-migrated",
+      "type": "required_pattern",
+      "path": "firmware/src/companion/CompanionService.cpp",
+      "pattern": "LegacyTicketStorageRecordV1[\\s\\S]*?Migrated saved ticket",
+      "message": "A firmware upgrade must migrate a pinned v1 ticket instead of deleting it when the ticket schema grows."
+    },
+    {
+      "id": "monetization-policy-is-centralized",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/monetization/MonetizationPolicy.kt",
+      "pattern": "sealed interface EntitlementState[\\s\\S]*?object MonetizationPolicy[\\s\\S]*?stableBrowsingSurfaces[\\s\\S]*?object EntitlementReducer",
+      "message": "Entitlement transitions and ad-surface decisions must remain centralized and testable."
+    },
+    {
+      "id": "community-and-play-builds-are-distinct",
+      "type": "required_pattern",
+      "path": "app/build.gradle.kts",
+      "pattern": "flavorDimensions.*distribution[\\s\\S]*?create\\(\"community\"\\)[\\s\\S]*?create\\(\"play\"\\)[\\s\\S]*?playImplementation",
+      "message": "The community build must remain a distinct ad-free artifact and Play-only dependencies must use playImplementation."
+    },
+    {
+      "id": "monetization-sdks-cannot-enter-shared-app",
+      "type": "forbidden_pattern",
+      "path": "app/build.gradle.kts",
+      "pattern": "(?im)^\\s*implementation\\([^\\r\\n]*(billing|play-services-ads|user-messaging-platform|admob)",
+      "message": "Billing, ads, and consent SDKs must never enter the shared/community dependency graph."
+    },
+    {
+      "id": "canonical-android-build-covers-both-distributions",
+      "type": "required_pattern",
+      "path": "scripts/build-xtraordinary-app.ps1",
+      "pattern": "testCommunityDebugUnitTest[\\s\\S]*?assembleCommunityDebug[\\s\\S]*?testPlayDebugUnitTest[\\s\\S]*?assemblePlayDebug",
+      "message": "The canonical Android wrapper must test and assemble both community and Play distributions."
     }
   ]
 }
