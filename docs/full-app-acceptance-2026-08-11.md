@@ -11,8 +11,8 @@ This is the evidence ledger for the current reset-first acceptance run. A check 
 
 ## Current state
 
-- Android: `0.2.0-dev33` / code 34 installed with app data and bond retained; APK SHA-256 `72F57F8E382A966FB838569DB86103771F8146151334763F6C5599A2C6A904BF`.
-- X3: `xtraordinary-v0.2.6-dev26-sleep-wake-local`, PC-USB-flashed application-only with write hash verified twice; SHA-256 `36088314D34DA6CD06315221F5E859E1565A7D9EF07C5F39DE2AED47F0D5AF0B`.
+- Android: `0.2.0-dev42` / code 43 installed with app data and bond retained; APK SHA-256 `8A255255093EB8C2E6860297C05C4DF87C6DB531B470E2AAA63F7116AB50191E`.
+- X3: `xtraordinary-v0.2.6-dev32-usb-owner-local`, production-phone-flashed application-only with write verification; SHA-256 `7F28384C7C41798EDF09A3BDA9CCA20D6D0196EAF215D05D52E151A16F7A25EF`.
 - X3 NVS reset and Android bond removal: complete.
 - Bluetooth bond: fresh Secure Connections bond to `XTEINK Companion`; 16-byte AES key recorded.
 - Linked test folder: `/Documents/XtraordinaryTest`, containing two repository EPUB fixtures.
@@ -50,6 +50,13 @@ This is the evidence ledger for the current reset-first acceptance run. A check 
 | Community build | Ad/billing SDKs absent and build remains ad-free | Build contract | Not implemented |
 | Accessibility | 48dp+ actions, screen-reader semantics, contrast, reflow/large text | Unit/visual/manual | Setup and Settings large-text visual coverage pass; full manual sweep pending |
 | Regression gate | Policy, protocol tests, app unit tests, lint, 20 screenshots, APK assembly | Automated | Canonical dev26 firmware build passed all 49 engineering policies and ESP32-C3 RV32IMC verification at pushed commit `4d7ebaa`; RAM 34.8%, flash 82.9%. Existing Android dev33 gate remains passed. Both canonical wrappers now reject source that is not clean and confirmed at the live upstream ref before compiling. |
+
+## 2026-08-13 USB and external-service update
+
+- USB success and stale-host recovery now pass on dev42/dev32: the retained 68,277-byte `test_tables.epub` queue resumed from a fresh Begin after firmware replacement, completed, cleared its durable queue, and produced exact X3 path `/Books/test_tables.epub`.
+- USB-specific cancel/abort and sequential two-file queueing remain open. Earlier BLE cancellation and BLE process-death evidence do not substitute for these USB cases.
+- Google reading-history production acceptance remains blocked by the production OAuth client. Wallet-format import exists, but consumer Wallet enumeration does not; live flight status still requires the documented provider/proxy boundary.
+- Trial, entitlement, ads, purchase, and the SDK-free community build remain unimplemented pending the external identity, Play Billing, product, AdMob, and UMP contracts recorded in `monetization-entitlement-design.md`.
 
 ## Next executable sequence
 
