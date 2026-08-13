@@ -605,10 +605,34 @@ void loop() {
     lastMemPrint = millis();
   }
 
-  // Handle incoming serial commands,
+  // Handle incoming serial commands without blocking the main loop or allocating
+  // one dynamic String for every hex-expanded CDC frame. The persistent bounded
+  // accumulator is shared by every command family on this ingress.
   // nb: we use logSerial from logging to avoid deprecation warnings
-  if (logSerial.available() > 0) {
-    String line = logSerial.readStringUntil('\n');
+  static char serialCommandLine[USB_COMMAND_RX_BUFFER_BYTES + 1] = {};
+  static size_t serialCommandLength = 0;
+  static bool serialCommandOverflow = false;
+  bool serialCommandReady = false;
+  while (logSerial.available() > 0 && !serialCommandReady) {
+    const int value = logSerial.read();
+    if (value < 0) break;
+    if (value == '\n') {
+      if (!serialCommandOverflow) {
+        serialCommandLine[serialCommandLength] = '\0';
+        serialCommandReady = true;
+      }
+      serialCommandLength = 0;
+      serialCommandOverflow = false;
+    } else if (!serialCommandOverflow) {
+      if (serialCommandLength < USB_COMMAND_RX_BUFFER_BYTES) {
+        serialCommandLine[serialCommandLength++] = static_cast<char>(value);
+      } else {
+        serialCommandOverflow = true;
+      }
+    }
+  }
+  if (serialCommandReady) {
+    String line(serialCommandLine);
     if (line.startsWith("CMD:")) {
       String cmd = line.substring(4);
       cmd.trim();
