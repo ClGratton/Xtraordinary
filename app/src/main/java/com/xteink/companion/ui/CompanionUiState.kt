@@ -38,6 +38,13 @@ enum class FocusPhase {
     Review,
 }
 
+enum class FocusPendingAction {
+    Start,
+    Pause,
+    Resume,
+    Stop,
+}
+
 enum class TicketMode {
     Static,
     Live,
@@ -48,6 +55,7 @@ data class FocusUiState(
     val selectedMinutes: Int = 25,
     val remainingSeconds: Int = 25 * 60,
     val phase: FocusPhase = FocusPhase.Setup,
+    val pendingAction: FocusPendingAction? = null,
 ) {
     val progress: Float
         get() {
@@ -236,7 +244,6 @@ data class CompanionUiState(
 )
 
 sealed interface UiNotice {
-    data object FocusStartedWithoutX3 : UiNotice
     data object PairBeforeSend : UiNotice
     data object EpubImportFailed : UiNotice
     data object ConnectX3ToDelete : UiNotice

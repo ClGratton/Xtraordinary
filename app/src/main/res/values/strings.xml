@@ -128,7 +128,7 @@
     <string name="ticket_static_removal_pending">Exit ticket on X3</string>
     <string name="stop_live_ticket">Stop live</string>
     <string name="pair_before_send">Pair an X3 before sending this view.</string>
-    <string name="focus_started_without_x3">Phone timer started. Pair X3 to mirror the session.</string>
+    <string name="focus_waiting_for_x3">Waiting for X3…</string>
     <string name="sample_boarding_pass_description">Sample X3 boarding pass preview for flight AZ 123, boarding at gate B12 at 18:40. The displayed code contains sample data and is not a valid boarding pass.</string>
     <string name="sample">SAMPLE</string>
     <string name="gate">Gate B12</string>

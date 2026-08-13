@@ -2,6 +2,41 @@
   "schemaVersion": 1,
   "rules": [
     {
+      "id": "focus-visible-state-is-ack-gated",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/CompanionViewModel.kt",
+      "pattern": "pendingAction = FocusPendingAction\\.Start[\\s\\S]*?result\\.isSuccess && pendingAction != null[\\s\\S]*?applyAcknowledged\\(pendingAction\\)",
+      "message": "Focus must not display a running phone timer until X3 acknowledges StartSession."
+    },
+    {
+      "id": "focus-ack-reducer-clears-pending-state",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/FocusSessionStore.kt",
+      "pattern": "applyAcknowledged[\\s\\S]*?FocusPendingAction\\.Start[\\s\\S]*?phase = FocusPhase\\.Running[\\s\\S]*?pendingAction = null[\\s\\S]*?FocusPendingAction\\.Stop[\\s\\S]*?phase = FocusPhase\\.Setup",
+      "message": "Focus applied phases must be reduced from acknowledged commands and clear pending state."
+    },
+    {
+      "id": "usb-commands-refresh-device-activity",
+      "type": "required_pattern",
+      "path": "firmware/src/main.cpp",
+      "pattern": "recognizedCommand[\\s\\S]*?if \\(!recognizedCommand\\) return[\\s\\S]*?lastActivityAtMs = millis\\(\\)[\\s\\S]*?powerManager\\.setPowerSaving\\(false\\)",
+      "message": "USB commands must restore full-speed processing and extend the shared inactivity deadline."
+    },
+    {
+      "id": "sleep-final-sync-is-power-interruptible",
+      "type": "required_pattern",
+      "path": "firmware/src/companion/CompanionService.cpp",
+      "pattern": "deepSleepWakeRequested_[\\s\\S]*?wakeRequested && wakeRequested\\(\\)[\\s\\S]*?WakeRequiresRestart[\\s\\S]*?WakeCancelled",
+      "message": "A new physical Power press must interrupt the bounded final-sync lifecycle or request a safe restart after teardown begins."
+    },
+    {
+      "id": "instant-wake-skips-released-recovery-settle",
+      "type": "required_pattern",
+      "path": "firmware/src/main.cpp",
+      "pattern": "PowerButton && rawPowerButtonPressed\\(\\)[\\s\\S]*?while \\(rawPowerButtonPressed\\(\\) && millis\\(\\) - settleStart < 500\\)",
+      "message": "An already-released instant wake must not pay the recovery-combination hold window."
+    },
+    {
       "id": "android-wrapper-requires-pushed-source",
       "type": "required_pattern",
       "path": "scripts/build-xtraordinary-app.ps1",
@@ -198,7 +233,7 @@
       "id": "companion-radio-stops-before-deep-sleep",
       "type": "required_pattern",
       "path": "firmware/src/main.cpp",
-      "pattern": "goToSleep\\(fromTimeout\\)[\\s\\S]*?finalizeForDeepSleep\\(1200, 2100\\)",
+      "pattern": "goToSleep\\(fromTimeout\\)[\\s\\S]*?finalizeForDeepSleep\\(1200, 2100, rawPowerButtonPressed\\)",
       "message": "The truthful sleep frame must render before bounded final sync and BLE controller teardown."
     },
     {
@@ -212,7 +247,7 @@
       "id": "companion-radio-teardown-preserves-bonds",
       "type": "required_pattern",
       "path": "firmware/src/companion/CompanionService.cpp",
-      "pattern": "finalizeForDeepSleep\\(uint32_t syncWindowMs, uint32_t timeoutMs\\)[\\s\\S]*?xTaskCreate[\\s\\S]*?resumeFastRadio\\(\\)[\\s\\S]*?NimBLEDevice::deinit\\(false\\)[\\s\\S]*?millis\\(\\) - startedAt\\) < timeoutMs",
+      "pattern": "finalizeForDeepSleep\\(uint32_t syncWindowMs, uint32_t timeoutMs,[\\s\\S]*?WakeRequestProbe wakeRequested\\)[\\s\\S]*?xTaskCreate[\\s\\S]*?resumeFastRadio\\(\\)[\\s\\S]*?NimBLEDevice::deinit\\(false\\)[\\s\\S]*?millis\\(\\) - startedAt\\) < timeoutMs",
       "message": "Final sync and deep-sleep BLE teardown must preserve bonds and keep every vendor call behind a hard deadline."
     },
     {

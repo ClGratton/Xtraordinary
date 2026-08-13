@@ -43,6 +43,9 @@ Persistent slow modes are separate from interactive ownership. A displayed Live 
 - If lease delivery fails, its capabilities sequence is marked unapplied so a later attempt can retry.
 - A disconnect clears the firmware lease and invalidates the old connection session.
 - Bluetooth bond data is never reset as part of lease recovery.
+- A visible state that implies device acceptance is committed only after its matching ACK. Before that, retain the last applied state and expose a pending state. Durable pending intent may replay after reconnect or process death, but replay must never make the phone appear active before X3 accepts it.
+- A command that needs responsive two-way traffic acquires the shared fast lease before its first state-changing message. If X3 is asleep or unreachable, keep the command pending and tell the user to wake the device; do not relabel a bonded device as unpaired.
+- USB receipt is itself device activity. Firmware restores full-speed processing and extends the shared inactivity deadline at the external-command boundary so USB operations do not depend on a physical wake press.
 
 ## Mandatory policy enforcement
 

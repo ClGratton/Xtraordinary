@@ -442,3 +442,18 @@ Measured failure: battery fell from 89% to 81% in one hour.
 - [x] Flash dev16, diagnose the connection-bootstrap/slow-link collision, then build and production-flash corrected `xtraordinary-v0.2.6-dev17-local` application-only with ROM-MD5 verification; SHA-256 `EE34AA63ED7B4D441E93B92981C7EC9AE9C3A6107F75D6DC87901A73E7CBDA1B`.
 - [x] Complete fresh pairing and verify advertisement, Secure Connections bond, encrypted GATT, service discovery, MTU 256, notification subscription, capabilities/status/library, clock, radio/reader policy, reading-stats request, and the complete ACK chain.
 - [ ] Exercise every production USB operation requested by the owner: firmware source selection, setup reset, book upload, cancellation, reconnect/resume, and multiple-file queueing.
+
+## 2026-08-13 pending-command truth, USB activity, and transition wake
+
+- [x] Reconstruct the interrupted work from the attachment and current diff instead of inferring it: Focus Start/Pause/Resume/Stop pending intent, USB activity handling, and debug-only retained crash retrieval were edited but never compiled or deployed.
+- [x] Keep Focus's phone phase/timer at the last acknowledged state until the matching X3 ACK; persist pending intent across process death and replay it only through a fresh protocol-ready link and the shared fast communication lease.
+- [x] Treat each recognized USB command as device activity by restoring full CPU speed and extending the common inactivity deadline before processing it.
+- [x] Diagnose dev26's immediate re-wake failure: the second tap lands after the Sleeping render but before final sync/BLE shutdown returns and before deep-sleep GPIO wake is armed, so the blocked main loop loses it.
+- [x] Make the reusable final-sync lifecycle Power-interruptible after the initiating sleep press is released. Cancel before teardown; use a controlled awake restart if teardown already began.
+- [x] Preserve **UP + POWER** recovery but skip its 500 ms settle when an instant wake tap is already physically released.
+- [ ] Commit and push the complete dev27/dev34 candidate, then run both canonical wrappers; compilation is forbidden before the upstream source checkpoint matches.
+- [ ] Install dev34 without clearing app data, invoke its debug-only USB crash-report action, and record the retained X3 crash report before another reset can replace it.
+- [ ] Flash dev27 application-only with write-hash verification; preserve NVS, bond, app data, and SD.
+- [ ] Physical acceptance: request sleep, wait only until **Sleeping** is visible, immediately fast-tap Power, and confirm it returns awake rather than finishing sleep.
+- [ ] Physical acceptance: enter established deep sleep, fast-tap Power, measure press-to-first-visible-change and confirm the X3 remains awake.
+- [ ] Verify a fresh post-wake protocol-ready chain and then resume USB book success/cancel/stale-host retry/multi-file queueing.

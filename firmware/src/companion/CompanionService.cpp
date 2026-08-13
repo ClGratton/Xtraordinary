@@ -387,8 +387,9 @@ void CompanionService::notifyPowerChanged() {
   statusNotifyPending_ = true;
 }
 
-bool CompanionService::finalizeForDeepSleep(uint32_t syncWindowMs, uint32_t timeoutMs) {
-  if (!initialized_) return true;
+DeepSleepFinalizeResult CompanionService::finalizeForDeepSleep(uint32_t syncWindowMs, uint32_t timeoutMs,
+                                                               WakeRequestProbe wakeRequested) {
+  if (!initialized_) return DeepSleepFinalizeResult::Ready;
 
   // The caller has already rendered the truthful Sleeping frame. One worker
   // owns the entire final-sync and shutdown lifecycle because both advertising
@@ -398,6 +399,8 @@ bool CompanionService::finalizeForDeepSleep(uint32_t syncWindowMs, uint32_t time
   deepSleepSyncWindowMs_ = syncWindowMs;
   deepSleepShutdownFinished_ = false;
   deepSleepShutdownStopped_ = false;
+  deepSleepShutdownStarted_ = false;
+  deepSleepWakeRequested_ = false;
   const BaseType_t created = xTaskCreate(
       [](void* context) {
         auto* service = static_cast<CompanionService*>(context);
@@ -412,6 +415,7 @@ bool CompanionService::finalizeForDeepSleep(uint32_t syncWindowMs, uint32_t time
           const uint32_t syncStartedAt = millis();
           uint32_t connectedAt = 0;
           while (static_cast<uint32_t>(millis() - syncStartedAt) < service->deepSleepSyncWindowMs_) {
+            if (service->deepSleepWakeRequested_) break;
             service->loop();
             if (service->connected() && connectedAt == 0) connectedAt = millis();
             if (connectedAt != 0 && static_cast<uint32_t>(millis() - connectedAt) >= 600 &&
@@ -423,6 +427,17 @@ bool CompanionService::finalizeForDeepSleep(uint32_t syncWindowMs, uint32_t time
           }
         }
 
+        // A new physical wake request during the bounded sync window wins over
+        // sleeping. No controller state has been destroyed yet, so the caller
+        // can restore an awake activity without a reboot.
+        if (service->deepSleepWakeRequested_) {
+          service->deepSleepPreparing_ = false;
+          service->deepSleepShutdownFinished_ = true;
+          vTaskDelete(nullptr);
+          return;
+        }
+
+        service->deepSleepShutdownStarted_ = true;
         service->initialized_ = false;
         if (service->server_) service->server_->advertiseOnDisconnect(false);
         if (service->advertising_ && service->advertising_->isAdvertising()) {
@@ -440,20 +455,28 @@ bool CompanionService::finalizeForDeepSleep(uint32_t syncWindowMs, uint32_t time
   if (created != pdPASS) {
     initialized_ = false;
     LOG_ERR("CMP", "Could not start bounded final-sync/BLE shutdown worker");
-    return false;
+    return DeepSleepFinalizeResult::TimedOut;
   }
 
   const uint32_t startedAt = millis();
   while (!deepSleepShutdownFinished_ && static_cast<uint32_t>(millis() - startedAt) < timeoutMs) {
+    if (wakeRequested && wakeRequested()) deepSleepWakeRequested_ = true;
     delay(5);
   }
+  if (wakeRequested && wakeRequested()) deepSleepWakeRequested_ = true;
+  const bool wakeWasRequested = deepSleepWakeRequested_;
   if (!deepSleepShutdownFinished_) {
     LOG_ERR("CMP", "Final sync/BLE shutdown exceeded %u ms; continuing into deep sleep",
             static_cast<unsigned>(timeoutMs));
-    return false;
+    return wakeWasRequested ? DeepSleepFinalizeResult::WakeRequiresRestart : DeepSleepFinalizeResult::TimedOut;
+  }
+  if (wakeWasRequested) {
+    LOG_INF("CMP", "Power wake requested during finalization; shutdown_started=%d", deepSleepShutdownStarted_);
+    return deepSleepShutdownStarted_ ? DeepSleepFinalizeResult::WakeRequiresRestart
+                                     : DeepSleepFinalizeResult::WakeCancelled;
   }
   LOG_INF("CMP", "Final sync/BLE shutdown before deep sleep stopped=%d", deepSleepShutdownStopped_);
-  return deepSleepShutdownStopped_;
+  return DeepSleepFinalizeResult::Ready;
 }
 
 void CompanionService::onWrite(const uint8_t* bytes, size_t length) {

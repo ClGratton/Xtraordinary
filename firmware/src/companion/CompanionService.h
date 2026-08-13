@@ -21,6 +21,15 @@ class NimBLEServer;
 
 namespace companion {
 
+enum class DeepSleepFinalizeResult : uint8_t {
+  Ready,
+  WakeCancelled,
+  WakeRequiresRestart,
+  TimedOut,
+};
+
+using WakeRequestProbe = bool (*)();
+
 class CompanionService {
   struct CommandPacket {
     uint16_t length = 0;
@@ -52,6 +61,8 @@ class CompanionService {
   volatile bool connectionParamsPending_ = false;
   volatile bool deepSleepShutdownFinished_ = false;
   volatile bool deepSleepShutdownStopped_ = false;
+  volatile bool deepSleepShutdownStarted_ = false;
+  volatile bool deepSleepWakeRequested_ = false;
   volatile bool deepSleepPreparing_ = false;
   uint32_t deepSleepSyncWindowMs_ = 0;
   SessionEngine session_;
@@ -176,7 +187,8 @@ class CompanionService {
   void leaveTicket();
   void wakeFastAdvertising();
   void notifyPowerChanged();
-  bool finalizeForDeepSleep(uint32_t syncWindowMs, uint32_t timeoutMs);
+  DeepSleepFinalizeResult finalizeForDeepSleep(uint32_t syncWindowMs, uint32_t timeoutMs,
+                                               WakeRequestProbe wakeRequested);
   void onWrite(const uint8_t* bytes, size_t length);
   bool handleUsbBookPacket(const uint8_t* bytes, size_t length, uint32_t& messageId);
   void onClientConnected(uint16_t connectionHandle);

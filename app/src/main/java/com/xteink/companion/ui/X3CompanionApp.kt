@@ -89,7 +89,6 @@ fun X3CompanionApp(
     val snackbarHostState = remember { SnackbarHostState() }
     var devicesVisible by rememberSaveable { mutableStateOf(false) }
     val noticeText = when (val notice = state.notice) {
-        UiNotice.FocusStartedWithoutX3 -> stringResource(R.string.focus_started_without_x3)
         UiNotice.PairBeforeSend -> stringResource(R.string.pair_before_send)
         UiNotice.EpubImportFailed -> stringResource(R.string.epub_import_failed)
         UiNotice.ConnectX3ToDelete -> stringResource(R.string.connect_x3_to_delete)

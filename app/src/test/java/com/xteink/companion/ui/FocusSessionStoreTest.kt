@@ -56,4 +56,39 @@ class FocusSessionStoreTest {
 
         assertEquals(52_000L, persisted.deadlineEpochMs)
     }
+
+    @Test
+    fun pendingStartDoesNotBeginPhoneDeadlineBeforeDeviceAck() {
+        val persisted = FocusUiState(
+            selectedMinutes = 25,
+            remainingSeconds = 1_500,
+            phase = FocusPhase.Setup,
+            pendingAction = FocusPendingAction.Start,
+        ).persistedAt(nowEpochMs = 10_000L)
+
+        assertEquals(FocusPhase.Setup, persisted.phase)
+        assertEquals(FocusPendingAction.Start, persisted.pendingAction)
+        assertEquals(0L, persisted.deadlineEpochMs)
+    }
+
+    @Test
+    fun acknowledgedFocusActionsCommitOnlyTheirAppliedPhase() {
+        val setup = FocusUiState(selectedMinutes = 25, pendingAction = FocusPendingAction.Start)
+        val running = setup.applyAcknowledged(FocusPendingAction.Start)
+        assertEquals(FocusPhase.Running, running.phase)
+        assertEquals(null, running.pendingAction)
+
+        val paused = running.copy(pendingAction = FocusPendingAction.Pause)
+            .applyAcknowledged(FocusPendingAction.Pause)
+        assertEquals(FocusPhase.Paused, paused.phase)
+
+        val resumed = paused.copy(pendingAction = FocusPendingAction.Resume)
+            .applyAcknowledged(FocusPendingAction.Resume)
+        assertEquals(FocusPhase.Running, resumed.phase)
+
+        val stopped = resumed.copy(pendingAction = FocusPendingAction.Stop)
+            .applyAcknowledged(FocusPendingAction.Stop)
+        assertEquals(FocusPhase.Setup, stopped.phase)
+        assertEquals(1_500, stopped.remainingSeconds)
+    }
 }

@@ -87,6 +87,7 @@ fun ControlDeckFocusContent(
             )
             FocusDeckActions(
                 phase = focus.phase,
+                pending = focus.pendingAction != null,
                 onStartFocus = onStartFocus,
                 onTogglePause = onTogglePause,
                 onEndFocus = onEndFocus,
@@ -261,6 +262,7 @@ private fun DurationStepButton(label: String, enabled: Boolean, onClick: () -> U
 @Composable
 private fun FocusDeckActions(
     phase: FocusPhase,
+    pending: Boolean,
     onStartFocus: () -> Unit,
     onTogglePause: () -> Unit,
     onEndFocus: () -> Unit,
@@ -309,9 +311,16 @@ private fun FocusDeckActions(
             modifier = Modifier
                 .weight(1f)
                 .height(actionHeight),
+            enabled = !pending,
             shape = RoundedCornerShape(actionCorner),
         ) {
-            when (phase) {
+            if (pending) {
+                Text(
+                    text = stringResource(R.string.focus_waiting_for_x3),
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                )
+            } else when (phase) {
                 FocusPhase.Setup, FocusPhase.Review -> PlayTriangleIcon(modifier = Modifier.padding(end = 8.dp))
                 FocusPhase.Running -> PauseIcon(modifier = Modifier.padding(end = 7.dp))
                 FocusPhase.Paused -> PlayTriangleIcon(modifier = Modifier.padding(end = 7.dp))
@@ -341,6 +350,7 @@ private fun FocusDeckActions(
                         scaleX = 0.72f + splitProgress * 0.28f
                     },
                 shape = RoundedCornerShape(actionCorner),
+                enabled = !pending,
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp),
             ) {
                 StopIcon(modifier = Modifier.padding(end = 7.dp))

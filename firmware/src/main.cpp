@@ -46,6 +46,10 @@ FontDecompressor fontDecompressor;
 SdCardFontSystem sdFontSystem;
 FontCacheManager fontCacheManager(renderer.getFontMap(), renderer.getSdCardFonts());
 static unsigned long allowSleepAt = 0;
+// Physical input and accepted external commands share this inactivity clock.
+// USB operations must wake low-power processing and keep their bounded work
+// alive without requiring a separate physical button press.
+static unsigned long lastActivityAtMs = 0;
 
 // Fonts
 EpdFont notoserif14RegularFont(&notoserif_14_regular);
@@ -170,6 +174,26 @@ void waitForPowerRelease() {
 
 constexpr char SLEEP_FRAME_FILE[] = "/.crosspoint/sleep_frame.bin";
 
+static bool rawPowerButtonPressed() { return digitalRead(InputManager::POWER_BUTTON_PIN) == LOW; }
+
+static void restoreAfterCancelledSleep(bool resumeReader, bool previousShowBootScreen) {
+  deepSleepInProgress = false;
+  APP_STATE.showBootScreen = previousShowBootScreen;
+  APP_STATE.saveToFile();
+  Storage.remove(SLEEP_FRAME_FILE);
+  lastActivityAtMs = millis();
+  allowSleepAt = millis() + 500;
+  if (resumeReader && !APP_STATE.openEpubPath.empty()) {
+    activityManager.goToReader(APP_STATE.openEpubPath);
+  } else {
+    activityManager.goHome();
+  }
+  activityManager.loop();
+#ifdef ENABLE_X3_COMPANION
+  companion::companionService.wakeFastAdvertising();
+#endif
+}
+
 static void saveSleepFrameBuffer() {
   HalFile file;
   if (!Storage.openFileForWrite("SLP", SLEEP_FRAME_FILE, file)) return;
@@ -201,6 +225,7 @@ void enterDeepSleep(bool fromTimeout = false) {
       SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::QUICK_RESUME ||
       (fromTimeout &&
        SETTINGS.quickResumeSleepScreen == CrossPointSettings::QUICK_RESUME_SLEEP_SCREEN::QUICK_RESUME_AFTER_TIMEOUT);
+  const bool previousShowBootScreen = APP_STATE.showBootScreen;
   APP_STATE.showBootScreen = !isQuickResumeSleep;
 
   APP_STATE.saveToFile();
@@ -209,6 +234,11 @@ void enterDeepSleep(bool fromTimeout = false) {
   // a WiFi activity would otherwise silentRestart() here and reboot instead.
   deepSleepInProgress = true;
   activityManager.goToSleep(fromTimeout);
+
+  // A manual sleep begins while Power is still held. Arm transition wake only
+  // after that initiating press is released, so a second press means "wake"
+  // instead of cancelling every normal sleep request.
+  if (!fromTimeout) waitForPowerRelease();
 
   if (isQuickResumeSleep) {
     saveSleepFrameBuffer();
@@ -219,7 +249,25 @@ void enterDeepSleep(bool fromTimeout = false) {
   // discovery/sync opportunity, then stop the controller. The whole vendor
   // lifecycle runs in a disposable worker behind one hard deadline, so neither
   // advertising restart nor teardown can strand the old awake frame onscreen.
-  companion::companionService.finalizeForDeepSleep(1200, 2100);
+  const auto finalizeResult =
+      companion::companionService.finalizeForDeepSleep(1200, 2100, rawPowerButtonPressed);
+  if (finalizeResult == companion::DeepSleepFinalizeResult::WakeCancelled) {
+    LOG_INF("MAIN", "Power pressed during final sync; cancelling sleep");
+    restoreAfterCancelledSleep(APP_STATE.lastSleepFromReader, previousShowBootScreen);
+    return;
+  }
+  if (finalizeResult == companion::DeepSleepFinalizeResult::WakeRequiresRestart) {
+    LOG_INF("MAIN", "Power pressed after BLE shutdown began; restarting awake safely");
+    deepSleepInProgress = false;
+    APP_STATE.showBootScreen = previousShowBootScreen;
+    APP_STATE.saveToFile();
+    if (APP_STATE.lastSleepFromReader && !APP_STATE.openEpubPath.empty()) {
+      silentRestartToReader();
+    } else {
+      silentRestart();
+    }
+    return;
+  }
 #endif
 
   // Tear down WiFi so the modem power domain isn't held alive across deep sleep.
@@ -270,6 +318,7 @@ void setupDisplayAndFonts(bool seamless = false) {
 }
 
 void setup() {
+  lastActivityAtMs = millis();
 #ifdef ENABLE_SERIAL_LOG
   // Earliest possible Serial setup. The 250 ms stall before begin() lets the
   // USB Serial/JTAG peripheral finish power-on and lets the host complete USB
@@ -349,16 +398,16 @@ void setup() {
   // boot to skip directly to the SD-card firmware update screen. Useful on devices where USB
   // flashing has been locked down (e.g. recent X3 firmware).
   bool recoveryFirmwareMode = false;
-  if (wakeupReason == HalGPIO::WakeupReason::PowerButton) {
+  if (wakeupReason == HalGPIO::WakeupReason::PowerButton && rawPowerButtonPressed()) {
     // Refresh the cached button state a few times — isPressed() needs ~half a second to settle
     // after boot per the HalGPIO contract. Use a millis-based deadline so we always wait the full
     // settle window even if the loop body takes longer than expected on slow boots.
     const unsigned long settleStart = millis();
-    while (millis() - settleStart < 500) {
+    while (rawPowerButtonPressed() && millis() - settleStart < 500) {
       gpio.update();
       delay(10);
     }
-    if (gpio.isPressed(HalGPIO::BTN_UP)) {
+    if (rawPowerButtonPressed() && gpio.isPressed(HalGPIO::BTN_UP)) {
       recoveryFirmwareMode = true;
       LOG_INF("MAIN", "Recovery firmware mode (UP + POWER held at boot)");
     }
@@ -493,6 +542,14 @@ void loop() {
     if (line.startsWith("CMD:")) {
       String cmd = line.substring(4);
       cmd.trim();
+      const bool recognizedCommand = cmd == "SCREENSHOT" || cmd == "CRASH_REPORT"
+#ifdef ENABLE_X3_COMPANION
+                                     || cmd == "RUNTIME_TRACE" || cmd.startsWith("USB_BOOK:")
+#endif
+          ;
+      if (!recognizedCommand) return;
+      lastActivityAtMs = millis();
+      powerManager.setPowerSaving(false);
       if (cmd == "SCREENSHOT") {
         const uint32_t bufferSize = display.getBufferSize();
         logSerial.printf("SCREENSHOT_START:%d\n", bufferSize);
@@ -537,11 +594,10 @@ void loop() {
   }
 
   // Check for any user activity (button press or release) or active background work
-  static unsigned long lastActivityTime = millis();
   const bool buttonActivity = gpio.wasAnyPressed() || gpio.wasAnyReleased();
   const bool tiltActivity = halTiltSensor.hadActivity();
   if (buttonActivity || tiltActivity) {
-    lastActivityTime = millis();         // Reset inactivity timer
+    lastActivityAtMs = millis();         // Reset inactivity timer
     powerManager.setPowerSaving(false);  // Restore normal CPU frequency on user activity
 #ifdef ENABLE_X3_COMPANION
     if (buttonActivity) companion::companionService.wakeFastAdvertising();
@@ -550,7 +606,7 @@ void loop() {
     // Focus and Live ticket must stay awake, but that is not continuous user
     // activity. Keep the inactivity deadline parked without pinning the CPU at
     // full speed on every loop iteration.
-    lastActivityTime = millis();
+    lastActivityAtMs = millis();
   }
 
   static bool screenshotButtonsReleased = true;
@@ -581,7 +637,7 @@ void loop() {
 #ifdef ENABLE_X3_COMPANION
   // The phone-managed companion policy is authoritative for idle Home and
   // static-ticket sleep. Activities such as Reading, Focus and Live ticket
-  // already reset lastActivityTime while they intentionally remain active.
+  // already reset lastActivityAtMs while they intentionally remain active.
   sleepTimeoutMs = companion::companionService.companionSleepAfterMs();
 #endif
   bool preserveStaticTicket = false;
@@ -592,7 +648,7 @@ void loop() {
   // fast discovery window.
   preserveStaticTicket = companion::companionService.staticTicketDisplayed();
 #endif
-  if (!preserveStaticTicket && sleepTimeoutMs > 0 && millis() - lastActivityTime >= sleepTimeoutMs) {
+  if (!preserveStaticTicket && sleepTimeoutMs > 0 && millis() - lastActivityAtMs >= sleepTimeoutMs) {
     LOG_DBG("SLP", "Auto-sleep triggered after %lu ms of inactivity", sleepTimeoutMs);
     enterDeepSleep(true);
     // This should never be hit as `enterDeepSleep` calls esp_deep_sleep_start
@@ -652,7 +708,7 @@ void loop() {
 #ifdef ENABLE_X3_COMPANION
     companionNeedsFullClock = companion::companionService.requiresFullClock();
 #endif
-    if (millis() - lastActivityTime >= HalPowerManager::IDLE_POWER_SAVING_MS && !companionNeedsFullClock) {
+    if (millis() - lastActivityAtMs >= HalPowerManager::IDLE_POWER_SAVING_MS && !companionNeedsFullClock) {
       runtime_trace::mark(runtime_trace::Checkpoint::POWER_SAVING_ENTER);
       // If we've been inactive for a while, increase the delay to save power
       int minimumFrequency = HalPowerManager::LOW_POWER_FREQ;

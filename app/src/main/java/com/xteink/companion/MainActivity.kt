@@ -50,6 +50,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val PrepareX3ResetAction = "com.xteink.companion.action.PREPARE_X3_RESET"
+private const val ReadX3CrashReportAction = "com.xteink.companion.action.READ_X3_CRASH_REPORT"
 private const val DeployLogTag = "XteinkDeploy"
 private const val FlightImportLogTag = "FlightPassImport"
 private const val GoogleBackupLogTag = "GoogleBackup"
@@ -360,13 +361,13 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        if (!handleExternalResetIntent(intent)) handleSharedFlightPass(intent)
+        if (!handleDiagnosticIntent(intent) && !handleExternalResetIntent(intent)) handleSharedFlightPass(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (!handleExternalResetIntent(intent)) handleSharedFlightPass(intent)
+        if (!handleDiagnosticIntent(intent) && !handleExternalResetIntent(intent)) handleSharedFlightPass(intent)
     }
 
     override fun onStart() {
@@ -390,6 +391,20 @@ class MainActivity : ComponentActivity() {
             runCatching { viewModel.prepareForExternalDeviceReset() }
                 .onSuccess { Log.i(DeployLogTag, "PERIPHERAL_RESET_READY") }
                 .onFailure { Log.e(DeployLogTag, "PERIPHERAL_RESET_FAILED", it) }
+        }
+        return true
+    }
+
+    private fun handleDiagnosticIntent(intent: Intent): Boolean {
+        val isDebuggable = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+        if (!isDebuggable || intent.action != ReadX3CrashReportAction) return false
+        // Keep normal foreground reconnect and durable USB work from racing the
+        // diagnostic's exclusive serial request.
+        externalResetPreparationRequested = true
+        lifecycleScope.launch {
+            runCatching { viewModel.readUsbCrashReport() }
+                .onSuccess { Log.i(DeployLogTag, "X3_CRASH_REPORT_START\n$it\nX3_CRASH_REPORT_END") }
+                .onFailure { Log.e(DeployLogTag, "X3_CRASH_REPORT_FAILED", it) }
         }
         return true
     }

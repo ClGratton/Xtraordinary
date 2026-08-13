@@ -164,6 +164,41 @@ then completed service discovery, MTU 256, notification subscription,
 Capabilities, and StatusChanged. This closes the instant-wake regression while
 retaining the rule that non-zero policies still verify the configured hold.
 
+## 2026-08-13 final-sync wake gap
+
+The dev26 acceptance above covered a fast tap after the X3 had completed its
+shutdown and entered deep sleep. It did not cover a second tap immediately
+after the visible **Sleeping** frame appeared. The owner has now separated the
+two cases:
+
+- after waiting about five seconds, a fast tap wakes immediately;
+- during the first seconds after requesting sleep, the same tap is ignored;
+- from an established off state, the first visible **Booting** update arrives
+  about two seconds after the press.
+
+Source establishes why the transition tap is lost. `SleepActivity` renders
+first, then `finalizeForDeepSleep(1200, 2100)` blocks the main loop while a
+worker gives the phone a final sync opportunity and tears down NimBLE. Deep
+sleep and its GPIO wake source are armed only after that call returns. A Power
+edge during the call therefore belongs to neither the awake input loop nor the
+deep-sleep wake mechanism.
+
+The dev27 candidate makes finalization explicitly interruptible. It polls the
+raw active-low Power GPIO every five milliseconds after the initiating sleep
+press has been released. A new press during the reversible sync phase cancels
+sleep and restores the prior reader/Home destination. If teardown has already
+started, the same request takes the safe controlled-restart path instead of
+trying to reuse partially destroyed BLE state. Non-zero wake-hold policies are
+unchanged.
+
+The approximately two-second first-frame delay also includes a 500 ms recovery
+firmware combination settle that dev26 paid even after an instant Power tap had
+already ended. Dev27 runs that settle only while Power is still physically held,
+preserving **UP + POWER** recovery while removing the unnecessary wait from an
+already-released instant wake. Hardware acceptance must measure the resulting
+press-to-first-visible-change time; source inspection alone cannot establish the
+e-ink result.
+
 ## Regression rule
 
 Do not treat visible e-ink immobility as proof of an input-scan defect or sleep. Trace the entire loop, power transition, allocation/logging path, input state, activity dispatch, render request, controller teardown, sleep entry, and wake source. Any deterministic hardware-configuration rejection must be bounded. Every third-party teardown call on the power-off path must also be behind a deadline, and physical acceptance must cross the configured deep-sleep deadline. A failed manual Power hold with no render and no BLE disconnect must be diagnosed at the input/event boundary before changing downstream sleep code.

@@ -131,8 +131,8 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     private val interactiveTransport = InteractiveTransportCoordinator()
     private var intentionalTransportIdle = true
     private var reconnectAttempt = 0
-    private var pendingFocusSync = initialFocus.phase == FocusPhase.Running ||
-        initialFocus.phase == FocusPhase.Paused
+    private var pendingFocusSync = initialFocus.pendingAction != null ||
+        initialFocus.phase == FocusPhase.Running || initialFocus.phase == FocusPhase.Paused
     private var liveTicketActive = initialTicketOnX3 && initialTicketMode == TicketMode.Live
     private var pendingTicketPayload: BoardingPassPayload? = initialPendingTicketPayload
     private val pendingDeletePaths = connectionPreferences
@@ -461,10 +461,11 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             state.copy(
                 surface = CompanionSurface.Focus,
                 focus = state.focus.copy(
-                    phase = FocusPhase.Running,
                     remainingSeconds = state.focus.selectedMinutes * 60,
+                    pendingAction = FocusPendingAction.Start,
                 ),
-                notice = if (state.isX3Connected) null else UiNotice.FocusStartedWithoutX3,
+                notice = if (state.isX3TransportConnected) null
+                else UiNotice.DeviceMessage("Waiting for X3. Wake it to start Focus."),
             )
         }
         focusSessionStore.save(_uiState.value.focus)
@@ -473,12 +474,12 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun togglePause() {
         _uiState.update { state ->
-            val nextPhase = when (state.focus.phase) {
-                FocusPhase.Running -> FocusPhase.Paused
-                FocusPhase.Paused -> FocusPhase.Running
-                else -> state.focus.phase
+            val pendingAction = when (state.focus.phase) {
+                FocusPhase.Running -> FocusPendingAction.Pause
+                FocusPhase.Paused -> FocusPendingAction.Resume
+                else -> null
             }
-            state.copy(focus = state.focus.copy(phase = nextPhase))
+            state.copy(focus = state.focus.copy(pendingAction = pendingAction))
         }
         focusSessionStore.save(_uiState.value.focus)
         requestFocusSync()
@@ -488,8 +489,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         _uiState.update { state ->
             state.copy(
                 focus = state.focus.copy(
-                    phase = FocusPhase.Setup,
-                    remainingSeconds = state.focus.selectedMinutes * 60,
+                    pendingAction = FocusPendingAction.Stop,
                 ),
             )
         }
@@ -502,8 +502,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             state.copy(
                 surface = CompanionSurface.Focus,
                 focus = state.focus.copy(
-                    phase = FocusPhase.Setup,
-                    remainingSeconds = state.focus.selectedMinutes * 60,
+                    pendingAction = FocusPendingAction.Stop,
                 ),
             )
         }
@@ -961,6 +960,8 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
     }
+
+    suspend fun readUsbCrashReport(): String = usbFlasher.readCrashReport()
 
 
     fun requestUploadBooksToX3(bookIds: Set<String>, method: BookTransferMethod) {
@@ -1532,7 +1533,6 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private fun requestFocusSync() {
-        if (!_uiState.value.isX3Connected) return
         pendingFocusSync = true
         intentionalTransportIdle = false
         if (_uiState.value.isX3TransportConnected) drainPendingFocusSync() else ensureTransportConnected()
@@ -1544,24 +1544,49 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             while (pendingFocusSync && _uiState.value.isX3TransportConnected) {
                 pendingFocusSync = false
                 val focus = _uiState.value.focus
+                val pendingAction = focus.pendingAction
                 val result = runCatching {
-                    when (focus.phase) {
-                        FocusPhase.Running, FocusPhase.Paused -> {
-                            val remaining = focus.remainingSeconds.coerceAtLeast(1)
-                            companionClient.startSession(
-                                SessionStart(
-                                    deadlineEpochSeconds = System.currentTimeMillis() / 1_000 + remaining,
-                                    durationSeconds = remaining,
-                                    title = focus.task,
-                                ),
-                            )
-                            if (focus.phase == FocusPhase.Paused) companionClient.pauseSession()
+                    withInteractiveTransport(FocusCommandOwner) { when (pendingAction) {
+                        FocusPendingAction.Start -> companionClient.startSession(
+                            SessionStart(
+                                deadlineEpochSeconds = System.currentTimeMillis() / 1_000 + focus.selectedMinutes * 60,
+                                durationSeconds = focus.selectedMinutes * 60,
+                                title = focus.task,
+                            ),
+                        )
+                        FocusPendingAction.Pause -> companionClient.pauseSession()
+                        FocusPendingAction.Resume -> companionClient.resumeSession()
+                        FocusPendingAction.Stop -> companionClient.stopSession()
+                        null -> when (focus.phase) {
+                            FocusPhase.Running, FocusPhase.Paused -> {
+                                val remaining = focus.remainingSeconds.coerceAtLeast(1)
+                                companionClient.startSession(
+                                    SessionStart(
+                                        deadlineEpochSeconds = System.currentTimeMillis() / 1_000 + remaining,
+                                        durationSeconds = remaining,
+                                        title = focus.task,
+                                    ),
+                                )
+                                if (focus.phase == FocusPhase.Paused) companionClient.pauseSession()
+                            }
+                            FocusPhase.Setup, FocusPhase.Review -> companionClient.stopSession()
                         }
-                        FocusPhase.Setup, FocusPhase.Review -> companionClient.stopSession()
-                    }
+                    } }
                 }
-                if (result.isFailure) {
+                if (result.isSuccess && pendingAction != null) {
+                    _uiState.update { state ->
+                        val current = state.focus
+                        if (current.pendingAction != pendingAction) state else {
+                            val applied = current.applyAcknowledged(pendingAction)
+                            state.copy(focus = applied, notice = null)
+                        }
+                    }
+                    focusSessionStore.save(_uiState.value.focus)
+                } else if (result.isFailure) {
                     pendingFocusSync = true
+                    _uiState.update {
+                        it.copy(notice = UiNotice.DeviceMessage("Waiting for X3. Wake it to apply Focus."))
+                    }
                     handleDeferredTransportFailure(result.exceptionOrNull())
                     break
                 }
@@ -1626,6 +1651,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     private companion object {
         val PassesScreenOwner = InteractiveTransportOwner("passes-screen")
         val TicketTransferOwner = InteractiveTransportOwner("ticket-transfer")
+        val FocusCommandOwner = InteractiveTransportOwner("focus-command")
         const val BackgroundDisconnectGraceMs = 1_500L
         const val LastConnectedModelKey = "last_connected_model"
         const val PendingDeletePathsKey = "pending_delete_paths"

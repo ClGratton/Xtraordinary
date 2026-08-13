@@ -8,6 +8,7 @@ internal data class PersistedFocusSession(
     val remainingSeconds: Int,
     val phase: FocusPhase,
     val deadlineEpochMs: Long,
+    val pendingAction: FocusPendingAction? = null,
 )
 
 internal fun PersistedFocusSession.restoreAt(nowEpochMs: Long): FocusUiState {
@@ -19,6 +20,7 @@ internal fun PersistedFocusSession.restoreAt(nowEpochMs: Long): FocusUiState {
             selectedMinutes = boundedMinutes,
             remainingSeconds = boundedRemaining,
             phase = phase,
+            pendingAction = pendingAction,
         )
     }
     val millisecondsLeft = (deadlineEpochMs - nowEpochMs).coerceAtLeast(0L)
@@ -30,6 +32,7 @@ internal fun PersistedFocusSession.restoreAt(nowEpochMs: Long): FocusUiState {
         selectedMinutes = boundedMinutes,
         remainingSeconds = secondsLeft,
         phase = if (secondsLeft == 0) FocusPhase.Review else FocusPhase.Running,
+        pendingAction = pendingAction,
     )
 }
 
@@ -43,7 +46,23 @@ internal fun FocusUiState.persistedAt(nowEpochMs: Long): PersistedFocusSession =
     } else {
         0L
     },
+    pendingAction = pendingAction,
 )
+
+internal fun FocusUiState.applyAcknowledged(action: FocusPendingAction): FocusUiState = when (action) {
+    FocusPendingAction.Start -> copy(
+        phase = FocusPhase.Running,
+        remainingSeconds = selectedMinutes * 60,
+        pendingAction = null,
+    )
+    FocusPendingAction.Pause -> copy(phase = FocusPhase.Paused, pendingAction = null)
+    FocusPendingAction.Resume -> copy(phase = FocusPhase.Running, pendingAction = null)
+    FocusPendingAction.Stop -> copy(
+        phase = FocusPhase.Setup,
+        remainingSeconds = selectedMinutes * 60,
+        pendingAction = null,
+    )
+}
 
 internal class FocusSessionStore(
     context: Context,
@@ -56,12 +75,16 @@ internal class FocusSessionStore(
         val phase = runCatching {
             FocusPhase.valueOf(preferences.getString(PhaseKey, defaults.phase.name) ?: defaults.phase.name)
         }.getOrDefault(defaults.phase)
+        val pendingAction = preferences.getString(PendingActionKey, null)?.let { value ->
+            runCatching { FocusPendingAction.valueOf(value) }.getOrNull()
+        }
         return PersistedFocusSession(
             task = preferences.getString(TaskKey, defaults.task) ?: defaults.task,
             selectedMinutes = preferences.getInt(SelectedMinutesKey, defaults.selectedMinutes),
             remainingSeconds = preferences.getInt(RemainingSecondsKey, defaults.remainingSeconds),
             phase = phase,
             deadlineEpochMs = preferences.getLong(DeadlineEpochMsKey, 0L),
+            pendingAction = pendingAction,
         ).restoreAt(nowEpochMs())
     }
 
@@ -73,6 +96,10 @@ internal class FocusSessionStore(
             .putInt(RemainingSecondsKey, persisted.remainingSeconds)
             .putString(PhaseKey, persisted.phase.name)
             .putLong(DeadlineEpochMsKey, persisted.deadlineEpochMs)
+            .apply {
+                if (persisted.pendingAction == null) remove(PendingActionKey)
+                else putString(PendingActionKey, persisted.pendingAction.name)
+            }
             .apply()
     }
 
@@ -82,5 +109,6 @@ internal class FocusSessionStore(
         const val RemainingSecondsKey = "remaining_seconds"
         const val PhaseKey = "phase"
         const val DeadlineEpochMsKey = "deadline_epoch_ms"
+        const val PendingActionKey = "pending_action"
     }
 }
