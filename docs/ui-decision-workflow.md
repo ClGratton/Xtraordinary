@@ -67,6 +67,8 @@ Every interactive surface must deliberately handle the applicable states:
 
 - Run the engineering policy gate and canonical Android build.
 - Generate the screenshot references named in `docs/ui-surface-evidence.json` and inspect the changed images, not just the task result.
+- The canonical build must run screenshot validation against the reviewed references. Updating a reference is a separate, deliberate review action and must never happen inside the normal validation build.
+- For changed interactive layouts, add machine-readable geometry and semantics assertions for the critical relationships identified in step 5. A screenshot comparison is supporting evidence, not a substitute for bounds, non-overlap, touch-target, traversal, and state assertions.
 - Run the Impeccable detector once on the final changed UI targets.
 - On a physical phone, exercise the actual primary action and capture the resulting state. Hardware claims require protocol or device evidence, not presence alone.
 - Add the decision and remaining limitations to the dated audit, acceptance note, or handoff.

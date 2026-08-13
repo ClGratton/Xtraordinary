@@ -404,6 +404,13 @@
       "message": "Every registered UI surface must keep default and adaptive screenshot evidence."
     },
     {
+      "id": "canonical-android-build-validates-screenshots",
+      "type": "required_pattern",
+      "path": "scripts/build-xtraordinary-app.ps1",
+      "pattern": ":app:validateDebugScreenshotTest",
+      "message": "The canonical Android build must execute deterministic screenshot validation."
+    },
+    {
       "id": "settings-does-not-delegate-google-to-setup",
       "type": "forbidden_pattern",
       "path": "app/src/main/java/com/xteink/companion/ui/components/SharedComponents.kt",
