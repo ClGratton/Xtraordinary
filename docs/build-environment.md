@@ -109,6 +109,14 @@ Background mode exercises the real `onStop` path and its clean disconnect. Proce
 
 Do not open COM7 as a passive log probe. On this X3, even a Windows `SerialPort` open with DTR and RTS requested false caused `USB_UART_CHIP_RESET`. Treat every COM7 open as a possible peripheral reset. Use an intentional serial monitor only when reset is acceptable, and never run an automatic crash-log probe immediately after flashing.
 
+When the X3 is attached to the Pixel, retrieve both the persistent crash file and retained runtime checkpoints through the debug app without opening desktop serial:
+
+```powershell
+& .\scripts\read-x3-diagnostics.ps1
+```
+
+The script uses the repository ADB toolchain, requires exactly one phone, and invokes the app's bounded, read-only USB diagnostics path. It does not reset the X3, clear app data, or alter the Bluetooth bond. Preserve the complete output: a CPU-lockup report without a panic string is incomplete unless its `RUNTIME_TRACE_PREVIOUS` checkpoint is also captured.
+
 ## Long-running command discipline
 
 Builds, tests, installs, flashing, and device-log captures must never be left running blindly.

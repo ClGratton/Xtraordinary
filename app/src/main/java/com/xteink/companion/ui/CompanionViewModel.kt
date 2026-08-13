@@ -995,6 +995,8 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
 
     suspend fun readUsbCrashReport(): String = usbFlasher.readCrashReport()
 
+    suspend fun readUsbDiagnostics(): String = usbFlasher.readDiagnostics()
+
 
     fun requestUploadBooksToX3(bookIds: Set<String>, method: BookTransferMethod) {
         if (bookIds.isEmpty() || _uiState.value.read.uploadingToX3) return

@@ -224,6 +224,16 @@ class UsbEspFlasher(context: Context) : Closeable {
         }
     }
 
+    suspend fun readDiagnostics(timeoutMs: Long = 8_000): String = withContext(Dispatchers.IO) {
+        val device = awaitPermission(findDevice() ?: error("X3 is not connected by USB"))
+        RomConnection.open(usbManager, device).use { connection ->
+            connection.prepareSerial()
+            val crashReport = connection.requestCrashReport(timeoutMs)
+            val runtimeTrace = connection.requestRuntimeTrace(timeoutMs)
+            "CRASH_REPORT\n$crashReport\n\nRUNTIME_TRACE\n$runtimeTrace"
+        }
+    }
+
     private suspend fun awaitPermission(device: UsbDevice): UsbDevice {
         if (usbManager.hasPermission(device)) return device
         _state.value = UsbFlashState(
@@ -408,7 +418,36 @@ class UsbEspFlasher(context: Context) : Closeable {
         }
 
         fun requestCrashReport(timeoutMs: Long): String {
-            writeAll("CMD:CRASH_REPORT\n".toByteArray(Charsets.US_ASCII))
+            val text = requestTextCommand(
+                command = "CRASH_REPORT",
+                timeoutMs = timeoutMs,
+                maxBytes = MaxCrashReportBytes,
+            ) { it.contains(CrashReportEnd) }
+            return text.substringAfter(CrashReportStart).substringBefore(CrashReportEnd).trim()
+        }
+
+        fun requestRuntimeTrace(timeoutMs: Long): String {
+            val text = requestTextCommand(
+                command = "RUNTIME_TRACE",
+                timeoutMs = timeoutMs,
+                maxBytes = MaxRuntimeTraceBytes,
+            ) { candidate ->
+                candidate.lineSequence().any { it.startsWith(RuntimeTraceActive) }
+            }
+            return text.lineSequence()
+                .filter { it.startsWith(RuntimeTracePrefix) }
+                .joinToString("\n")
+                .ifBlank { error("X3 returned no retained runtime trace") }
+        }
+
+        private fun requestTextCommand(
+            command: String,
+            timeoutMs: Long,
+            maxBytes: Int,
+            isComplete: (String) -> Boolean,
+        ): String {
+            drainInput()
+            writeAll("CMD:$command\n".toByteArray(Charsets.US_ASCII))
             val deadline = System.currentTimeMillis() + timeoutMs
             val bytes = ByteArrayOutputStream()
             val buffer = ByteArray(input.maxPacketSize.coerceAtLeast(64))
@@ -416,14 +455,12 @@ class UsbEspFlasher(context: Context) : Closeable {
                 val count = connection.bulkTransfer(input, buffer, buffer.size, 250)
                 if (count > 0) {
                     bytes.write(buffer, 0, count)
-                    require(bytes.size() <= MaxCrashReportBytes) { "X3 crash report is unexpectedly large" }
+                    require(bytes.size() <= maxBytes) { "X3 diagnostic response is unexpectedly large" }
                     val text = bytes.toByteArray().toString(Charsets.UTF_8)
-                    if (text.contains(CrashReportEnd)) {
-                        return text.substringAfter(CrashReportStart).substringBefore(CrashReportEnd).trim()
-                    }
+                    if (isComplete(text)) return text
                 }
             }
-            error("Timed out reading crash_report.txt from the X3")
+            error("Timed out reading X3 diagnostic command $command")
         }
 
         private fun command(
@@ -567,8 +604,11 @@ class UsbEspFlasher(context: Context) : Closeable {
             private const val SwdAutoFeedEnable = 1 shl 31
             private const val EraseTimeoutMs = 360_000
             private const val MaxCrashReportBytes = 64 * 1024
+            private const val MaxRuntimeTraceBytes = 4 * 1024
             private const val CrashReportStart = "CRASH_REPORT_START"
             private const val CrashReportEnd = "CRASH_REPORT_END"
+            private const val RuntimeTracePrefix = "RUNTIME_TRACE_"
+            private const val RuntimeTraceActive = "RUNTIME_TRACE_ACTIVE"
 
             fun open(manager: UsbManager, device: UsbDevice): RomConnection {
                 val control = (0 until device.interfaceCount)
