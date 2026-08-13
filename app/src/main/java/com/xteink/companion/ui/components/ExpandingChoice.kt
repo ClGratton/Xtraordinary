@@ -41,6 +41,10 @@ fun ExpandingChoiceRow(
     onSelect: (String) -> Unit,
     optionHeight: Dp,
     modifier: Modifier = Modifier,
+    selectedWeight: Float = 1.35f,
+    unselectedWeight: Float = 0.75f,
+    optionContentPadding: Dp = 14.dp,
+    optionContentSpacing: Dp = 6.dp,
     selectedContainer: Color = MaterialTheme.colorScheme.primaryContainer,
     selectedContent: Color = MaterialTheme.colorScheme.onPrimaryContainer,
     restingContainer: Color = MaterialTheme.colorScheme.surfaceContainer,
@@ -55,7 +59,7 @@ fun ExpandingChoiceRow(
         choices.forEach { choice ->
             val selected = choice.key == selectedKey
             val weight = animateFloatAsState(
-                targetValue = if (selected) 1.35f else 0.75f,
+                targetValue = if (selected) selectedWeight else unselectedWeight,
                 label = "${choice.key} option width",
             )
             ExpandingChoiceOption(
@@ -67,6 +71,8 @@ fun ExpandingChoiceRow(
                 selectedContent = selectedContent,
                 restingContainer = restingContainer,
                 restingContent = restingContent,
+                contentPadding = optionContentPadding,
+                contentSpacing = optionContentSpacing,
                 modifier = Modifier.weight(weight.value),
                 actionContent = actionContent,
             )
@@ -84,6 +90,8 @@ private fun ExpandingChoiceOption(
     selectedContent: Color,
     restingContainer: Color,
     restingContent: Color,
+    contentPadding: Dp,
+    contentSpacing: Dp,
     modifier: Modifier = Modifier,
     actionContent: @Composable ColumnScope.(String) -> Unit,
 ) {
@@ -100,8 +108,8 @@ private fun ExpandingChoiceOption(
         border = if (selected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(contentPadding),
+            verticalArrangement = Arrangement.spacedBy(contentSpacing),
         ) {
             Text(choice.title, style = MaterialTheme.typography.titleMedium, maxLines = 2)
             Text(

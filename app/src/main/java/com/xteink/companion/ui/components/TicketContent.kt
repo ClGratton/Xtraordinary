@@ -254,9 +254,9 @@ private fun PassControlCard(
 private fun UnifiedPassBody(pass: BoardingPassUiState, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
-            .heightIn(min = 390.dp)
-            .padding(horizontal = 12.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+            .heightIn(min = 360.dp)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -567,7 +567,11 @@ private fun PassModeChooser(
         ),
         selectedKey = mode.name,
         onSelect = { onSetMode(TicketMode.valueOf(it)) },
-        optionHeight = 170.dp,
+        optionHeight = 140.dp,
+        selectedWeight = 1.25f,
+        unselectedWeight = 0.90f,
+        optionContentPadding = 12.dp,
+        optionContentSpacing = 4.dp,
         modifier = modifier,
     ) { key ->
         Row(
