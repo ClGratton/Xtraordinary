@@ -150,6 +150,7 @@ Reader cleanup now has a dedicated `displayReaderCleanup()` path. It uses the X3
 - **Stop upload** cancels the active Android job and sends `AbortBookUpload` in a non-cancellable cleanup context. A disconnect, explicit abort, inactivity timeout, size mismatch, hash mismatch, or write failure removes the temporary file. A partial book is never exposed in the library.
 - The BLE path uses Android's existing document URI permission. It does not require Wi-Fi, `CHANGE_NETWORK_STATE`, or `WRITE_SETTINGS`.
 - Durable USB work drains through one shared availability boundary. It runs when the Pixel first observes the X3 USB device, when the app returns to the foreground with USB already attached, and when a new USB queue is committed. This does not open BLE or acquire an X3 interactive radio lease.
+- Firmware flashing and setup reset acquire the shared exclusive USB-maintenance scope. The scope cancels and awaits any active book transaction without clearing its durable queue, blocks automatic drains while ROM maintenance owns the interfaces, and releases ownership for a later USB-availability event. Maintenance and book transfer never claim the CDC interfaces concurrently.
 - USB transfer diagnostics use the `XteinkUsbBook` log tag and record detect/permission/open/begin/chunk/commit/abort, the first failing phase and byte offset, and successful elapsed throughput. The lifecycle trigger and diagnostic phases apply to all USB book queues rather than one title or screen.
 
 ## Static ticket

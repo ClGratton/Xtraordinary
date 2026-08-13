@@ -32,6 +32,7 @@ import com.xteink.companion.protocol.TicketDisplayMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -120,6 +121,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     private var radioPolicySyncJob: Job? = null
     private var readingQuietJob: Job? = null
     private var bookUploadJob: Job? = null
+    private var usbMaintenanceActive = false
     private var interactiveTransportRenewalJob: Job? = null
     private var lastDeletedReadingSession: ReadingSessionStat? = null
     private var radioPolicyRevision = 0L
@@ -767,7 +769,18 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 device = it.device.copy(reconnecting = false, message = "X3 is ready to restart"),
             )
         }
-        drainPendingUsbWork()
+    }
+
+    /** Gives firmware/reset maintenance exclusive USB ownership without discarding durable work. */
+    private suspend fun <T> withExclusiveUsbMaintenance(block: suspend () -> T): T {
+        usbMaintenanceActive = true
+        bookUploadJob?.cancelAndJoin()
+        return try {
+            prepareForExternalDeviceReset()
+            block()
+        } finally {
+            usbMaintenanceActive = false
+        }
     }
 
     fun onAppForegrounded() {
@@ -891,8 +904,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 val file = firmwareReleases.downloadVerified(release)
                 _uiState.update { it.copy(device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Transferring)) }
                 if (useUsb) {
-                    prepareForExternalDeviceReset()
-                    usbFlasher.flash(file)
+                    withExclusiveUsbMaintenance { usbFlasher.flash(file) }
                 } else {
                     companionClient.awaitConnected()
                     intentionalTransportIdle = true
@@ -951,8 +963,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         }
         viewModelScope.launch {
             val result = runCatching {
-                prepareForExternalDeviceReset()
-                usbFlasher.resetSetupData()
+                withExclusiveUsbMaintenance { usbFlasher.resetSetupData() }
             }
             if (result.isSuccess) {
                 _uiState.update {
@@ -1111,6 +1122,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
 
     /** Drains durable work whenever the shared USB-availability lifecycle permits it. */
     private fun drainPendingUsbWork() {
+        if (usbMaintenanceActive) return
         resumePendingBookUploadIfPossible()
     }
 

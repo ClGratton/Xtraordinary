@@ -451,6 +451,20 @@
       "path": "app/src/main/java/com/xteink/companion/ui/components/DeviceConnectionSheet.kt",
       "pattern": "onSelect = if \\(source == selectedSource\\)[\\s\\S]*?null[\\s\\S]*?else[\\s\\S]*?onSelectSource\\(source\\)",
       "message": "A selected firmware card must delegate taps to its nested install action instead of reopening source selection."
+    },
+    {
+      "id": "usb-maintenance-has-exclusive-ownership",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/CompanionViewModel.kt",
+      "pattern": "withExclusiveUsbMaintenance[\\s\\S]*?usbMaintenanceActive = true[\\s\\S]*?bookUploadJob\\?\\.cancelAndJoin\\(\\)[\\s\\S]*?prepareForExternalDeviceReset\\(\\)[\\s\\S]*?usbMaintenanceActive = false[\\s\\S]*?withExclusiveUsbMaintenance \\{ usbFlasher\\.flash\\(file\\) \\}[\\s\\S]*?withExclusiveUsbMaintenance \\{ usbFlasher\\.resetSetupData\\(\\) \\}",
+      "message": "Firmware and setup maintenance must exclusively own USB while preserving paused durable book work."
+    },
+    {
+      "id": "usb-drain-respects-maintenance-owner",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/CompanionViewModel.kt",
+      "pattern": "private fun drainPendingUsbWork\\(\\)[\\s\\S]*?if \\(usbMaintenanceActive\\) return[\\s\\S]*?resumePendingBookUploadIfPossible\\(\\)",
+      "message": "Automatic durable USB drains must not race an active maintenance owner."
     }
   ]
 }
