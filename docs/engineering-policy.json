@@ -481,19 +481,19 @@
       "message": "Restoring the durable phone library must retrigger the shared USB-work drain after an earlier attach event arrived too soon."
     },
     {
-      "id": "usb-cdc-ack-turnaround-is-centralized",
-      "type": "required_pattern",
-      "path": "app/src/main/java/com/xteink/companion/data/UsbBookTransfer.kt",
-      "pattern": "writeAll\\(line\\)[\\s\\S]*?awaitReply\\(envelope\\.messageId, timeoutMs\\)[\\s\\S]*?delay\\(UsbReplyTurnaroundGuardMs\\)[\\s\\S]*?UsbReplyTurnaroundGuardMs = 20L",
-      "message": "CDC request pacing must be centralized after ACK reception so no command emits the next host frame during ESP32-C3 endpoint turnaround."
-    },
-    {
       "id": "usb-command-ingress-is-bounded-and-nonblocking",
       "type": "required_pattern",
       "path": "firmware/src/main.cpp",
       "pattern": "static char serialCommandLine\\[USB_COMMAND_RX_BUFFER_BYTES \\+ 1\\][\\s\\S]*?while \\(logSerial\\.available\\(\\) > 0 && !serialCommandReady\\)[\\s\\S]*?serialCommandOverflow[\\s\\S]*?if \\(serialCommandReady\\)",
       "forbidden_pattern": "readStringUntil\\('\\\\n'\\)",
       "message": "USB serial commands must use one bounded non-blocking ingress accumulator rather than allocating and blocking once per long frame."
+    },
+    {
+      "id": "book-upload-owner-is-transport-scoped",
+      "type": "required_pattern",
+      "path": "firmware/src/companion/CompanionService.cpp",
+      "pattern": "beginBookUpload\\(envelope, BookUploadOwner::Usb\\)[\\s\\S]*?bookUploadOwner_ == BookUploadOwner::Ble\\) abortBookUpload\\(false\\)[\\s\\S]*?beginBookUpload\\(envelope, BookUploadOwner::Ble\\)[\\s\\S]*?owner == BookUploadOwner::Ble\\) requestFastConnection\\(\\)[\\s\\S]*?bookUploadOwner_ != owner",
+      "message": "Book transactions must be owned by their transport so a bounded BLE release cannot abort USB work or make USB request BLE-fast mode."
     }
   ]
 }

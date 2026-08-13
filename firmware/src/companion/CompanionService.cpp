@@ -497,13 +497,13 @@ bool CompanionService::handleUsbBookPacket(const uint8_t* bytes, size_t length, 
       // A prior USB host may have vanished without a transport callback. A new
       // explicit Begin owns the temporary path and safely restarts from zero.
       if (bookUploadActive_) abortBookUpload(false);
-      return beginBookUpload(envelope);
+      return beginBookUpload(envelope, BookUploadOwner::Usb);
     case MessageType::BOOK_UPLOAD_CHUNK:
-      return writeBookUploadChunk(envelope);
+      return writeBookUploadChunk(envelope, BookUploadOwner::Usb);
     case MessageType::COMMIT_BOOK_UPLOAD:
-      return envelope.payloadLength == 0 && commitBookUpload();
+      return envelope.payloadLength == 0 && commitBookUpload(BookUploadOwner::Usb);
     case MessageType::ABORT_BOOK_UPLOAD:
-      if (envelope.payloadLength != 0 || !bookUploadActive_) return false;
+      if (envelope.payloadLength != 0 || !bookUploadActive_ || bookUploadOwner_ != BookUploadOwner::Usb) return false;
       abortBookUpload();
       return true;
     default:
@@ -530,7 +530,7 @@ void CompanionService::onClientConnected(uint16_t connectionHandle) {
 }
 
 void CompanionService::onClientDisconnected() {
-  if (bookUploadActive_) abortBookUpload(false);
+  if (bookUploadActive_ && bookUploadOwner_ == BookUploadOwner::Ble) abortBookUpload(false);
   if (ticketBarcodeUploadActive_ || ticketBarcodeCommitted_) abortTicketBarcode();
   // Interactive mode belongs to one GATT session. Never let a long lease from
   // a departed app keep the next idle connection at full cadence.
@@ -695,16 +695,16 @@ void CompanionService::handlePacket(const uint8_t* bytes, size_t length) {
       }
       break;
     case MessageType::BEGIN_BOOK_UPLOAD:
-      ok = beginBookUpload(envelope);
+      ok = beginBookUpload(envelope, BookUploadOwner::Ble);
       break;
     case MessageType::BOOK_UPLOAD_CHUNK:
-      ok = writeBookUploadChunk(envelope);
+      ok = writeBookUploadChunk(envelope, BookUploadOwner::Ble);
       break;
     case MessageType::COMMIT_BOOK_UPLOAD:
-      ok = envelope.payloadLength == 0 && commitBookUpload();
+      ok = envelope.payloadLength == 0 && commitBookUpload(BookUploadOwner::Ble);
       break;
     case MessageType::ABORT_BOOK_UPLOAD:
-      ok = envelope.payloadLength == 0 && bookUploadActive_;
+      ok = envelope.payloadLength == 0 && bookUploadActive_ && bookUploadOwner_ == BookUploadOwner::Ble;
       if (ok) abortBookUpload();
       break;
     case MessageType::BEGIN_FIRMWARE:
@@ -1355,7 +1355,7 @@ bool CompanionService::deleteLibraryEntries(const EnvelopeView& envelope) {
   return cursor == envelope.payloadLength && scanLibrary();
 }
 
-bool CompanionService::beginBookUpload(const EnvelopeView& envelope) {
+bool CompanionService::beginBookUpload(const EnvelopeView& envelope, BookUploadOwner owner) {
   if (reading_ || bookUploadActive_ || !Storage.ready() || envelope.payloadLength < 2 + 8 + 32) return false;
   const uint16_t nameLength = readU16(envelope.payload);
   if (nameLength == 0 || nameLength > 160 || envelope.payloadLength != 2u + nameLength + 8u + 32u) return false;
@@ -1384,14 +1384,15 @@ bool CompanionService::beginBookUpload(const EnvelopeView& envelope) {
 
   bookUploadReceived_ = 0;
   bookUploadActive_ = true;
+  bookUploadOwner_ = owner;
   bookUploadLastActivityMs_ = millis();
-  requestFastConnection();
+  if (owner == BookUploadOwner::Ble) requestFastConnection();
   LOG_INF("CMP", "Book upload started path=%s bytes=%llu", bookUploadFinalPath_, bookUploadExpectedSize_);
   return true;
 }
 
-bool CompanionService::writeBookUploadChunk(const EnvelopeView& envelope) {
-  if (!bookUploadActive_ || !bookUploadFile_ || envelope.payloadLength < 5) return false;
+bool CompanionService::writeBookUploadChunk(const EnvelopeView& envelope, BookUploadOwner owner) {
+  if (!bookUploadActive_ || bookUploadOwner_ != owner || !bookUploadFile_ || envelope.payloadLength < 5) return false;
   const uint32_t offset = readU32(envelope.payload);
   const size_t count = envelope.payloadLength - 4;
   if (offset != bookUploadReceived_ || bookUploadReceived_ + count > bookUploadExpectedSize_) return false;
@@ -1401,8 +1402,9 @@ bool CompanionService::writeBookUploadChunk(const EnvelopeView& envelope) {
   return true;
 }
 
-bool CompanionService::commitBookUpload() {
-  if (!bookUploadActive_ || !bookUploadFile_ || bookUploadReceived_ != bookUploadExpectedSize_) return false;
+bool CompanionService::commitBookUpload(BookUploadOwner owner) {
+  if (!bookUploadActive_ || bookUploadOwner_ != owner || !bookUploadFile_ ||
+      bookUploadReceived_ != bookUploadExpectedSize_) return false;
   bookUploadFile_.flush();
   if (!bookUploadFile_.close()) {
     abortBookUpload();
@@ -1433,9 +1435,11 @@ bool CompanionService::commitBookUpload() {
   }
 
   LOG_INF("CMP", "Book upload committed path=%s", bookUploadFinalPath_);
+  const bool restoreSlowConnection = bookUploadOwner_ == BookUploadOwner::Ble;
   bookUploadActive_ = false;
+  bookUploadOwner_ = BookUploadOwner::None;
   bookUploadFinalPath_[0] = '\0';
-  scheduleSlowConnection();
+  if (restoreSlowConnection) scheduleSlowConnection();
   return scanLibrary();
 }
 
@@ -1443,11 +1447,13 @@ void CompanionService::abortBookUpload(bool restoreSlowConnection) {
   if (bookUploadFile_) bookUploadFile_.close();
   Storage.remove(BOOK_UPLOAD_TEMP_PATH);
   bookUploadActive_ = false;
+  const bool restoreOwnedBleConnection = bookUploadOwner_ == BookUploadOwner::Ble;
+  bookUploadOwner_ = BookUploadOwner::None;
   bookUploadReceived_ = 0;
   bookUploadExpectedSize_ = 0;
   bookUploadLastActivityMs_ = 0;
   bookUploadFinalPath_[0] = '\0';
-  if (restoreSlowConnection) {
+  if (restoreSlowConnection && restoreOwnedBleConnection) {
     scheduleSlowConnection();
   }
 }

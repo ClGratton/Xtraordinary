@@ -84,6 +84,8 @@ class CompanionService {
   uint8_t bookUploadExpectedSha_[32] = {};
   char bookUploadFinalPath_[181] = {};
   bool bookUploadActive_ = false;
+  enum class BookUploadOwner : uint8_t { None, Ble, Usb };
+  BookUploadOwner bookUploadOwner_ = BookUploadOwner::None;
   uint32_t bookUploadLastActivityMs_ = 0;
   bool applyPending_ = false;
   uint32_t applyAtMs_ = 0;
@@ -159,9 +161,9 @@ class CompanionService {
   bool beginFirmware(const EnvelopeView& envelope);
   bool writeFirmwareChunk(const EnvelopeView& envelope);
   bool commitFirmware();
-  bool beginBookUpload(const EnvelopeView& envelope);
-  bool writeBookUploadChunk(const EnvelopeView& envelope);
-  bool commitBookUpload();
+  bool beginBookUpload(const EnvelopeView& envelope, BookUploadOwner owner);
+  bool writeBookUploadChunk(const EnvelopeView& envelope, BookUploadOwner owner);
+  bool commitBookUpload(BookUploadOwner owner);
   void abortBookUpload(bool restoreSlowConnection = true);
   bool deleteLibraryEntries(const EnvelopeView& envelope);
   bool notify(MessageType type, const uint8_t* payload, size_t payloadLength);
