@@ -437,6 +437,13 @@
       "path": "app/src/main/java/com/xteink/companion/data/UsbBookTransfer.kt",
       "pattern": "begin ack[\\s\\S]*?progress file=[\\s\\S]*?commit ack[\\s\\S]*?failed phase=[\\s\\S]*?LogTag = \"XteinkUsbBook\"",
       "message": "USB book transfer must retain phase, offset, and throughput diagnostics for physical failures."
+    },
+    {
+      "id": "usb-command-rx-fits-max-envelope",
+      "type": "required_pattern",
+      "path": "firmware/src/main.cpp",
+      "pattern": "USB_COMMAND_RX_BUFFER_BYTES = companion::MAX_PACKET_BYTES \\* 2 \\+ 64[\\s\\S]*?setRxBufferSize\\(USB_COMMAND_RX_BUFFER_BYTES\\)[\\s\\S]*?usbCommandRxBufferBytes != USB_COMMAND_RX_BUFFER_BYTES",
+      "message": "The X3 CDC RX queue must hold a full hex-expanded companion envelope and report allocation failure."
     }
   ]
 }

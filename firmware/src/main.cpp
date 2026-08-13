@@ -37,6 +37,10 @@
 #include "util/ScreenshotUtil.h"
 #ifdef ENABLE_X3_COMPANION
 #include "companion/CompanionService.h"
+
+// USB commands hex-encode one complete companion envelope. Reserve enough CDC
+// RX capacity for the largest protocol packet plus its prefix and terminator.
+constexpr size_t USB_COMMAND_RX_BUFFER_BYTES = companion::MAX_PACKET_BYTES * 2 + 64;
 #endif
 
 GfxRenderer renderer(display);
@@ -383,8 +387,17 @@ void setup() {
   // and the host has to be physically replugged for logs to flow. Warm reboot
   // worked without the delay because USB was already enumerated.
   delay(250);
+#ifdef ENABLE_X3_COMPANION
+  const size_t usbCommandRxBufferBytes = logSerial.setRxBufferSize(USB_COMMAND_RX_BUFFER_BYTES);
+#endif
   Serial.begin(115200);
   logSerial.setTxTimeoutMs(1);  // This is a load-bearing 1. Do not modify.
+#ifdef ENABLE_X3_COMPANION
+  if (usbCommandRxBufferBytes != USB_COMMAND_RX_BUFFER_BYTES) {
+    LOG_ERR("USB", "Could not allocate command RX buffer requested=%u actual=%u",
+            static_cast<unsigned>(USB_COMMAND_RX_BUFFER_BYTES), static_cast<unsigned>(usbCommandRxBufferBytes));
+  }
+#endif
 #endif
 
   runtime_trace::begin();
