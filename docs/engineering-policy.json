@@ -472,6 +472,13 @@
       "path": "app/src/main/java/com/xteink/companion/data/UsbBookTransfer.kt",
       "pattern": "ByteArray\\(UsbBookChunkBytes\\)[\\s\\S]*?UsbBookChunkBytes = 240",
       "message": "Hex-over-CDC book chunks must retain sustained-frame headroom instead of reusing the BLE maximum."
+    },
+    {
+      "id": "book-library-readiness-drains-pending-usb",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/CompanionViewModel.kt",
+      "pattern": "fun restoreBooks\\(books: List<ImportedBookUiState>\\)[\\s\\S]*?books = books\\.sortedByDescending[\\s\\S]*?drainPendingUsbWork\\(\\)",
+      "message": "Restoring the durable phone library must retrigger the shared USB-work drain after an earlier attach event arrived too soon."
     }
   ]
 }

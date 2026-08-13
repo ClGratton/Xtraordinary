@@ -690,6 +690,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 ),
             )
         }
+        drainPendingUsbWork()
     }
 
     fun setReadQuery(query: String) {
