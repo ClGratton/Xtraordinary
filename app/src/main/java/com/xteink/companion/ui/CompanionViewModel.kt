@@ -146,7 +146,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     private var reconnectAttempt = 0
     private var pendingFocusSync = initialFocus.pendingAction != null ||
         initialFocus.phase == FocusPhase.Running || initialFocus.phase == FocusPhase.Paused
-    private var liveTicketActive = initialTicketOnX3 && initialTicketMode == TicketMode.Live
+    private var liveTicketActive = initialTicketOnX3 && initialTicketModes.deployed == TicketMode.Live
     private var pendingTicketPayload: BoardingPassPayload? = initialPendingTicketPayload
     private var pendingTicketPassId: String? = ticketPreferences.getString("pending_show_pass_id", null)
     private val pendingDeletePaths = connectionPreferences

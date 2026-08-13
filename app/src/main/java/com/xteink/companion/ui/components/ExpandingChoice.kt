@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -26,9 +27,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -105,14 +103,14 @@ private fun ExpandingChoiceOption(
 ) {
     val haptics = LocalHapticFeedback.current
     Surface(
-        onClick = {
+        modifier = modifier.height(optionHeight).selectable(
+            selected = selected,
+            role = androidx.compose.ui.semantics.Role.RadioButton,
+            onClick = {
             if (!selected) haptics.performHapticFeedback(HapticFeedbackType.ToggleOn)
             onSelect()
-        },
-        modifier = modifier.height(optionHeight).semantics {
-            role = Role.RadioButton
-            this.selected = selected
-        },
+            },
+        ),
         color = if (selected) selectedContainer else restingContainer,
         contentColor = if (selected) selectedContent else restingContent,
         shape = shape,

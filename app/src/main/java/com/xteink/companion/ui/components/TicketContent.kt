@@ -26,6 +26,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -66,8 +67,6 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -725,9 +724,16 @@ private fun PassModeChooser(
 @Composable
 private fun ModeSegment(mode: TicketMode, selectedMode: TicketMode, onSetMode: (TicketMode) -> Unit, modifier: Modifier) {
     val selected = mode == selectedMode
+    val haptics = LocalHapticFeedback.current
     Surface(
-        onClick = { onSetMode(mode) },
-        modifier = modifier.fillMaxHeight().semantics { role = Role.RadioButton; this.selected = selected },
+        modifier = modifier.fillMaxHeight().selectable(
+            selected = selected,
+            role = androidx.compose.ui.semantics.Role.RadioButton,
+            onClick = {
+                if (!selected) haptics.performHapticFeedback(HapticFeedbackType.ToggleOn)
+                onSetMode(mode)
+            },
+        ),
         color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
         contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
         shape = MaterialTheme.shapes.medium,
