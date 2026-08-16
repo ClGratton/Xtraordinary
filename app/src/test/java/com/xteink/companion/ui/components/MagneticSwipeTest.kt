@@ -60,4 +60,10 @@ class MagneticSwipeTest {
         assertEquals(MagneticThresholdTransition.Entered, opposite?.transition)
         assertEquals(-1f, opposite?.direction ?: 0f, 0.0001f)
     }
+
+    @Test
+    fun settleHapticOnlyFiresAfterAnActualPageChange() {
+        assertTrue(shouldEmitPagerSettleHaptic(startPage = 0, settledPage = 1))
+        assertEquals(false, shouldEmitPagerSettleHaptic(startPage = 1, settledPage = 1))
+    }
 }

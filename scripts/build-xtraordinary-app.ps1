@@ -9,7 +9,8 @@ param(
         ':app:validatePlayDebugScreenshotTest',
         ':app:lintPlayDebug',
         ':app:assemblePlayDebug'
-    )
+    ),
+    [switch]$UiEvidenceCandidate
 )
 
 $ErrorActionPreference = 'Stop'
@@ -32,8 +33,24 @@ if (-not (Test-Path -LiteralPath $sourceCheck)) {
     throw "Pushed-source gate was not found at $sourceCheck"
 }
 
+if ($UiEvidenceCandidate) {
+    $allowedEvidenceTasks = @(
+        ':app:updateCommunityDebugScreenshotTest',
+        ':app:updatePlayDebugScreenshotTest'
+    )
+    foreach ($task in $Tasks) {
+        if ($allowedEvidenceTasks -notcontains $task) {
+            throw "UiEvidenceCandidate may only update deterministic Community/Play screenshot evidence."
+        }
+    }
+}
+
 & $sourceCheck
-& $policyCheck
+if ($UiEvidenceCandidate) {
+    & $policyCheck -Mode UiEvidenceCandidate
+} else {
+    & $policyCheck -Mode Release
+}
 if (-not $?) {
     throw "Engineering policy gate failed"
 }

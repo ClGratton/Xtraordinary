@@ -51,6 +51,7 @@ fun ExpandingChoiceRow(
     onSelect: (String) -> Unit,
     optionHeight: Dp,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     selectedWeight: Float = 1.35f,
     unselectedWeight: Float = 0.75f,
     optionContentPadding: Dp = 14.dp,
@@ -88,6 +89,7 @@ fun ExpandingChoiceRow(
                 choice = choice,
                 selected = selected,
                 onSelect = { onSelect(choice.key) },
+                enabled = enabled,
                 optionHeight = optionHeight,
                 selectedContainer = selectedContainer,
                 selectedContent = selectedContent,
@@ -108,6 +110,7 @@ private fun ExpandingChoiceOption(
     choice: ExpandingChoice,
     selected: Boolean,
     onSelect: () -> Unit,
+    enabled: Boolean,
     optionHeight: Dp,
     selectedContainer: Color,
     selectedContent: Color,
@@ -138,6 +141,7 @@ private fun ExpandingChoiceOption(
     Surface(
         modifier = modifier.height(optionHeight).selectable(
             selected = selected,
+            enabled = enabled,
             role = androidx.compose.ui.semantics.Role.RadioButton,
             onClick = {
                 if (!selected) haptics.performHapticFeedback(HapticFeedbackType.ToggleOn)

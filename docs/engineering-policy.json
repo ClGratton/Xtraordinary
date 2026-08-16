@@ -606,6 +606,33 @@
       "path": "scripts/build-xtraordinary-app.ps1",
       "pattern": "testCommunityDebugUnitTest[\\s\\S]*?assembleCommunityDebug[\\s\\S]*?testPlayDebugUnitTest[\\s\\S]*?assemblePlayDebug",
       "message": "The canonical Android wrapper must test and assemble both community and Play distributions."
+    },
+    {
+      "id": "ui-changes-require-stable-terra-reviews",
+      "type": "ui_review_attestations",
+      "path": "docs/ui-review-policy.json",
+      "message": "Registered UI surfaces require distinct, passing, source-bound Terra specialist receipts."
+    },
+    {
+      "id": "ui-review-workflow-is-agent-independent",
+      "type": "required_pattern",
+      "path": "AGENTS.md",
+      "pattern": "separate read-only Terra specialist roles[\\s\\S]*?reviewed source hashes[\\s\\S]*?reject missing, reused, or stale receipts",
+      "message": "The repository must require permanent source-bound specialist reviews instead of chat memory."
+    },
+    {
+      "id": "passes-front-omits-import-provenance",
+      "type": "forbidden_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/components/TicketContent.kt",
+      "pattern": "pass\\.source",
+      "message": "The operational pass face must not expose non-actionable import provenance."
+    },
+    {
+      "id": "ui-evidence-candidate-is-bounded",
+      "type": "required_pattern",
+      "path": "scripts/build-xtraordinary-app.ps1",
+      "pattern": "UiEvidenceCandidate[\\s\\S]*?updateCommunityDebugScreenshotTest[\\s\\S]*?updatePlayDebugScreenshotTest[\\s\\S]*?may only update deterministic",
+      "message": "Unreviewed UI candidates may only compile deterministic screenshot evidence through the pushed-source wrapper."
     }
   ]
 }

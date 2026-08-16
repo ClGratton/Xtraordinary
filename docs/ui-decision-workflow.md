@@ -65,6 +65,8 @@ Every interactive surface must deliberately handle the applicable states:
 
 ### 9. Verify and record evidence
 
+- Run the separate stable Terra reviewer prompts required by `docs/ui-specialist-review-contract.md`; do not let the implementation owner self-certify UX, hierarchy, layout, typography, color, shape, motion, or accessibility.
+- Bind each passing receipt to the exact reviewed source hashes. Any later source change expires the receipt and requires the affected reviews again.
 - Run the engineering policy gate and canonical Android build.
 - Generate the screenshot references named in `docs/ui-surface-evidence.json` and inspect the changed images, not just the task result.
 - The canonical build must run screenshot validation against the reviewed references. Updating a reference is a separate, deliberate review action and must never happen inside the normal validation build.
@@ -102,4 +104,6 @@ A UI change is complete only when:
 - `docs/ui-audit-2026-08-11.md`: dated evidence and prioritized findings.
 - `docs/passes-design-ux-contract.md`: mandatory reconciled UX and visual contract for Android Passes and the X3 ticket renderer.
 - `docs/ui-surface-evidence.json`: machine-checked render coverage contract.
+- `docs/ui-specialist-review-contract.md`: permanent reviewer roles, receipt workflow, and bounded-delegation rules.
+- `docs/ui-review-policy.json`: machine-checked role, source, and evidence contract.
 - `docs/engineering-policy.json`: build-blocking repository rules.

@@ -218,11 +218,19 @@ private fun PagerResistanceFeedback(
                 }
             }
             snapshotFlow { pagerState.isScrollInProgress }.first { scrolling -> !scrolling }
+            if (shouldEmitPagerSettleHaptic(dragStartPage, pagerState.settledPage)) {
+                if (!vibrator.playPrimitive(context, VibrationEffect.Composition.PRIMITIVE_LOW_TICK, 0.34f)) {
+                    fallback.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
+                }
+            }
             dragSessionActive = false
             onCenterSettled(releaseDirection)
         }
     }
 }
+
+internal fun shouldEmitPagerSettleHaptic(startPage: Int, settledPage: Int): Boolean =
+    startPage != settledPage
 
 @Suppress("DEPRECATION")
 internal fun Context.touchVibrator(): Vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

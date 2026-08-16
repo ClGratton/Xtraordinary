@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "agentType": "terra_medium",
+  "contract": "docs/ui-specialist-review-contract.md",
+  "roles": [
+    {
+      "id": "ux-flow",
+      "prompt": "docs/ui-reviewers/ux-flow.md",
+      "requiredChecks": [
+        "immutable-pending-operation-truth",
+        "no-conflicting-ticket-operations",
+        "operational-copy-earns-space"
+      ]
+    },
+    {
+      "id": "hierarchy",
+      "prompt": "docs/ui-reviewers/hierarchy.md",
+      "requiredChecks": [
+        "front-hierarchy-order",
+        "contained-expanding-action",
+        "provenance-not-front-primary"
+      ]
+    },
+    {
+      "id": "layout-spacing-margins",
+      "prompt": "docs/ui-reviewers/layout-spacing-margins.md",
+      "requiredChecks": [
+        "carousel-peek-equals-route-rail",
+        "front-back-bounds-match",
+        "adaptive-bounds-do-not-overlap"
+      ]
+    },
+    {
+      "id": "typography",
+      "prompt": "docs/ui-reviewers/typography.md",
+      "requiredChecks": [
+        "header-reflows-before-overlap",
+        "operational-facts-reflow-before-truncation",
+        "required-large-text-fixtures"
+      ]
+    },
+    {
+      "id": "color-contrast",
+      "prompt": "docs/ui-reviewers/color-contrast.md",
+      "requiredChecks": [
+        "primary-reserved-for-transaction",
+        "quiet-remains-grayscale",
+        "role-pair-contrast"
+      ]
+    },
+    {
+      "id": "shape-affordance",
+      "prompt": "docs/ui-reviewers/shape-affordance.md",
+      "requiredChecks": [
+        "selected-action-contained",
+        "action-shape-and-target",
+        "resting-option-remains-selectable"
+      ]
+    },
+    {
+      "id": "motion-interaction",
+      "prompt": "docs/ui-reviewers/motion-interaction.md",
+      "requiredChecks": [
+        "page-and-turn-gesture-ownership",
+        "chooser-bounds-stable-through-morph",
+        "reduced-motion-final-state"
+      ]
+    },
+    {
+      "id": "accessibility-adaptive",
+      "prompt": "docs/ui-reviewers/accessibility-adaptive.md",
+      "requiredChecks": [
+        "single-selected-radio-and-owned-action",
+        "no-duplicate-route-or-provenance-announcement",
+        "all-controls-reachable-at-required-scales"
+      ]
+    }
+  ],
+  "conditionalRoles": [
+    {
+      "id": "eink-scanner",
+      "prompt": "docs/ui-reviewers/eink-scanner.md",
+      "appliesTo": "x3-display"
+    }
+  ],
+  "surfaces": [
+    {
+      "id": "passes",
+      "sourceFiles": [
+        "app/src/main/java/com/xteink/companion/ui/components/TicketContent.kt",
+        "app/src/main/java/com/xteink/companion/ui/components/ExpandingChoice.kt",
+        "app/src/main/java/com/xteink/companion/ui/components/MagneticPager.kt",
+        "app/src/main/java/com/xteink/companion/ui/components/PassCardLayoutPolicy.kt",
+        "app/src/main/java/com/xteink/companion/ui/components/PassModeLayoutPolicy.kt",
+        "app/src/main/java/com/xteink/companion/ui/components/TicketMetadataPresentation.kt",
+        "app/src/main/java/com/xteink/companion/ui/CompanionUiState.kt",
+        "app/src/main/java/com/xteink/companion/ui/TicketOperationPolicy.kt",
+        "app/src/main/java/com/xteink/companion/ui/CompanionViewModel.kt"
+      ],
+      "requiredRoles": [
+        "ux-flow",
+        "hierarchy",
+        "layout-spacing-margins",
+        "typography",
+        "color-contrast",
+        "shape-affordance",
+        "motion-interaction",
+        "accessibility-adaptive"
+      ],
+      "record": "docs/ui-review-records/passes-current.json"
+    }
+  ]
+}

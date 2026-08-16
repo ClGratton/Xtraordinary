@@ -36,7 +36,8 @@ Never center the title between Back and Import. Never let connection chrome, cou
 
 - Primary: origin to destination.
 - Secondary: status and signed delay; departure and arrival; gate, terminal, and seat.
-- Tertiary: flight number, passenger/group, source/freshness, and explicit `Show code` action.
+- Tertiary: flight number, passenger/group, actionable live freshness, and explicit `Show code` action.
+- Import provenance such as `Imported from Google Wallet`, photo extraction, or pass-file origin stays in import history/details. It does not occupy or announce itself from the operational face unless it changes trust, freshness, or recovery.
 - The front contains no barcode semantics.
 - A sample always says `Sample - not valid for boarding` visually and semantically.
 
@@ -73,7 +74,7 @@ The chooser's quality comes from physical continuity and unequal emphasis: the s
 - Static: `Keeps this confirmed pass visible after X3 sleeps. No flight refresh.`
 - Live: `Checks for flight changes periodically. X3 may sleep between check-ins.`
 
-Do not use `Live pane`. Source and freshness are visible when available. Live with stale or unavailable provider data says so and preserves last confirmed X3 truth.
+Do not use `Live pane`. Live provider and freshness are visible only when they establish current, stale, or unavailable operational data. Live with stale or unavailable provider data says so and preserves last confirmed X3 truth.
 
 Removal names the deployed pass and confirms that the phone copy remains. Pending removal continues to render old acknowledged truth until the matching clear acknowledgement.
 
@@ -173,7 +174,7 @@ X3 dynamic strings use purpose-named font roles and width-bounded helpers. Layou
 - desired next-send mode cannot relabel acknowledged mode;
 - opening, turning, or paging Passes does not own an interactive lease;
 - every pending/failure state names operation, pass, and current device truth;
-- sample, source, freshness, and stale Live semantics are exposed;
+- sample, actionable freshness, and stale Live semantics are exposed; import provenance is absent from the operational face and its semantics;
 - pager has position plus Previous/Next accessibility actions;
 - Static/Live is a selectable group with exactly one selected option;
 - operation controls are at least 48 dp and status is a polite live region.

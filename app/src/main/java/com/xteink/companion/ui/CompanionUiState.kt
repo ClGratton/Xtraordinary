@@ -50,6 +50,11 @@ enum class TicketMode {
     Live,
 }
 
+data class PendingTicketOperation(
+    val passId: String,
+    val mode: TicketMode,
+)
+
 data class FocusUiState(
     val task: String = "Deep work",
     val selectedMinutes: Int = 25,
@@ -140,6 +145,8 @@ data class TicketUiState(
     val selectedPassId: String = SamplePasses.first().id,
     val isOnX3: Boolean = false,
     val sendPending: Boolean = false,
+    /** Immutable identity of the payload currently queued or being sent. */
+    val pendingOperation: PendingTicketOperation? = null,
     val removalPending: Boolean = false,
     val deployedPassId: String? = null,
     /** Last mode confirmed by the X3, never the user's next-send selection. */
