@@ -412,6 +412,20 @@
       "message": "Passes work must retain the reconciled UX, visual-system, X3, and evidence contract."
     },
     {
+      "id": "passes-mode-action-remains-contained-and-expanding",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/components/TicketContent.kt",
+      "pattern": "ExpandingChoiceRow\\([\\s\\S]*?selectedWeight\\s*=[\\s\\S]*?unselectedWeight\\s*=[\\s\\S]*?\\)\\s*\\{\\s*key\\s*->[\\s\\S]*?Button\\(",
+      "message": "The selected Static/Live surface must expand and own its action instead of using detached equal chips and an external send row."
+    },
+    {
+      "id": "passes-does-not-regress-to-detached-mode-segments",
+      "type": "forbidden_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/components/TicketContent.kt",
+      "pattern": "ModeSegment\\(",
+      "message": "Passes must not flatten Static/Live into detached equal-width mode segments."
+    },
+    {
       "id": "ui-surfaces-have-render-evidence",
       "type": "ui_surface_evidence",
       "path": "docs/ui-surface-evidence.json",

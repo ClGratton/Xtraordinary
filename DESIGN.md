@@ -107,6 +107,7 @@ Opening a tool is nested navigation. Android Back and `Back to Tools` return to 
 - The front prioritizes route, signed delay/status, departure/arrival, and gate/terminal/seat. Flight, passenger/group, source/freshness, and the turn action are supporting information.
 - The back prioritizes one scanner-safe code with only a thin route/flight identity line and the turn action.
 - Static and Live are presentation/power choices for the next send, not navigation destinations and not the acknowledged X3 state.
+- Static and Live use the product's expressive stateful-control grammar: the selected surface widens and grows its Send/Remove action from within, while the other surface remains visible and selectable. Do not detach the action into a generic full-width row or flatten the choices into equal chips; proportion, color, spring motion, and haptics together explain what changed.
 - Selected pass, desired next-send mode, pending intent, and acknowledged X3 pass/mode remain distinct. Applied UI requires the matching device acknowledgement or fresh authoritative reconciliation.
 - Opening or paging Passes does not retain an interactive Bluetooth lease. Bounded send, remove, and refresh work uses the generic scoped lease.
 - Sample codes are visibly marked and intentionally non-scannable.

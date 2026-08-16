@@ -370,7 +370,7 @@ private fun ManagedDeviceState(
             ) {
                 Text(stringResource(R.string.fix_bluetooth))
             }
-        } else device.message?.takeIf { it.isNotBlank() }?.let { message ->
+        } else managedDeviceStatusMessage(presence, device.message)?.let { message ->
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyMedium,
@@ -394,6 +394,10 @@ private fun ManagedDeviceState(
         }
     }
 }
+
+/** A passive discovery miss is already represented by Available for a managed X3. */
+internal fun managedDeviceStatusMessage(presence: DevicePresence, message: String?): String? =
+    message?.takeIf { it.isNotBlank() && presence != DevicePresence.Available }
 
 @Composable
 private fun EmptyDevicesState(onConnect: () -> Unit) {

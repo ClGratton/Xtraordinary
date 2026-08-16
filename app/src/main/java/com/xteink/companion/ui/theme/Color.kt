@@ -2,9 +2,10 @@ package com.xteink.companion.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Dark enough for ordinary on-primary text at AA contrast, not just large type.
-internal val ExpressivePrimary = Color(0xFFB3261E)
-internal val ExpressiveOnPrimary = Color(0xFFFFFFFF)
+// Keep the original energetic coral; the near-black pair reaches AA without
+// muting every primary control across the app.
+internal val ExpressivePrimary = Color(0xFFF0443F)
+internal val ExpressiveOnPrimary = Color(0xFF211917)
 internal val ExpressivePrimaryContainer = Color(0xFFFFD2CA)
 internal val ExpressiveOnPrimaryContainer = Color(0xFF3C0904)
 internal val ExpressiveSecondary = Color(0xFF9A3F34)

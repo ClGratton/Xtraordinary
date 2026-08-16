@@ -66,7 +66,9 @@ Deployment status names the affected pass and acknowledged mode. Required state 
 
 If selected ID differs from acknowledged deployed ID, the selected card is never labelled `On X3` and an unqualified remove action is never shown.
 
-Static and Live are one labelled selectable group. The selected value is `Mode for next send`; changing it cannot relabel acknowledged X3 mode. Both options retain the same base silhouette and zero elevation. Only the selected option owns the stable send/remove action.
+Static and Live are one selectable group. Its semantic label is `Mode for next send`; changing it cannot relabel acknowledged X3 mode. Both options retain the same base material and zero elevation. Only the selected option owns the send/remove action.
+
+The chooser's quality comes from physical continuity and unequal emphasis: the selected option expands horizontally, its color and outline transform, and its action grows from inside the same surface; the resting option contracts but remains legible and selectable. This single authored motion explains selection, power consequence, and action ownership without another instruction block. It must not be flattened into detached equal-width chips plus a separate action row. The enclosing chooser keeps stable bounds while selection changes, haptics confirm the threshold, and reduced-motion settings remain authoritative.
 
 - Static: `Keeps this confirmed pass visible after X3 sleeps. No flight refresh.`
 - Live: `Checks for flight changes periodically. X3 may sleep between check-ins.`
@@ -110,7 +112,7 @@ Use complete reviewed Material role pairs. A static theme must not inherit an un
 Use the checked-in shape family by role:
 
 - physical pass: `shapes.large`, low elevation, no outline;
-- Static/Live choices: `shapes.medium`, zero elevation;
+- Static/Live choices: `shapes.large`, zero elevation; selection changes proportion and color rather than replacing the silhouette;
 - scanner chamber: `shapes.small`, one hard border;
 - actions and badges: `CircleShape`.
 
@@ -130,6 +132,8 @@ Use a four-dp quantum and purpose-named tokens. The default vocabulary is 4, 8, 
 - Static/Live selection and pending/action transforms do not move the enclosing row.
 
 Normal-scale header, card, deployment status, and mode/action fit the first content viewport at 412 by 915 and 360 by 800. At larger text scales scrolling is allowed; clipping and overlap are not.
+
+At normal text scale the pass height is viewport-responsive within reviewed minimum and maximum bounds: compact screens keep the minimum, while taller phones give the pass the otherwise unused vertical space. Font-scale expansion remains a separate policy so accessibility growth is never inferred from screen height.
 
 ## X3 ticket contract
 

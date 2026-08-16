@@ -9,6 +9,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -25,8 +26,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -110,13 +109,18 @@ fun PassesToolContent(
         ticket.passes.getOrNull(pagerState.settledPage)?.let { onSelectPass(it.id) }
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(top = 2.dp, bottom = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val passCardHeight = PassCardLayoutPolicy.heightFor(
+            fontScale = LocalDensity.current.fontScale,
+            viewportHeight = maxHeight,
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(top = 2.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -165,6 +169,7 @@ fun PassesToolContent(
                 pass = ticket.passes[page],
                 containerColor = containerColor,
                 contentColor = contentColor,
+                cardHeight = passCardHeight,
             )
         }
         DeploymentStatus(ticket = ticket, modifier = Modifier.padding(horizontal = 16.dp))
@@ -181,6 +186,7 @@ fun PassesToolContent(
             removalPending = ticket.removalPending,
             modifier = Modifier.padding(horizontal = 16.dp),
         )
+    }
     }
 
     if (importChoiceVisible) {
@@ -253,10 +259,10 @@ private fun PassControlCard(
     pass: BoardingPassUiState,
     containerColor: Color,
     contentColor: Color,
+    cardHeight: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
 ) {
     var requestedCodeFace by remember(pass.id) { mutableStateOf(false) }
-    val cardHeight = PassCardLayoutPolicy.heightFor(LocalDensity.current.fontScale)
     val turn by animateFloatAsState(
         targetValue = if (requestedCodeFace) 1f else 0f,
         // Compose's MotionDurationScale makes this immediately settle at a
@@ -408,6 +414,7 @@ private fun UnifiedPassBody(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        Spacer(modifier = Modifier.weight(1f))
         TextButton(onClick = onShowCode, modifier = Modifier.fillMaxWidth().height(48.dp)) {
             Text(stringResource(R.string.show_pass_code))
         }
@@ -429,6 +436,7 @@ private fun PassCodeBody(pass: BoardingPassUiState, onShowDetails: () -> Unit, m
             isSample = pass.isSample,
             modifier = if (pass.barcodeFormat.isLinear) Modifier.fillMaxWidth().height(160.dp) else Modifier.size(190.dp),
         )
+        Spacer(modifier = Modifier.weight(1f))
         TextButton(onClick = onShowDetails, modifier = Modifier.height(48.dp)) { Text(stringResource(R.string.show_pass_details)) }
     }
 }
@@ -637,110 +645,95 @@ private fun PassModeChooser(
         label = "ticket action gap",
     )
     val sendAvailable = !(isOnX3 && deployedPassId == selectedPass.id && deployedMode == mode) && !sendPending
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(R.string.mode_for_next_send), style = MaterialTheme.typography.labelLarge)
-        Row(
-            modifier = Modifier.fillMaxWidth().height(52.dp).selectableGroup(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            ModeSegment(TicketMode.Static, mode, onSetMode, Modifier.weight(1f))
-            ModeSegment(TicketMode.Live, mode, onSetMode, Modifier.weight(1f))
-        }
-        Text(
-            text = stringResource(if (mode == TicketMode.Static) R.string.static_ticket_body_short else R.string.live_ticket_body_short),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Row(
+    Column(modifier = modifier) {
+        ExpandingChoiceRow(
+            choices = listOf(
+                ExpandingChoice(
+                    key = TicketMode.Static.name,
+                    title = stringResource(R.string.static_ticket),
+                    body = stringResource(R.string.static_ticket_body_short),
+                ),
+                ExpandingChoice(
+                    key = TicketMode.Live.name,
+                    title = stringResource(R.string.live_ticket),
+                    body = stringResource(R.string.live_ticket_body_short),
+                ),
+            ),
+            selectedKey = mode.name,
+            onSelect = { onSetMode(TicketMode.valueOf(it)) },
+            optionHeight = 152.dp,
+            selectedWeight = 1.45f,
+            unselectedWeight = 0.75f,
+            optionContentPadding = 14.dp,
+            optionContentSpacing = 4.dp,
+            groupContentDescription = stringResource(R.string.mode_for_next_send),
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(splitGap),
-        ) {
-            Button(
-                onClick = {
-                    haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-                    onSend()
-                },
-                enabled = sendAvailable,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp),
-                shape = MaterialTheme.shapes.extraLarge,
-                contentPadding = PaddingValues(horizontal = 8.dp),
+        ) { key ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(splitGap),
             ) {
-                if (sendAvailable) {
-                    SendToX3Icon(
-                        modifier = Modifier.size(21.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                }
-                Text(
-                    text = stringResource(
-                        if (sendPending) R.string.ticket_send_pending
-                        else if (isOnX3 && deployedPassId == selectedPass.id && deployedMode == mode && mode == TicketMode.Static) R.string.static_ticket_on_x3
-                        else if (isOnX3 && deployedPassId == selectedPass.id && deployedMode == mode) R.string.live_ticket_on_x3
-                        else if (mode == TicketMode.Static) R.string.send_static_ticket
-                        else R.string.start_live_and_send,
-                    ),
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(start = if (sendAvailable) 6.dp else 0.dp),
-                    maxLines = 1,
-                )
-            }
-            if (splitProgress > 0.001f) {
-                FilledTonalButton(
+                Button(
                     onClick = {
-                        haptics.performHapticFeedback(HapticFeedbackType.Reject)
-                        onRemove()
+                        haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                        onSend()
                     },
-                    enabled = !removalPending,
+                    enabled = sendAvailable,
                     modifier = Modifier
-                        .weight(splitProgress.coerceAtLeast(0.001f))
-                        .height(48.dp)
-                        .graphicsLayer {
-                            alpha = splitProgress
-                            scaleX = 0.72f + splitProgress * 0.28f
-                        },
+                        .weight(1f)
+                        .height(48.dp),
                     shape = MaterialTheme.shapes.extraLarge,
                     contentPadding = PaddingValues(horizontal = 8.dp),
                 ) {
+                    if (sendAvailable) {
+                        SendToX3Icon(
+                            modifier = Modifier.size(21.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    }
                     Text(
                         text = stringResource(
-                            if (removalPending && deployedMode == TicketMode.Static) R.string.ticket_static_removal_pending
-                            else if (removalPending) R.string.ticket_removal_pending
-                            else if (deployedMode == TicketMode.Live) R.string.stop_live_ticket
-                            else R.string.remove_ticket_from_x3,
+                            if (sendPending) R.string.ticket_send_pending
+                            else if (!sendAvailable && key == TicketMode.Static.name) R.string.static_ticket_on_x3
+                            else if (!sendAvailable) R.string.live_ticket_on_x3
+                            else if (key == TicketMode.Static.name) R.string.send_static_ticket
+                            else R.string.start_live_and_send,
                         ),
                         style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.padding(start = if (sendAvailable) 6.dp else 0.dp),
                         maxLines = 1,
                     )
                 }
+                if (splitProgress > 0.001f) {
+                    FilledTonalButton(
+                        onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.Reject)
+                            onRemove()
+                        },
+                        enabled = !removalPending,
+                        modifier = Modifier
+                            .weight(splitProgress.coerceAtLeast(0.001f))
+                            .height(48.dp)
+                            .graphicsLayer {
+                                alpha = splitProgress
+                                scaleX = 0.72f + splitProgress * 0.28f
+                            },
+                        shape = MaterialTheme.shapes.extraLarge,
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                    ) {
+                        Text(
+                            text = stringResource(
+                                if (removalPending && deployedMode == TicketMode.Static) R.string.ticket_static_removal_pending
+                                else if (removalPending) R.string.ticket_removal_pending
+                                else if (deployedMode == TicketMode.Live) R.string.stop_live_ticket
+                                else R.string.remove_ticket_from_x3,
+                            ),
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                        )
+                    }
+                }
             }
-        }
-    }
-}
-
-@Composable
-private fun ModeSegment(mode: TicketMode, selectedMode: TicketMode, onSetMode: (TicketMode) -> Unit, modifier: Modifier) {
-    val selected = mode == selectedMode
-    val haptics = LocalHapticFeedback.current
-    Surface(
-        modifier = modifier.fillMaxHeight().selectable(
-            selected = selected,
-            role = androidx.compose.ui.semantics.Role.RadioButton,
-            onClick = {
-                if (!selected) haptics.performHapticFeedback(HapticFeedbackType.ToggleOn)
-                onSetMode(mode)
-            },
-        ),
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
-        contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
-        shape = MaterialTheme.shapes.medium,
-        border = if (selected) null else androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(stringResource(if (mode == TicketMode.Static) R.string.static_ticket else R.string.live_ticket), style = MaterialTheme.typography.labelLarge)
         }
     }
 }

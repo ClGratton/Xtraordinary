@@ -5,7 +5,11 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,12 +25,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -48,6 +55,7 @@ fun ExpandingChoiceRow(
     unselectedWeight: Float = 0.75f,
     optionContentPadding: Dp = 14.dp,
     optionContentSpacing: Dp = 6.dp,
+    groupContentDescription: String? = null,
     selectedContainer: Color = MaterialTheme.colorScheme.primaryContainer,
     selectedContent: Color = MaterialTheme.colorScheme.onPrimaryContainer,
     restingContainer: Color = MaterialTheme.colorScheme.surfaceContainer,
@@ -56,7 +64,13 @@ fun ExpandingChoiceRow(
     actionContent: @Composable ColumnScope.(String) -> Unit,
 ) {
     Row(
-        modifier = modifier.fillMaxWidth().selectableGroup(),
+        modifier = modifier
+            .fillMaxWidth()
+            .selectableGroup()
+            .then(
+                if (groupContentDescription == null) Modifier
+                else Modifier.semantics { contentDescription = groupContentDescription },
+            ),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.Top,
     ) {
@@ -64,6 +78,10 @@ fun ExpandingChoiceRow(
             val selected = choice.key == selectedKey
             val weight = animateFloatAsState(
                 targetValue = if (selected) selectedWeight else unselectedWeight,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMediumLow,
+                ),
                 label = "${choice.key} option width",
             )
             ExpandingChoiceOption(
@@ -102,25 +120,40 @@ private fun ExpandingChoiceOption(
     actionContent: @Composable ColumnScope.(String) -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
+    val animatedContainer by animateColorAsState(
+        targetValue = if (selected) selectedContainer else restingContainer,
+        animationSpec = tween(durationMillis = 180),
+        label = "${choice.key} option container",
+    )
+    val animatedContent by animateColorAsState(
+        targetValue = if (selected) selectedContent else restingContent,
+        animationSpec = tween(durationMillis = 180),
+        label = "${choice.key} option content",
+    )
+    val animatedOutline by animateColorAsState(
+        targetValue = if (selected) Color.Transparent else MaterialTheme.colorScheme.outline,
+        animationSpec = tween(durationMillis = 180),
+        label = "${choice.key} option outline",
+    )
     Surface(
         modifier = modifier.height(optionHeight).selectable(
             selected = selected,
             role = androidx.compose.ui.semantics.Role.RadioButton,
             onClick = {
-            if (!selected) haptics.performHapticFeedback(HapticFeedbackType.ToggleOn)
-            onSelect()
+                if (!selected) haptics.performHapticFeedback(HapticFeedbackType.ToggleOn)
+                onSelect()
             },
         ),
-        color = if (selected) selectedContainer else restingContainer,
-        contentColor = if (selected) selectedContent else restingContent,
+        color = animatedContainer,
+        contentColor = animatedContent,
         shape = shape,
-        border = if (selected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        border = BorderStroke(1.dp, animatedOutline),
     ) {
         Column(
             modifier = Modifier.padding(contentPadding),
             verticalArrangement = Arrangement.spacedBy(contentSpacing),
         ) {
-            Text(choice.title, style = MaterialTheme.typography.titleMedium, maxLines = 2)
+            Text(choice.title, style = MaterialTheme.typography.titleLarge, maxLines = 2)
             Text(
                 text = choice.body,
                 style = MaterialTheme.typography.labelMedium,
@@ -130,8 +163,14 @@ private fun ExpandingChoiceOption(
             androidx.compose.foundation.layout.Spacer(modifier = Modifier.weight(1f))
             AnimatedVisibility(
                 visible = selected,
-                enter = fadeIn() + expandVertically(expandFrom = Alignment.Bottom),
-                exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Bottom),
+                enter = fadeIn(tween(140)) + expandVertically(
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                    expandFrom = Alignment.Bottom,
+                ),
+                exit = fadeOut(tween(110)) + shrinkVertically(
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                    shrinkTowards = Alignment.Bottom,
+                ),
             ) {
                 Column {
                     actionContent(choice.key)
