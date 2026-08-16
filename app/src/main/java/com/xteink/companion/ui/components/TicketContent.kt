@@ -443,17 +443,17 @@ private fun UnifiedPassBody(
                 OperationalFact(
                     label = stringResource(R.string.gate).substringBefore(" "),
                     value = pass.gate,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(PassLayout.gateFactWeight),
                 )
                 OperationalFact(
                     label = stringResource(R.string.terminal),
                     value = pass.terminal.ifBlank { "—" },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(PassLayout.terminalFactWeight),
                 )
                 OperationalFact(
                     label = stringResource(R.string.seat),
                     value = pass.seat,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(PassLayout.seatFactWeight),
                 )
             }
         }
@@ -586,6 +586,9 @@ private fun TicketMetadata(pass: BoardingPassUiState) {
 private object PassLayout {
     val bodyInset = 12.dp
     val codeInset = 12.dp
+    const val gateFactWeight = 1.4f
+    const val terminalFactWeight = 1f
+    const val seatFactWeight = 0.8f
 }
 
 @Composable
