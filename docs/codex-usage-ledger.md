@@ -25,3 +25,10 @@
 - Work performed: one build stopped on incorrect JUnit imports; one corrected Community/Play compile, unit-test, and screenshot build passed; compact evidence then exposed label/icon crowding; a measured-width policy correction and final Community/Play build passed.
 - Cause: full dual-variant compiler, unit-test, and deterministic screenshot pipelines were run three times. The narrow reviewer was not repeated after the adaptive-only correction.
 - Durable correction: compact width now removes the optional QR object glyph before squeezing the action label, while retaining the independent edge cue. The portable any-project and teaching-material delegation template was added to `docs/codex-usage-workflow.md` in the same commit.
+
+## 2026-08-16 - Orphan-chevron correction checkpoint
+
+- Pre-stage snapshot: 66% used.
+- Post-stage snapshot: 74% used; an eight-point increase, reported immediately. Seven-day window remains `10080` minutes and resets at Unix `1787510643` (2026-08-23 20:44 Europe/Rome); Plus plan, no credits.
+- Work performed: one source correction, one canonical Community/Play UI-evidence build, inspection of the two relevant renders, and one narrow read-only Terra re-review. The build passed in 1 minute 8 seconds.
+- Decision: no further compiler run or reviewer wave in this task. Preserve the accepted Passes evidence and leave firmware, hardware-current, external-service, accessibility, and full-release acceptance explicitly open in `HANDOFF.md` and `docs/x3-takeover-tracker.md`.
