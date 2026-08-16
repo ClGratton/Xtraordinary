@@ -32,3 +32,11 @@
 - Post-stage snapshot: 74% used; an eight-point increase, reported immediately. Seven-day window remains `10080` minutes and resets at Unix `1787510643` (2026-08-23 20:44 Europe/Rome); Plus plan, no credits.
 - Work performed: one source correction, one canonical Community/Play UI-evidence build, inspection of the two relevant renders, and one narrow read-only Terra re-review. The build passed in 1 minute 8 seconds.
 - Decision: no further compiler run or reviewer wave in this task. Preserve the accepted Passes evidence and leave firmware, hardware-current, external-service, accessibility, and full-release acceptance explicitly open in `HANDOFF.md` and `docs/x3-takeover-tracker.md`.
+
+## 2026-08-16 - Final-sync firmware build checkpoint
+
+- Pre-build snapshot: 74% used.
+- Post-build snapshot: 81% used; a seven-point increase, reported and recorded immediately. Seven-day window remains `10080` minutes and resets at Unix `1787510643` (2026-08-23 20:44 Europe/Rome); Plus plan, no credits.
+- Work performed: one canonical X3 release build for `xtraordinary-v0.2.6-dev35-final-sync-local`; the 98-rule firmware-release policy gate passed, ESP32-C3 RV32IMC verification passed, and PlatformIO completed in 1 minute 10 seconds at 35.2% RAM and 83.0% flash.
+- Artifact: `firmware/.pio/build/x3_companion_release/firmware.bin`, 5,455,216 bytes, SHA-256 `A8B157833668BD14A7022DECAC8B8D48C438DAAC2F04311B35A9A0B19AE0E9CC`.
+- Decision: no duplicate compiler run. Continue only with the already-built artifact, guarded hardware flash, and bounded physical validation; do not dispatch optional reviewer waves.
