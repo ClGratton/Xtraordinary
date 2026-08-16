@@ -34,6 +34,21 @@ $androidBuildWrapperContent = Get-Content -LiteralPath $androidBuildWrapper -Raw
 if ($androidBuildWrapperContent -notmatch 'UiEvidenceCandidate[\s\S]*?--rerun-tasks') {
     throw 'UI evidence candidate mode must force its exact approved tests and screenshots to rerun.'
 }
+$usageWorkflowPath = Join-Path $repoRoot 'docs\codex-usage-workflow.md'
+$usageLedgerPath = Join-Path $repoRoot 'docs\codex-usage-ledger.md'
+$agentsPath = Join-Path $repoRoot 'AGENTS.md'
+if (-not (Test-Path -LiteralPath $usageWorkflowPath -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $usageLedgerPath -PathType Leaf)) {
+    throw 'Repository-owned Codex usage checkpoints, delegation limits, and ledger enforcement must remain active.'
+}
+$usageWorkflowContent = Get-Content -LiteralPath $usageWorkflowPath -Raw
+if ($usageWorkflowContent -notmatch 'account/rateLimits/read' -or
+    $usageWorkflowContent -notmatch '30 minutes' -or
+    $usageWorkflowContent -notmatch 'fork_turns' -or
+    $usageWorkflowContent -notmatch 'twenty percent' -or
+    (Get-Content -LiteralPath $agentsPath -Raw) -notmatch 'docs/codex-usage-workflow.md') {
+    throw 'Repository-owned Codex usage checkpoints, delegation limits, and ledger enforcement must remain active.'
+}
 
 function Test-PolicyGlob {
     param([string]$Path, [string]$Glob)

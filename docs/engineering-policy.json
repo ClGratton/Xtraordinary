@@ -412,6 +412,20 @@
       "message": "UI specialists must retain the shared visual-language, icon, placement, optical-quality, and critique course."
     },
     {
+      "id": "codex-usage-workflow-is-durable",
+      "type": "required_pattern",
+      "path": "docs/codex-usage-workflow.md",
+      "pattern": "## Authoritative meter[\\s\\S]*?account/rateLimits/read[\\s\\S]*?## Required checkpoints[\\s\\S]*?30 minutes[\\s\\S]*?## Delegation budget[\\s\\S]*?fork_turns[\\s\\S]*?## Build budget[\\s\\S]*?## Ledger rule",
+      "message": "Long-running work must retain signed-in usage checkpoints, bounded delegation/build rules, and a durable ledger."
+    },
+    {
+      "id": "codex-usage-ledger-records-the-reviewed-incident",
+      "type": "required_pattern",
+      "path": "docs/codex-usage-ledger.md",
+      "pattern": "## 2026-08-16 - Long-history reviewer incident[\\s\\S]*?51,003,520 cached input[\\s\\S]*?## 2026-08-16 - Visual-language correction checkpoint[\\s\\S]*?53% used[\\s\\S]*?60% used",
+      "message": "The audited usage incident and the seven-point correction checkpoint must remain documented outside chat memory."
+    },
+    {
       "id": "passes-design-ux-contract-is-durable",
       "type": "required_pattern",
       "path": "docs/passes-design-ux-contract.md",
