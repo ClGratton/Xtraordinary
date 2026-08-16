@@ -31,9 +31,15 @@ One agent may not sign two required roles for the same candidate. The implementa
 
 A successful build or screenshot comparison does not sign a visual judgement. The receipt records which specialist made the judgement and which machine evidence supports it.
 
+## Interaction discoverability
+
+The UX-flow reviewer starts from rendered evidence, before source or semantics, and performs a source-blind five-second affordance inventory. A critical action must be recognizable as interactive without first reading its label: shape, icon, placement, target size, and state feedback must communicate the interaction. A hidden hit area or footer-like text is a blocking failure even when the semantic role and click handler are correct. The `interaction-affordance-is-self-evident` receipt check must cite a current rendered PNG.
+
 ## Receipt schema and identity boundary
 
 Each surface record contains `sourceCommit`, `implementationOwnerId`, `reviewedFiles` as a complete path-to-SHA-256 map, an explicit empty `findings` array, and one receipt for every required role. A receipt contains a distinct `reviewerId`, a distinct `reviewerTaskId`, `agentType: terra_medium`, `verdict: pass`, the role's exact `checks`, and non-empty `checkEvidence` for every check. Each evidence item is a repository-relative **leaf file** plus its SHA-256; a directory, a generic screenshot claim, or copied check IDs are not evidence.
+
+Reviewed-source classification includes behavior owners as well as render entry points. A gesture, motion, layout, state, or copy policy consumed by a surface must be listed with that surface so changing the reusable owner expires the receipts just as changing the Composable would.
 
 The local gate can prove coverage, freshness, file identity, and that declared identities are distinct. It cannot prove that a string in JSON was produced by an independent Terra agent. Protected CI with authenticated reviewer/task identities or protected CODEOWNERS approval is required to make identity independence tamper-resistant. Do not describe a local receipt alone as cryptographic or human identity proof.
 
@@ -43,4 +49,6 @@ Operational surfaces show information only when it changes an immediate action, 
 
 ## Bounded delegation
 
-Use one narrow task per specialist, reuse shared evidence paths, and stop after a verdict plus actionable checks. Do not ask every reviewer to rediscover the full repository or restate other roles. Reconcile once after the independent reports.
+Use one narrow task per specialist, reuse shared evidence paths, and stop after a verdict plus actionable checks. Spawn reviewers with `fork_turns: "none"` and provide a compact, source-bound evidence packet; never fork this full task history into a reviewer. Do not ask every reviewer to rediscover the full repository or restate other roles. Batch implementation corrections before re-review and reconcile once after the independent reports.
+
+Read the signed-in Codex rate-limit snapshot before a reviewer wave and after it. Report the change when the wave consumes at least five percentage points, stop optional re-review loops, and do not begin a broad wave with less than twenty percent remaining unless the user explicitly asks to continue.

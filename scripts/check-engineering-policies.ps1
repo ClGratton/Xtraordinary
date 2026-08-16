@@ -99,7 +99,7 @@ $protectedCoverageGlobs = @(
     'firmware/lib/hal/HalDisplay.*'
 )
 $protectedRoleChecks = [ordered]@{
-    'ux-flow' = @('immutable-pending-operation-truth', 'no-conflicting-ticket-operations', 'operational-copy-earns-space')
+    'ux-flow' = @('interaction-affordance-is-self-evident', 'immutable-pending-operation-truth', 'no-conflicting-ticket-operations', 'operational-copy-earns-space')
     'hierarchy' = @('front-hierarchy-order', 'contained-expanding-action', 'provenance-not-front-primary')
     'layout-spacing-margins' = @('carousel-peek-equals-route-rail', 'front-back-bounds-match', 'adaptive-bounds-do-not-overlap')
     'typography' = @('header-reflows-before-overlap', 'operational-facts-reflow-before-truncation', 'required-large-text-fixtures')
@@ -407,6 +407,10 @@ foreach ($rule in $manifest.rules) {
                         if ($checkEvidence.Count -eq 0) {
                             $failures.Add("[$($rule.id)] Role '$requiredRoleId' for '$($surface.id)' needs leaf evidence for '$requiredCheck'.")
                             continue
+                        }
+                        if ($requiredCheck -eq 'interaction-affordance-is-self-evident' -and
+                            @($checkEvidence | Where-Object { $_.path -match '\.png$' }).Count -eq 0) {
+                            $failures.Add("[$($rule.id)] Role '$requiredRoleId' for '$($surface.id)' must cite rendered PNG evidence for '$requiredCheck'.")
                         }
                         foreach ($evidence in $checkEvidence) {
                             if ([string]::IsNullOrWhiteSpace($evidence.path) -or $evidence.sha256 -notmatch '^[0-9a-fA-F]{64}$') {

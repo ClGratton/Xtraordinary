@@ -419,6 +419,13 @@
       "message": "The selected Static/Live surface must expand and own its action instead of using detached equal chips and an external send row."
     },
     {
+      "id": "passes-turn-affordance-is-a-visible-control",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/components/TicketContent.kt",
+      "pattern": "TurnSurfaceButton\\([\\s\\S]*?show_pass_code[\\s\\S]*?TurnSurfaceButton\\([\\s\\S]*?show_pass_details[\\s\\S]*?private fun TurnSurfaceButton[\\s\\S]*?FilledTonalButton\\([\\s\\S]*?TurnSurfaceIcon",
+      "message": "Pass front/back turning must use the shared shaped icon control on both faces, not footer-like text or an invisible hit area."
+    },
+    {
       "id": "passes-does-not-regress-to-detached-mode-segments",
       "type": "forbidden_pattern",
       "path": "app/src/main/java/com/xteink/companion/ui/components/TicketContent.kt",

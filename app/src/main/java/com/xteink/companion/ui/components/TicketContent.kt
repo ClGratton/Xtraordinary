@@ -32,6 +32,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -55,6 +56,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -491,13 +493,11 @@ private fun UnifiedPassBody(
         }
         TicketMetadata(pass)
         Spacer(modifier = Modifier.weight(0.5f))
-        TextButton(
+        TurnSurfaceButton(
+            label = stringResource(R.string.show_pass_code),
             onClick = onShowCode,
-            modifier = Modifier.fillMaxWidth().height(48.dp),
-            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
-        ) {
-            Text(stringResource(R.string.show_pass_code))
-        }
+            modifier = Modifier.align(Alignment.End),
+        )
       }
     }
 }
@@ -542,11 +542,65 @@ private fun PassCodeBody(pass: BoardingPassUiState, onShowDetails: () -> Unit, m
             modifier = if (pass.barcodeFormat.isLinear) Modifier.fillMaxWidth().height(160.dp) else Modifier.size(190.dp),
         )
         Spacer(modifier = Modifier.weight(1f))
-        TextButton(
+        TurnSurfaceButton(
+            label = stringResource(R.string.show_pass_details),
             onClick = onShowDetails,
-            modifier = Modifier.height(48.dp),
-            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
-        ) { Text(stringResource(R.string.show_pass_details)) }
+            modifier = Modifier.align(Alignment.End),
+        )
+    }
+}
+
+@Composable
+private fun TurnSurfaceButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    FilledTonalButton(
+        onClick = onClick,
+        modifier = modifier
+            .heightIn(min = 48.dp)
+            .testTag("pass_turn_surface"),
+        shape = MaterialTheme.shapes.medium,
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+    ) {
+        TurnSurfaceIcon(modifier = Modifier.size(22.dp))
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(label)
+    }
+}
+
+@Composable
+private fun TurnSurfaceIcon(modifier: Modifier = Modifier) {
+    val color = LocalContentColor.current
+    Canvas(modifier = modifier.clearAndSetSemantics { }) {
+        val stroke = 1.7.dp.toPx()
+        val left = 4.dp.toPx()
+        val top = 2.dp.toPx()
+        val foldX = 13.dp.toPx()
+        val foldY = 7.dp.toPx()
+        val right = 18.dp.toPx()
+        val bottom = 17.dp.toPx()
+
+        drawLine(color, Offset(left, top), Offset(foldX, top), strokeWidth = stroke)
+        drawLine(color, Offset(foldX, top), Offset(right, foldY), strokeWidth = stroke)
+        drawLine(color, Offset(right, foldY), Offset(right, bottom), strokeWidth = stroke)
+        drawLine(color, Offset(right, bottom), Offset(left, bottom), strokeWidth = stroke)
+        drawLine(color, Offset(left, bottom), Offset(left, top), strokeWidth = stroke)
+        drawLine(color, Offset(foldX, top), Offset(foldX, foldY), strokeWidth = stroke)
+        drawLine(color, Offset(foldX, foldY), Offset(right, foldY), strokeWidth = stroke)
+
+        drawArc(
+            color = color,
+            startAngle = -18f,
+            sweepAngle = 205f,
+            useCenter = false,
+            topLeft = Offset(1.dp.toPx(), 8.dp.toPx()),
+            size = androidx.compose.ui.geometry.Size(20.dp.toPx(), 12.dp.toPx()),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke),
+        )
+        drawLine(color, Offset(2.dp.toPx(), 15.dp.toPx()), Offset(2.dp.toPx(), 20.dp.toPx()), strokeWidth = stroke)
+        drawLine(color, Offset(2.dp.toPx(), 20.dp.toPx()), Offset(7.dp.toPx(), 19.dp.toPx()), strokeWidth = stroke)
     }
 }
 

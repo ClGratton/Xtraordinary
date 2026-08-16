@@ -36,6 +36,7 @@
       "id": "ux-flow",
       "prompt": "docs/ui-reviewers/ux-flow.md",
       "requiredChecks": [
+        "interaction-affordance-is-self-evident",
         "immutable-pending-operation-truth",
         "no-conflicting-ticket-operations",
         "operational-copy-earns-space"
@@ -123,6 +124,7 @@
         "app/src/main/java/com/xteink/companion/ui/components/TicketContent.kt",
         "app/src/main/java/com/xteink/companion/ui/components/ExpandingChoice.kt",
         "app/src/main/java/com/xteink/companion/ui/components/MagneticPager.kt",
+        "app/src/main/java/com/xteink/companion/ui/components/MagneticSwipe.kt",
         "app/src/main/java/com/xteink/companion/ui/components/PassCardLayoutPolicy.kt",
         "app/src/main/java/com/xteink/companion/ui/components/PassModeLayoutPolicy.kt",
         "app/src/main/java/com/xteink/companion/ui/components/PassMotionPolicy.kt",
@@ -180,6 +182,7 @@
         "app/src/main/java/com/xteink/companion/ui/components/TicketContent.kt",
         "app/src/main/java/com/xteink/companion/ui/components/ExpandingChoice.kt",
         "app/src/main/java/com/xteink/companion/ui/components/MagneticPager.kt",
+        "app/src/main/java/com/xteink/companion/ui/components/MagneticSwipe.kt",
         "app/src/main/java/com/xteink/companion/ui/components/PassCardLayoutPolicy.kt",
         "app/src/main/java/com/xteink/companion/ui/components/PassModeLayoutPolicy.kt",
         "app/src/main/java/com/xteink/companion/ui/components/PassMotionPolicy.kt",
