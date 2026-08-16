@@ -131,8 +131,8 @@
       "id": "firmware-wrapper-runs-policy-gate",
       "type": "required_pattern",
       "path": "scripts/build-x3-firmware.ps1",
-      "pattern": "check-engineering-policies\\.ps1",
-      "message": "The firmware wrapper must run the engineering policy gate before PlatformIO."
+      "pattern": "check-engineering-policies\\.ps1[\\s\\S]*?-Mode FirmwareRelease[\\s\\S]*?platformIo run",
+      "message": "The firmware wrapper must run the scoped FirmwareRelease engineering policy gate before PlatformIO."
     },
     {
       "id": "generic-interactive-coordinator-exists",

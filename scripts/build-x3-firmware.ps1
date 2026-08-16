@@ -23,7 +23,7 @@ if (-not (Test-Path -LiteralPath $sourceCheck)) {
 }
 
 & $sourceCheck
-& $policyCheck
+& $policyCheck -Mode FirmwareRelease
 if (-not $?) {
     throw "Engineering policy gate failed"
 }

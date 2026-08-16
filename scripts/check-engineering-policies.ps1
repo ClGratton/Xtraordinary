@@ -1,6 +1,6 @@
 param(
     [string]$ManifestPath,
-    [ValidateSet('Release', 'UiEvidenceCandidate')]
+    [ValidateSet('Release', 'UiEvidenceCandidate', 'FirmwareRelease')]
     [string]$Mode = 'Release'
 )
 
@@ -33,6 +33,11 @@ $androidBuildWrapper = Join-Path $repoRoot 'scripts\build-xtraordinary-app.ps1'
 $androidBuildWrapperContent = Get-Content -LiteralPath $androidBuildWrapper -Raw
 if ($androidBuildWrapperContent -notmatch 'UiEvidenceCandidate[\s\S]*?--rerun-tasks') {
     throw 'UI evidence candidate mode must force its exact approved tests and screenshots to rerun.'
+}
+$firmwareBuildWrapper = Join-Path $repoRoot 'scripts\build-x3-firmware.ps1'
+$firmwareBuildWrapperContent = Get-Content -LiteralPath $firmwareBuildWrapper -Raw
+if ($firmwareBuildWrapperContent -notmatch 'check-engineering-policies\.ps1[\s\S]*?-Mode FirmwareRelease') {
+    throw 'The firmware wrapper must run the policy gate in FirmwareRelease mode.'
 }
 $usageWorkflowPath = Join-Path $repoRoot 'docs\codex-usage-workflow.md'
 $usageLedgerPath = Join-Path $repoRoot 'docs\codex-usage-ledger.md'
@@ -331,6 +336,9 @@ foreach ($rule in $manifest.rules) {
                 continue
             }
             foreach ($surface in $reviewPolicy.surfaces) {
+                if ($Mode -eq 'FirmwareRelease' -and $surface.kind -eq 'android-ui') {
+                    continue
+                }
                 $changedSinceBaseline = Get-ChangedPolicyPaths -RepositoryRoot $repoRoot -BaselineCommit $surface.baselineCommit
                 $surfaceSourcePaths = Get-SurfaceSourcePaths -Surface $surface -TrackedPaths $trackedPaths
                 if (@($changedSinceBaseline | Where-Object { $_ -in $surfaceSourcePaths }).Count -eq 0) {

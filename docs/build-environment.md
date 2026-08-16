@@ -98,6 +98,8 @@ The script refuses to start unless the firmware artifact, one ADB phone, and the
 
 Both canonical build wrappers run `scripts/assert-pushed-source.ps1` before the engineering-policy gate or compiler. A build requires a named branch, a clean working tree, a configured remote upstream, and exact equality between local HEAD, the remote-tracking HEAD, and a live `git ls-remote` result. Commit and push source before compiling; never use a generated binary as the only recovery point. `.codex-build`, `artifacts`, PlatformIO output, Gradle output, and the generated BuildVersion include are disposable and ignored.
 
+The firmware wrapper invokes the same checker in `FirmwareRelease` mode. It validates every engineering rule and enforces current review receipts for changed X3 display surfaces, while Android-only UI receipts remain the responsibility of the Android Release build. This separation prevents an unrelated Android screenshot receipt from blocking a firmware compiler without weakening X3 display review or the Android release gate.
+
 After flashing, verify recurrence rather than accepting one connection:
 
 ```powershell
