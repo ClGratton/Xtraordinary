@@ -114,6 +114,13 @@
       "message": "AGENTS.md must require the canonical firmware build wrapper."
     },
     {
+      "id": "wireless-adb-discovery-before-phone-absent",
+      "type": "required_pattern",
+      "path": "AGENTS.md",
+      "pattern": "Do not report that a wireless-debug phone is absent[\\s\\S]*?restart the repository ADB daemon in the normal user context[\\s\\S]*?adb mdns services[\\s\\S]*?_adb-tls-connect\\._tcp[\\s\\S]*?adb devices -l",
+      "message": "Agents must restart a restricted ADB daemon and perform current mDNS discovery before declaring a wireless-debug phone unavailable."
+    },
+    {
       "id": "android-wrapper-runs-policy-gate",
       "type": "required_pattern",
       "path": "scripts/build-xtraordinary-app.ps1",
