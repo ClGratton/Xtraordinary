@@ -2,7 +2,7 @@
 
 Status: mandatory for every Android UI change and every X3 display-layout change.
 
-The reviewer roles are repository-owned. They are not remembered chat personas and they are not optional advice. A UI candidate must be reviewed by separate read-only Terra agents using the prompt files under `docs/ui-reviewers/`. Their receipts are bound to the latest commit that changed the registered surface and to SHA-256 hashes of every source file classified to that surface. Changing reviewed source makes the receipt stale and blocks the engineering policy gate. A registered Android UI/resource or X3 display path with no unique surface owner is a gate failure, not an invitation to choose a convenient reviewer scope.
+The reviewer roles are repository-owned. They are not remembered chat personas and they are not optional advice. Every implementer and reviewer studies `docs/ui-visual-language-foundations.md` before evaluating a candidate; role prompts add specialist questions but cannot replace that shared course. A UI candidate must be reviewed by separate read-only Terra agents using the prompt files under `docs/ui-reviewers/`. Their receipts are bound to the latest commit that changed the registered surface and to SHA-256 hashes of every source file classified to that surface. Changing reviewed source makes the receipt stale and blocks the engineering policy gate. A registered Android UI/resource or X3 display path with no unique surface owner is a gate failure, not an invitation to choose a convenient reviewer scope.
 
 ## Required roles
 
@@ -31,9 +31,9 @@ One agent may not sign two required roles for the same candidate. The implementa
 
 A successful build or screenshot comparison does not sign a visual judgement. The receipt records which specialist made the judgement and which machine evidence supports it.
 
-## Interaction discoverability
+## Interaction discoverability and visual quality
 
-The UX-flow reviewer starts from rendered evidence, before source or semantics, and performs a source-blind five-second affordance inventory. A critical action must be recognizable as interactive without first reading its label: shape, icon, placement, target size, and state feedback must communicate the interaction. A hidden hit area or footer-like text is a blocking failure even when the semantic role and click handler are correct. The `interaction-affordance-is-self-evident` receipt check must cite a current rendered PNG.
+The UX-flow reviewer starts from rendered evidence, before source or semantics, and performs the full critique sequence in `docs/ui-visual-language-foundations.md`. A critical action must be recognizable as interactive without first reading its label, and the predicted action, glyph metaphor, placement, and motion must agree. A hidden hit area, footer-like text, malformed compound glyph, contradictory metaphor, or misplaced spatial cue is a blocking failure even when the semantic role and click handler are correct. The `interaction-affordance-is-self-evident` and `icon-and-spatial-metaphor-are-coherent` receipt checks must cite a current rendered PNG.
 
 ## Receipt schema and identity boundary
 

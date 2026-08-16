@@ -31,6 +31,7 @@ UI work must be based on product intent, rendered evidence, and explicit trade-o
 - Use current primary sources: official Android, Material, Google Identity/Drive, and W3C guidance as applicable.
 - Record links in the audit or decision note when external guidance materially affects the result.
 - Platform convention yields only when the product has a documented reason and the alternative remains accessible.
+- Study and apply `docs/ui-visual-language-foundations.md` before selecting or drawing any functional icon. A visible control is not accepted until its metaphor, geometry, placement, and optical quality agree.
 
 ### 5. Write the hierarchy before layout values
 

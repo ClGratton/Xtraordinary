@@ -405,6 +405,13 @@
       "message": "UI work must retain the structured research, hierarchy, state, and render-verification workflow."
     },
     {
+      "id": "ui-visual-language-course-is-durable",
+      "type": "required_pattern",
+      "path": "docs/ui-visual-language-foundations.md",
+      "pattern": "## 1\\. Meaning before drawing[\\s\\S]*?## 2\\. Icon grammar[\\s\\S]*?## 3\\. Placement is part of meaning[\\s\\S]*?## 4\\. Affordance quality, not affordance presence[\\s\\S]*?## 5\\. Required critique passes[\\s\\S]*?## 6\\. Implementation discipline[\\s\\S]*?## 7\\. Rejection examples",
+      "message": "UI specialists must retain the shared visual-language, icon, placement, optical-quality, and critique course."
+    },
+    {
       "id": "passes-design-ux-contract-is-durable",
       "type": "required_pattern",
       "path": "docs/passes-design-ux-contract.md",
@@ -422,8 +429,15 @@
       "id": "passes-turn-affordance-is-a-visible-control",
       "type": "required_pattern",
       "path": "app/src/main/java/com/xteink/companion/ui/components/TicketContent.kt",
-      "pattern": "TurnSurfaceButton\\([\\s\\S]*?show_pass_code[\\s\\S]*?TurnSurfaceButton\\([\\s\\S]*?show_pass_details[\\s\\S]*?private fun TurnSurfaceButton[\\s\\S]*?FilledTonalButton\\([\\s\\S]*?TurnSurfaceIcon",
-      "message": "Pass front/back turning must use the shared shaped icon control on both faces, not footer-like text or an invisible hit area."
+      "pattern": "TurnSurfaceControl\\([\\s\\S]*?show_pass_code[\\s\\S]*?PassFaceDestination\\.Code[\\s\\S]*?TurnSurfaceControl\\([\\s\\S]*?show_pass_details[\\s\\S]*?PassFaceDestination\\.Details[\\s\\S]*?private fun TurnSurfaceControl[\\s\\S]*?FilledTonalButton\\([\\s\\S]*?PassCodeGlyph[\\s\\S]*?TurnEdgeCue[\\s\\S]*?PassTurnAffordancePolicy",
+      "message": "Pass front/back turning must use one shared shaped action, a restrained code cue, and a separate card-edge direction cue."
+    },
+    {
+      "id": "passes-turn-icon-does-not-collapse-paper-and-arrow",
+      "type": "forbidden_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/components/TicketContent.kt",
+      "pattern": "TurnSurfaceIcon|foldX|foldY",
+      "message": "The pass turn affordance must not regress to an overlaid paper/document and direction symbol."
     },
     {
       "id": "passes-does-not-regress-to-detached-mode-segments",

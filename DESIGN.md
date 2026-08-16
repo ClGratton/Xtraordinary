@@ -125,6 +125,7 @@ Opening a tool is nested navigation. Android Back and `Back to Tools` return to 
 ## Icons
 
 Icons are drawn as consistent vector geometry. Pass transfer actions use an upward arrow leaving a tray.
+Functional icon work follows `docs/ui-visual-language-foundations.md`: one glyph has one meaning, independent ideas retain optical clearance, object cues stay inside their labelled control, and spatial/directional cues stay at the boundary they describe. Visibility alone is not acceptance.
 
 ## Motion
 

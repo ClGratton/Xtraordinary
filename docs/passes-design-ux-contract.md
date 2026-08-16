@@ -50,6 +50,7 @@ Never center the title between Back and Import. Never let connection chrome, cou
 - Front and back have identical bounds, clipping, shape, elevation, and carousel position.
 - Swap faces at the midpoint of a restrained vertical-axis turn; text is never mirrored. Reduced motion performs an immediate same-bounds swap.
 - The whole card is not an invisible tap target. The labelled turn control is at least 48 by 48 dp.
+- The turn control exposes one semantic action. Its front may use one small code/QR object glyph after the label; the details face does not invent a paper/document glyph. A single semantics-cleared direction cue stays at the card boundary it describes. Object and direction cues are never overlaid or collapsed into a custom compound symbol, and front/back action-row geometry remains stable.
 
 Horizontal drag belongs exclusively to pass paging. It retains magnetic resistance, threshold/fling/settle haptics, and visible neighboring route rails. Turning never changes pager index; paging never changes face.
 

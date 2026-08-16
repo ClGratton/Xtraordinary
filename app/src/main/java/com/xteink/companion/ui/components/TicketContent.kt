@@ -493,10 +493,10 @@ private fun UnifiedPassBody(
         }
         TicketMetadata(pass)
         Spacer(modifier = Modifier.weight(0.5f))
-        TurnSurfaceButton(
+        TurnSurfaceControl(
             label = stringResource(R.string.show_pass_code),
+            destination = PassFaceDestination.Code,
             onClick = onShowCode,
-            modifier = Modifier.align(Alignment.End),
         )
       }
     }
@@ -542,65 +542,90 @@ private fun PassCodeBody(pass: BoardingPassUiState, onShowDetails: () -> Unit, m
             modifier = if (pass.barcodeFormat.isLinear) Modifier.fillMaxWidth().height(160.dp) else Modifier.size(190.dp),
         )
         Spacer(modifier = Modifier.weight(1f))
-        TurnSurfaceButton(
+        TurnSurfaceControl(
             label = stringResource(R.string.show_pass_details),
+            destination = PassFaceDestination.Details,
             onClick = onShowDetails,
-            modifier = Modifier.align(Alignment.End),
         )
     }
 }
 
+private enum class PassFaceDestination { Code, Details }
+
 @Composable
-private fun TurnSurfaceButton(
+private fun TurnSurfaceControl(
     label: String,
+    destination: PassFaceDestination,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    FilledTonalButton(
-        onClick = onClick,
+    Box(
         modifier = modifier
-            .heightIn(min = 48.dp)
-            .testTag("pass_turn_surface"),
-        shape = MaterialTheme.shapes.medium,
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+            .fillMaxWidth()
+            .heightIn(min = 48.dp),
     ) {
-        TurnSurfaceIcon(modifier = Modifier.size(22.dp))
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(label)
+        FilledTonalButton(
+            onClick = onClick,
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(horizontal = PassTurnAffordancePolicy.actionHorizontalInsetDp.dp)
+                .heightIn(min = 48.dp)
+                .testTag("pass_turn_surface"),
+            shape = MaterialTheme.shapes.medium,
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+        ) {
+            Text(label)
+            if (destination == PassFaceDestination.Code) {
+                Spacer(modifier = Modifier.width(8.dp))
+                PassCodeGlyph(modifier = Modifier.size(PassTurnAffordancePolicy.objectGlyphSizeDp.dp))
+            }
+        }
+        TurnEdgeCue(
+            pointsTowardTrailingEdge = destination == PassFaceDestination.Code,
+            modifier = Modifier
+                .align(
+                    if (destination == PassFaceDestination.Code) Alignment.CenterEnd
+                    else Alignment.CenterStart,
+                )
+                .size(PassTurnAffordancePolicy.edgeCueSizeDp.dp),
+        )
     }
 }
 
 @Composable
-private fun TurnSurfaceIcon(modifier: Modifier = Modifier) {
+private fun PassCodeGlyph(modifier: Modifier = Modifier) {
     val color = LocalContentColor.current
     Canvas(modifier = modifier.clearAndSetSemantics { }) {
-        val stroke = 1.7.dp.toPx()
-        val left = 4.dp.toPx()
-        val top = 2.dp.toPx()
-        val foldX = 13.dp.toPx()
-        val foldY = 7.dp.toPx()
-        val right = 18.dp.toPx()
-        val bottom = 17.dp.toPx()
+        val stroke = 1.5.dp.toPx()
+        val finderSize = 6.dp.toPx()
+        val inset = 1.dp.toPx()
+        val far = size.width - finderSize - inset
+        val finderStyle = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke)
+        drawRect(color, topLeft = Offset(inset, inset), size = androidx.compose.ui.geometry.Size(finderSize, finderSize), style = finderStyle)
+        drawRect(color, topLeft = Offset(far, inset), size = androidx.compose.ui.geometry.Size(finderSize, finderSize), style = finderStyle)
+        drawRect(color, topLeft = Offset(inset, far), size = androidx.compose.ui.geometry.Size(finderSize, finderSize), style = finderStyle)
+        drawRect(color, topLeft = Offset(10.dp.toPx(), 10.dp.toPx()), size = androidx.compose.ui.geometry.Size(3.dp.toPx(), 3.dp.toPx()))
+        drawRect(color, topLeft = Offset(14.dp.toPx(), 10.dp.toPx()), size = androidx.compose.ui.geometry.Size(3.dp.toPx(), 7.dp.toPx()))
+        drawRect(color, topLeft = Offset(10.dp.toPx(), 14.dp.toPx()), size = androidx.compose.ui.geometry.Size(3.dp.toPx(), 3.dp.toPx()))
+    }
+}
 
-        drawLine(color, Offset(left, top), Offset(foldX, top), strokeWidth = stroke)
-        drawLine(color, Offset(foldX, top), Offset(right, foldY), strokeWidth = stroke)
-        drawLine(color, Offset(right, foldY), Offset(right, bottom), strokeWidth = stroke)
-        drawLine(color, Offset(right, bottom), Offset(left, bottom), strokeWidth = stroke)
-        drawLine(color, Offset(left, bottom), Offset(left, top), strokeWidth = stroke)
-        drawLine(color, Offset(foldX, top), Offset(foldX, foldY), strokeWidth = stroke)
-        drawLine(color, Offset(foldX, foldY), Offset(right, foldY), strokeWidth = stroke)
-
-        drawArc(
-            color = color,
-            startAngle = -18f,
-            sweepAngle = 205f,
-            useCenter = false,
-            topLeft = Offset(1.dp.toPx(), 8.dp.toPx()),
-            size = androidx.compose.ui.geometry.Size(20.dp.toPx(), 12.dp.toPx()),
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke),
-        )
-        drawLine(color, Offset(2.dp.toPx(), 15.dp.toPx()), Offset(2.dp.toPx(), 20.dp.toPx()), strokeWidth = stroke)
-        drawLine(color, Offset(2.dp.toPx(), 20.dp.toPx()), Offset(7.dp.toPx(), 19.dp.toPx()), strokeWidth = stroke)
+@Composable
+private fun TurnEdgeCue(
+    pointsTowardTrailingEdge: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val color = LocalContentColor.current
+    Canvas(modifier = modifier.clearAndSetSemantics { }) {
+        val stroke = 1.8.dp.toPx()
+        val centerX = size.width / 2f
+        val centerY = size.height / 2f
+        val direction = if (pointsTowardTrailingEdge) 1f else -1f
+        val tipX = centerX + direction * 4.dp.toPx()
+        val baseX = centerX - direction * 3.dp.toPx()
+        val arm = 5.dp.toPx()
+        drawLine(color, Offset(baseX, centerY - arm), Offset(tipX, centerY), strokeWidth = stroke)
+        drawLine(color, Offset(tipX, centerY), Offset(baseX, centerY + arm), strokeWidth = stroke)
     }
 }
 

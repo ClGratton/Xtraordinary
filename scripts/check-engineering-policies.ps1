@@ -98,13 +98,14 @@ $protectedCoverageGlobs = @(
     'firmware/src/activities/*.h',
     'firmware/lib/hal/HalDisplay.*'
 )
+$protectedVisualLanguageResource = 'docs/ui-visual-language-foundations.md'
 $protectedRoleChecks = [ordered]@{
-    'ux-flow' = @('interaction-affordance-is-self-evident', 'immutable-pending-operation-truth', 'no-conflicting-ticket-operations', 'operational-copy-earns-space')
+    'ux-flow' = @('interaction-affordance-is-self-evident', 'icon-and-spatial-metaphor-are-coherent', 'immutable-pending-operation-truth', 'no-conflicting-ticket-operations', 'operational-copy-earns-space')
     'hierarchy' = @('front-hierarchy-order', 'contained-expanding-action', 'provenance-not-front-primary')
     'layout-spacing-margins' = @('carousel-peek-equals-route-rail', 'front-back-bounds-match', 'adaptive-bounds-do-not-overlap')
     'typography' = @('header-reflows-before-overlap', 'operational-facts-reflow-before-truncation', 'required-large-text-fixtures')
     'color-contrast' = @('primary-reserved-for-transaction', 'quiet-remains-grayscale', 'role-pair-contrast')
-    'shape-affordance' = @('selected-action-contained', 'action-shape-and-target', 'resting-option-remains-selectable')
+    'shape-affordance' = @('selected-action-contained', 'action-shape-and-target', 'glyph-geometry-is-optically-separated', 'resting-option-remains-selectable')
     'motion-interaction' = @('page-and-turn-gesture-ownership', 'chooser-bounds-stable-through-morph', 'reduced-motion-final-state')
     'accessibility-adaptive' = @('single-selected-radio-and-owned-action', 'no-duplicate-route-or-provenance-announcement', 'all-controls-reachable-at-required-scales')
     'eink-scanner' = @('binary-hierarchy-and-safe-region', 'scanner-quiet-zone-and-scaling', 'mapped-hints-and-refresh-boundary')
@@ -233,6 +234,18 @@ foreach ($rule in $manifest.rules) {
                     foreach ($requiredCheck in @($role.requiredChecks)) {
                         if ($promptContent -notmatch [regex]::Escape($requiredCheck)) {
                             $failures.Add("[$($rule.id)] Role '$($role.id)' prompt must require check '$requiredCheck'.")
+                        }
+                    }
+                    if (@($role.requiredResources) -notcontains $protectedVisualLanguageResource -or
+                        $promptContent -notmatch [regex]::Escape($protectedVisualLanguageResource)) {
+                        $failures.Add("[$($rule.id)] Role '$($role.id)' must study the protected visual-language foundation.")
+                    }
+                    foreach ($requiredResource in @($role.requiredResources)) {
+                        $resourcePath = [System.IO.Path]::GetFullPath((Join-Path $repoRoot $requiredResource))
+                        if (-not $resourcePath.StartsWith([System.IO.Path]::GetFullPath($repoRoot), [System.StringComparison]::OrdinalIgnoreCase) -or
+                            -not (Test-Path -LiteralPath $resourcePath -PathType Leaf) -or
+                            $promptContent -notmatch [regex]::Escape($requiredResource)) {
+                            $failures.Add("[$($rule.id)] Role '$($role.id)' has a missing or unreferenced required resource '$requiredResource'.")
                         }
                     }
                 }
