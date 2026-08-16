@@ -122,7 +122,10 @@ fun PassesToolContent(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(top = 2.dp, bottom = 16.dp),
+                .padding(
+                    top = 2.dp,
+                    bottom = if (fontScale >= 1.6f) 112.dp else 16.dp,
+                ),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
         if (fontScale >= 1.6f) {
@@ -356,7 +359,7 @@ private fun UnifiedPassBody(
             .fillMaxHeight()
             .padding(horizontal = PassLayout.bodyInset, vertical = 8.dp),
     ) {
-      val compactFacts = maxWidth < 210.dp || fontScale > 1.15f
+      val compactFacts = maxWidth < 180.dp || fontScale > 1.15f
       val accessibilityLayout = compactFacts
       Column(
         modifier = Modifier.fillMaxSize(),
