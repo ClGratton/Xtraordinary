@@ -29,6 +29,11 @@ if ($uiReviewRule.Count -ne 1 -or $uiReviewRule[0].type -ne 'ui_review_attestati
     $uiReviewRule[0].path -ne 'docs/ui-review-policy.json') {
     throw 'Engineering policy manifest must retain the stable Terra UI-review gate at docs/ui-review-policy.json.'
 }
+$androidBuildWrapper = Join-Path $repoRoot 'scripts\build-xtraordinary-app.ps1'
+$androidBuildWrapperContent = Get-Content -LiteralPath $androidBuildWrapper -Raw
+if ($androidBuildWrapperContent -notmatch 'UiEvidenceCandidate[\s\S]*?--rerun-tasks') {
+    throw 'UI evidence candidate mode must force its exact approved tests and screenshots to rerun.'
+}
 
 function Test-PolicyGlob {
     param([string]$Path, [string]$Glob)

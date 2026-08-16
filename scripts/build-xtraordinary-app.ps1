@@ -67,7 +67,11 @@ if (-not $?) {
 
 Push-Location $repoRoot
 try {
-    & $gradle --no-daemon --console=plain @Tasks
+    $gradleArguments = @('--no-daemon', '--console=plain')
+    if ($UiEvidenceCandidate) {
+        $gradleArguments += '--rerun-tasks'
+    }
+    & $gradle @gradleArguments @Tasks
     if ($LASTEXITCODE -ne 0) {
         throw "Android build failed with exit code $LASTEXITCODE"
     }
