@@ -6,7 +6,7 @@ import androidx.compose.ui.unit.dp
 /** Keeps both pass faces equal while giving enlarged type room instead of clipping it. */
 internal object PassCardLayoutPolicy {
     val minimumNormalHeight: Dp = 304.dp
-    val maximumNormalHeight: Dp = 352.dp
+    val maximumNormalHeight: Dp = 392.dp
     private val normalScreenChrome: Dp = 336.dp
 
     fun heightFor(fontScale: Float, viewportHeight: Dp): Dp = when {
