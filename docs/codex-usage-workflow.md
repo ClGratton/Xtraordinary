@@ -51,3 +51,16 @@ Append `docs/codex-usage-ledger.md` whenever:
 
 Each entry records date, task ID when available, start/end percentages, reset window, relevant token deltas, cause, and the durable correction. Do not store credentials, auth tokens, or unrelated account data.
 
+## Portable template for any project
+
+Use this sequence outside Xtraordinary as well:
+
+1. Create a small durable brief: objective, audience, constraints, source-of-truth files, and definition of done.
+2. Start a fresh task for each materially different objective. Link the brief instead of carrying an old chat.
+3. Primary agent inspects and implements. Delegate only one bounded concern at a time with no inherited history.
+4. Give a specialist the minimum packet: exact question, 2-5 inputs, read-only/edit ownership, output format, and stop condition.
+5. Reconcile once. Batch corrections. Build or render once from the settled candidate.
+6. Store successful commands, decisions, rubrics, and recurring checks in the project; future tasks read those artifacts.
+7. Take meter snapshots at the checkpoints above and stop optional iteration when the budget threshold is reached.
+
+For teaching material, default to one source-research pass, one audience/learning-objective outline, primary-agent drafting, and one final pedagogy/factual review. Do not run multiple vague rewrite agents. Ask the reviewer to check named outcomes such as prerequisite fit, misconception risk, worked-example correctness, cognitive load, and assessment alignment.
