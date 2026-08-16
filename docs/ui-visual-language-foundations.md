@@ -69,6 +69,7 @@ The reviewer records what failed, not just that a screenshot looked acceptable. 
 
 - Use one reusable component for the same action on matching states or faces.
 - Keep decorative vector cues separate from semantic button content.
+- A directional mark must belong visibly to a control, path, or physical boundary. Never float a bare chevron beside a control as an unexplained second hint; attach it to the boundary it describes or omit it.
 - Encode target size, icon box, gap, and placement as purpose-named tokens or component policy.
 - Add geometry tests for non-overlap and stable placement when a cue depends on an edge, seam, or boundary.
 - Screenshot evidence supplements, but does not replace, semantic and geometry assertions.
@@ -81,6 +82,7 @@ Block the candidate when:
 - two symbols are overlaid and read as one malformed symbol;
 - a paper/document metaphor is used for a code, details, or turn action without product meaning;
 - an edge or direction cue is pulled into the middle of a generic button;
+- a bare chevron or punctuation mark floats near a control without being attached to the control, path, seam, or boundary it describes;
 - icon placement contradicts the direction it communicates;
 - a reviewer says only "the button is visible" without judging metaphor and optical construction;
 - the label is doing all the explanatory work while the icon predicts a different result;
@@ -91,4 +93,3 @@ Block the candidate when:
 - [Android images and graphics](https://developer.android.com/design/ui/mobile/guides/layout-and-content/images-graphics): vector-first small assets, 24 dp icon treatment, intrinsic padding, and consistent sizing.
 - [Android accessibility for apps](https://developer.android.com/guide/topics/ui/accessibility/apps.html): simple controls, 48 dp minimum targets, purpose-based descriptions, and decorative-icon semantics.
 - [Android grids and units](https://developer.android.com/design/ui/mobile/guides/layout-and-content/grids-and-units): 4 dp alignment for icons and 8 dp component/layout rhythm.
-

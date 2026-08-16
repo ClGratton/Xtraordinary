@@ -1,5 +1,20 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-16 reconciliation: implemented is not the same as physically accepted
+
+The 2026-08-16 work is a Passes UI and engineering-process slice, not completion of the entire takeover. It hardened the shared pass hierarchy, responsive type/layout, selected Static/Live action ownership, immutable pending-operation truth, reduced-motion policy, review provenance, usage accounting, and the face-change affordance. The pass face now uses one centred labelled control, an optional small QR cue only when width permits, and no detached chevron. The reusable visual-language course and policy gate explicitly reject compound paper/arrow glyphs and orphaned directional punctuation.
+
+The radio, battery, synchronization, and reading-statistics work was not discarded or replaced by this design pass. Its canonical behavior is documented in [`docs/x3-power-sync-flow.md`](docs/x3-power-sync-flow.md) and [`docs/interactive-transport-lifecycle.md`](docs/interactive-transport-lifecycle.md): five minutes of fast discovery by default, a 1.5-second advertising pulse every 30/60/120 seconds in standby, a separate 1/2/4-second connected-background interval, a 10-minute default inactivity sleep, and a generic scoped interactive lease. Desired phone settings remain distinct from matching X3 acknowledgements. Focus and an open Live ticket keep X3 awake and pulse-discoverable without retaining GATT solely because the surface is visible. Reading sessions are journalled on X3, transferred in chunks, persisted on Android before ACK, and displayed as cumulative and per-session statistics; the real two-session/eight-sample import was previously accepted.
+
+Evidence status must remain explicit:
+
+- **Implemented and protocol/real-device evidenced:** fresh Secure Connections bonding; encrypted GATT bootstrap; capability/status/policy and reading-statistics ACK chains; Bluetooth-off blocker truth; idle GATT release; bounded settings delivery; generic interactive ownership; Home standby text derived from the applied interval; end-to-end reading-statistics import.
+- **Implemented but still awaiting current physical acceptance:** rapid Settings-edit stress returning to **Synced to X3** and releasing GATT; Home current between standby pulses; Focus/Live wakefulness and update latency; Reading drain/current measurement; Static/Live removal and persistence; current pass gestures, e-ink matrix/linear rendering, rotated scanner, ghosting, barcode scanning, and ACK/power behavior.
+- **Firmware blocker still open:** canonically build, application-only flash, and repeatedly exercise the final-sync command-policy correction for the dev33 sleep-boundary CPU lockup while preserving NVS, bond, app data, and SD.
+- **External work still open:** production Google Drive OAuth acceptance; a deployed live-flight proxy/provider and credentials outside the APK; production entitlement, Play Billing, UMP, and AdMob integrations; accessibility and the complete canonical regression/physical acceptance gate.
+
+The authoritative consolidated open list is the final 2026-08-16 section of [`docs/x3-takeover-tracker.md`](docs/x3-takeover-tracker.md). Older unchecked tracker entries may describe superseded candidates; they are history unless repeated in that consolidated list.
+
 ## Start here
 
 The complete accepted dev26 source and evidence are preserved on `codex/x3-dev25-recovery` through pushed commit `4f25363`. Never compile a new candidate from uncommitted or unpushed source: both canonical wrappers invoke `scripts/assert-pushed-source.ps1` before the policy gate and compiler, and the check verifies a clean named branch, its upstream, matching local/upstream commits, and the live remote ref. Generated build output may be discarded; source checkpoints may not.

@@ -523,3 +523,17 @@ Measured failure: battery fell from 89% to 81% in one hour.
 - [ ] Physically accept phone gestures/semantics, X3 matrix and linear tickets, rotated Scan/Ticket mapping, ghosting refresh, real acknowledgement/power behavior, and barcode scanning without resetting app data, NVS, SD, or Bluetooth bonds.
 - [ ] Validate the follow-up Android candidate that restores the selected Static/Live card's horizontal expansion and contained send/remove action, makes normal pass height responsive to available viewport space, and suppresses redundant passive-probe failure text when a managed X3 is already represented as Available/Paired.
 - [ ] Validate Android dev46 after eight separate source-bound Terra specialist reviews: import provenance is removed from the operational face, pending send identity is immutable, send/clear cannot overlap, large text reflows header/facts/chooser, saturated color is reserved for the contained transaction, and stale review receipts block the canonical build.
+
+## 2026-08-16 authoritative reconciliation
+
+This section consolidates the current acceptance boundary. Older unchecked entries remain useful incident history, but a superseded candidate or duplicate step is not automatically current work unless it appears below.
+
+- [x] Preserve the generic radio/power lifecycle in `docs/x3-power-sync-flow.md` and `docs/interactive-transport-lifecycle.md`: fast discovery, pulse-based standby, separate connected-background cadence, scoped interactive ownership, ACK-gated desired/applied settings, and no visibility-owned permanent GATT for Focus or Live tickets.
+- [x] Preserve the implemented reading-statistics path: X3 SD journal, chunked protocol delivery, Android persistence before ACK, cumulative/session UI, and the previously accepted two-session/eight-sample real-device import.
+- [x] Harden the Passes visual-language process and machine policy so the shared face-change control cannot regress to a paper/arrow compound glyph or a detached free-floating chevron.
+- [ ] Canonically build and application-only flash the final-sync command-policy correction, then prove repeated sleep-boundary reconnect and wake cycles without a new CPU-lockup report while preserving NVS, bond, app data, and SD.
+- [ ] Physically stress rapid Settings edits; verify the newest desired values alone become **Synced to X3**, then confirm GATT is released and Home returns to the configured standby cadence.
+- [ ] Measure Home current between 30/60/120-second advertising pulses and Reading drain; verify button-triggered fast discovery plus Focus/Live wakefulness and expected update latency.
+- [ ] Physically accept Static/Live ticket persistence, removal, resend, ACK truth, ghosting refresh, matrix and linear X3 layouts, rotated scanner controls, phone gestures/semantics, and real barcode scanning.
+- [ ] Deploy and accept the external live-flight provider/proxy; configure and accept production Google Drive OAuth; integrate and accept production entitlement, Play Billing, UMP, and AdMob contracts.
+- [ ] Complete accessibility evidence and the canonical automated plus physical regression gate. Source inspection or screenshot generation alone does not close these items.

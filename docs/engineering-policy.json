@@ -443,8 +443,8 @@
       "id": "passes-turn-affordance-is-a-visible-control",
       "type": "required_pattern",
       "path": "app/src/main/java/com/xteink/companion/ui/components/TicketContent.kt",
-      "pattern": "TurnSurfaceControl\\([\\s\\S]*?show_pass_code[\\s\\S]*?PassFaceDestination\\.Code[\\s\\S]*?TurnSurfaceControl\\([\\s\\S]*?show_pass_details[\\s\\S]*?PassFaceDestination\\.Details[\\s\\S]*?private fun TurnSurfaceControl[\\s\\S]*?FilledTonalButton\\([\\s\\S]*?PassCodeGlyph[\\s\\S]*?TurnEdgeCue[\\s\\S]*?PassTurnAffordancePolicy",
-      "message": "Pass front/back turning must use one shared shaped action, a restrained code cue, and a separate card-edge direction cue."
+      "pattern": "TurnSurfaceControl\\([\\s\\S]*?show_pass_code[\\s\\S]*?PassFaceDestination\\.Code[\\s\\S]*?TurnSurfaceControl\\([\\s\\S]*?show_pass_details[\\s\\S]*?PassFaceDestination\\.Details[\\s\\S]*?private fun TurnSurfaceControl[\\s\\S]*?FilledTonalButton\\([\\s\\S]*?PassCodeGlyph[\\s\\S]*?PassTurnAffordancePolicy",
+      "message": "Pass front/back turning must use one shared shaped action and only the restrained code-destination cue."
     },
     {
       "id": "passes-turn-icon-does-not-collapse-paper-and-arrow",
@@ -452,6 +452,13 @@
       "path": "app/src/main/java/com/xteink/companion/ui/components/TicketContent.kt",
       "pattern": "TurnSurfaceIcon|foldX|foldY",
       "message": "The pass turn affordance must not regress to an overlaid paper/document and direction symbol."
+    },
+    {
+      "id": "passes-turn-affordance-has-no-orphan-chevron",
+      "type": "forbidden_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/components/TicketContent.kt",
+      "pattern": "TurnEdgeCue|pointsTowardTrailingEdge",
+      "message": "The pass turn affordance must not add a free-floating chevron beside the labelled control."
     },
     {
       "id": "passes-does-not-regress-to-detached-mode-segments",

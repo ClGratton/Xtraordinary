@@ -572,7 +572,6 @@ private fun TurnSurfaceControl(
             onClick = onClick,
             modifier = Modifier
                 .align(Alignment.Center)
-                .padding(end = PassTurnAffordancePolicy.actionHorizontalInsetDp.dp)
                 .heightIn(min = 48.dp)
                 .testTag("pass_turn_surface"),
             shape = MaterialTheme.shapes.medium,
@@ -584,15 +583,6 @@ private fun TurnSurfaceControl(
                 PassCodeGlyph(modifier = Modifier.size(PassTurnAffordancePolicy.objectGlyphSizeDp.dp))
             }
         }
-        TurnEdgeCue(
-            pointsTowardTrailingEdge = destination == PassFaceDestination.Code,
-            modifier = Modifier
-                .align(
-                    if (destination == PassFaceDestination.Code) Alignment.CenterEnd
-                    else Alignment.CenterStart,
-                )
-                .size(PassTurnAffordancePolicy.edgeCueSizeDp.dp),
-        )
     }
 }
 
@@ -611,25 +601,6 @@ private fun PassCodeGlyph(modifier: Modifier = Modifier) {
         drawRect(color, topLeft = Offset(10.dp.toPx(), 10.dp.toPx()), size = androidx.compose.ui.geometry.Size(3.dp.toPx(), 3.dp.toPx()))
         drawRect(color, topLeft = Offset(14.dp.toPx(), 10.dp.toPx()), size = androidx.compose.ui.geometry.Size(3.dp.toPx(), 7.dp.toPx()))
         drawRect(color, topLeft = Offset(10.dp.toPx(), 14.dp.toPx()), size = androidx.compose.ui.geometry.Size(3.dp.toPx(), 3.dp.toPx()))
-    }
-}
-
-@Composable
-private fun TurnEdgeCue(
-    pointsTowardTrailingEdge: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    val color = LocalContentColor.current
-    Canvas(modifier = modifier.clearAndSetSemantics { }) {
-        val stroke = 1.8.dp.toPx()
-        val centerX = size.width / 2f
-        val centerY = size.height / 2f
-        val direction = if (pointsTowardTrailingEdge) 1f else -1f
-        val tipX = centerX + direction * 4.dp.toPx()
-        val baseX = centerX - direction * 3.dp.toPx()
-        val arm = 5.dp.toPx()
-        drawLine(color, Offset(baseX, centerY - arm), Offset(tipX, centerY), strokeWidth = stroke)
-        drawLine(color, Offset(tipX, centerY), Offset(baseX, centerY + arm), strokeWidth = stroke)
     }
 }
 

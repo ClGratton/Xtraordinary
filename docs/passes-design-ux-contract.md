@@ -50,7 +50,7 @@ Never center the title between Back and Import. Never let connection chrome, cou
 - Front and back have identical bounds, clipping, shape, elevation, and carousel position.
 - Swap faces at the midpoint of a restrained vertical-axis turn; text is never mirrored. Reduced motion performs an immediate same-bounds swap.
 - The whole card is not an invisible tap target. The labelled turn control is at least 48 by 48 dp.
-- The turn control exposes one semantic action. Its front may use one small code/QR object glyph after the label; the details face does not invent a paper/document glyph. A single semantics-cleared direction cue stays at the card boundary it describes. Object and direction cues are never overlaid or collapsed into a custom compound symbol, and front/back action-row geometry remains stable.
+- The turn control exposes one semantic action. Its front may use one small code/QR object glyph after the label; the details face does not invent a paper/document glyph. Do not add a free-floating chevron or punctuation mark to imply turning: a spatial cue must be visibly attached to the boundary it describes or be omitted. Front/back action-row geometry remains stable, and the same-bounds turn motion supplies the transition relationship.
 
 Horizontal drag belongs exclusively to pass paging. It retains magnetic resistance, threshold/fling/settle haptics, and visible neighboring route rails. Turning never changes pager index; paging never changes face.
 
@@ -116,7 +116,8 @@ Use the checked-in shape family by role:
 - physical pass: `shapes.large`, low elevation, no outline;
 - Static/Live choices: `shapes.large`, zero elevation; selection changes proportion and color rather than replacing the silhouette;
 - scanner chamber: `shapes.small`, one hard border;
-- actions and badges: `CircleShape`.
+- enabled transaction actions and status badges: `CircleShape`;
+- secondary in-card navigation, including `Show code` / `Show details`: `shapes.medium`, with identical front/back bounds.
 
 Avoid double framing. The pass uses elevation, unselected choices use an outline, and the scanner chamber uses a hard border. Raw corner literals do not belong in Passes.
 
