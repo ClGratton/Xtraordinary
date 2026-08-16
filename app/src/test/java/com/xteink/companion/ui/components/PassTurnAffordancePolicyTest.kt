@@ -18,4 +18,11 @@ class PassTurnAffordancePolicyTest {
                 PassTurnAffordancePolicy.edgeCueSizeDp,
         )
     }
+
+    @Test
+    fun optionalObjectGlyphYieldsToTheLabelAtCompactWidth() {
+        assertTrue(!PassTurnAffordancePolicy.showsObjectGlyph(150, isCodeDestination = true))
+        assertTrue(PassTurnAffordancePolicy.showsObjectGlyph(200, isCodeDestination = true))
+        assertTrue(!PassTurnAffordancePolicy.showsObjectGlyph(200, isCodeDestination = false))
+    }
 }

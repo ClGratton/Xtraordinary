@@ -6,9 +6,13 @@ object PassTurnAffordancePolicy {
     const val edgeCueSizeDp = 20
     const val objectGlyphSizeDp = 18
     const val minimumCueGapDp = 8
+    const val minimumWidthForObjectGlyphDp = 180
 
     fun actionToEdgeCueGapDp(): Int = actionHorizontalInsetDp - edgeCueSizeDp
 
     fun keepsObjectAndDirectionCuesSeparated(): Boolean =
         actionToEdgeCueGapDp() >= minimumCueGapDp
+
+    fun showsObjectGlyph(availableWidthDp: Int, isCodeDestination: Boolean): Boolean =
+        isCodeDestination && availableWidthDp >= minimumWidthForObjectGlyphDp
 }

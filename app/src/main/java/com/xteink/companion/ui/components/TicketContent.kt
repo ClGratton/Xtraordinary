@@ -559,23 +559,27 @@ private fun TurnSurfaceControl(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp),
     ) {
+        val showObjectGlyph = PassTurnAffordancePolicy.showsObjectGlyph(
+            availableWidthDp = maxWidth.value.toInt(),
+            isCodeDestination = destination == PassFaceDestination.Code,
+        )
         FilledTonalButton(
             onClick = onClick,
             modifier = Modifier
                 .align(Alignment.Center)
-                .padding(horizontal = PassTurnAffordancePolicy.actionHorizontalInsetDp.dp)
+                .padding(end = PassTurnAffordancePolicy.actionHorizontalInsetDp.dp)
                 .heightIn(min = 48.dp)
                 .testTag("pass_turn_surface"),
             shape = MaterialTheme.shapes.medium,
             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
         ) {
             Text(label)
-            if (destination == PassFaceDestination.Code) {
+            if (showObjectGlyph) {
                 Spacer(modifier = Modifier.width(8.dp))
                 PassCodeGlyph(modifier = Modifier.size(PassTurnAffordancePolicy.objectGlyphSizeDp.dp))
             }
