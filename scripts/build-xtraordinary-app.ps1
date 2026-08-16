@@ -34,15 +34,23 @@ if (-not (Test-Path -LiteralPath $sourceCheck)) {
 }
 
 if ($UiEvidenceCandidate) {
-    $allowedEvidenceTasks = @(
+    # UiEvidenceCandidate may only update deterministic screenshot evidence after
+    # the matching Community/Play unit tests establish motion-state fixtures.
+    $requiredEvidenceTasks = @(
+        ':app:testCommunityDebugUnitTest',
         ':app:updateCommunityDebugScreenshotTest',
+        ':app:testPlayDebugUnitTest',
         ':app:updatePlayDebugScreenshotTest'
     )
-    foreach ($task in $Tasks) {
-        if ($allowedEvidenceTasks -notcontains $task) {
-            throw "UiEvidenceCandidate may only update deterministic Community/Play screenshot evidence."
+    # This exact candidate set may only update deterministic Community/Play screenshot evidence.
+    if ($PSBoundParameters.ContainsKey('Tasks')) {
+        $isExactTaskSet = $Tasks.Count -eq $requiredEvidenceTasks.Count -and
+            @($requiredEvidenceTasks | Where-Object { $_ -notin $Tasks }).Count -eq 0
+        if (-not $isExactTaskSet) {
+            throw "UiEvidenceCandidate requires the exact Community/Play unit-test and deterministic screenshot-update task set."
         }
     }
+    $Tasks = $requiredEvidenceTasks
 }
 
 & $sourceCheck

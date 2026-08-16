@@ -6,6 +6,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -54,6 +55,10 @@ fun ExpandingChoiceRow(
     enabled: Boolean = true,
     selectedWeight: Float = 1.35f,
     unselectedWeight: Float = 0.75f,
+    choiceWidthAnimationSpec: AnimationSpec<Float> = spring(
+        dampingRatio = Spring.DampingRatioMediumBouncy,
+        stiffness = Spring.StiffnessMediumLow,
+    ),
     optionContentPadding: Dp = 14.dp,
     optionContentSpacing: Dp = 6.dp,
     groupContentDescription: String? = null,
@@ -79,10 +84,7 @@ fun ExpandingChoiceRow(
             val selected = choice.key == selectedKey
             val weight = animateFloatAsState(
                 targetValue = if (selected) selectedWeight else unselectedWeight,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessMediumLow,
-                ),
+                animationSpec = choiceWidthAnimationSpec,
                 label = "${choice.key} option width",
             )
             ExpandingChoiceOption(

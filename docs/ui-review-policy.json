@@ -2,6 +2,35 @@
   "schemaVersion": 1,
   "agentType": "terra_medium",
   "contract": "docs/ui-specialist-review-contract.md",
+  "candidateTasks": [
+    ":app:testCommunityDebugUnitTest",
+    ":app:updateCommunityDebugScreenshotTest",
+    ":app:testPlayDebugUnitTest",
+    ":app:updatePlayDebugScreenshotTest"
+  ],
+  "coveredSourceGlobs": [
+    "app/src/main/java/com/xteink/companion/ui/**/*.kt",
+    "app/src/main/java/com/xteink/companion/ui/*.kt",
+    "app/src/main/res/**/*",
+    "app/src/test/java/com/xteink/companion/ui/**/*.kt",
+    "app/src/test/java/com/xteink/companion/ui/*.kt",
+    "app/src/screenshotTest/**/*.kt",
+    "firmware/src/activities/**/*.cpp",
+    "firmware/src/activities/**/*.h",
+    "firmware/src/activities/*.cpp",
+    "firmware/src/activities/*.h",
+    "firmware/lib/hal/HalDisplay.*"
+  ],
+  "evidenceGlobs": [
+    "app/src/screenshotTest*/reference/**/*.png",
+    "app/src/screenshotTest*/reference/*.png",
+    "app/src/test/**/*.kt",
+    "app/src/screenshotTest/**/*.kt",
+    "firmware/test/**/*.cpp",
+    "firmware/test/**/*.h",
+    "docs/ui-evidence/**/*.md",
+    "docs/ui-evidence/**/*.json"
+  ],
   "roles": [
     {
       "id": "ux-flow",
@@ -74,24 +103,86 @@
         "no-duplicate-route-or-provenance-announcement",
         "all-controls-reachable-at-required-scales"
       ]
-    }
-  ],
-  "conditionalRoles": [
+    },
     {
       "id": "eink-scanner",
       "prompt": "docs/ui-reviewers/eink-scanner.md",
-      "appliesTo": "x3-display"
+      "requiredChecks": [
+        "binary-hierarchy-and-safe-region",
+        "scanner-quiet-zone-and-scaling",
+        "mapped-hints-and-refresh-boundary"
+      ]
     }
   ],
   "surfaces": [
     {
       "id": "passes",
-      "sourceFiles": [
+      "kind": "android-ui",
+      "baselineCommit": "32177b176df3cd8d1baf091439fcdf73c869b4b1",
+      "sourceGlobs": [
         "app/src/main/java/com/xteink/companion/ui/components/TicketContent.kt",
         "app/src/main/java/com/xteink/companion/ui/components/ExpandingChoice.kt",
         "app/src/main/java/com/xteink/companion/ui/components/MagneticPager.kt",
         "app/src/main/java/com/xteink/companion/ui/components/PassCardLayoutPolicy.kt",
         "app/src/main/java/com/xteink/companion/ui/components/PassModeLayoutPolicy.kt",
+        "app/src/main/java/com/xteink/companion/ui/components/PassMotionPolicy.kt",
+        "app/src/main/java/com/xteink/companion/ui/components/TicketMetadataPresentation.kt",
+        "app/src/main/java/com/xteink/companion/ui/CompanionUiState.kt",
+        "app/src/main/java/com/xteink/companion/ui/TicketOperationPolicy.kt",
+        "app/src/main/java/com/xteink/companion/ui/CompanionViewModel.kt",
+        "app/src/test/java/com/xteink/companion/ui/TicketOperationPolicyTest.kt",
+        "app/src/test/java/com/xteink/companion/ui/components/PassReducedMotionTest.kt",
+        "app/src/test/java/com/xteink/companion/ui/components/PassModeLayoutPolicyTest.kt",
+        "app/src/test/java/com/xteink/companion/ui/components/PassCardLayoutPolicyTest.kt",
+        "app/src/test/java/com/xteink/companion/ui/components/MagneticSwipeTest.kt",
+        "app/src/screenshotTest/kotlin/com/xteink/companion/ui/CompanionPreviewScreenshotTest.kt"
+      ],
+      "requiredRoles": [
+        "ux-flow",
+        "hierarchy",
+        "layout-spacing-margins",
+        "typography",
+        "color-contrast",
+        "shape-affordance",
+        "motion-interaction",
+        "accessibility-adaptive"
+      ],
+      "requiredEvidenceFiles": [
+        "app/src/test/java/com/xteink/companion/ui/TicketOperationPolicyTest.kt",
+        "app/src/test/java/com/xteink/companion/ui/components/PassReducedMotionTest.kt",
+        "app/src/test/java/com/xteink/companion/ui/components/PassModeLayoutPolicyTest.kt",
+        "app/src/test/java/com/xteink/companion/ui/components/PassCardLayoutPolicyTest.kt",
+        "app/src/test/java/com/xteink/companion/ui/components/MagneticSwipeTest.kt",
+        "app/src/screenshotTest/kotlin/com/xteink/companion/ui/CompanionPreviewScreenshotTest.kt",
+        "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/passDetailPhoneScreenshot_Pass detail phone_8d24a6c6_0.png",
+        "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/passDetailCompactScreenshot_Pass detail compact_573ae314_0.png",
+        "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/passDetailLargeTextScreenshot_Pass detail large text_44657ee4_0.png",
+        "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/passDetailHugeTextScreenshot_Pass detail huge text_9beb6ec2_0.png",
+        "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/quietPassDetailPhoneScreenshot_Quiet pass detail_9a2f9f8d_0.png",
+        "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/passDetailPhoneScreenshot_Pass detail phone_8d24a6c6_0.png",
+        "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/passDetailCompactScreenshot_Pass detail compact_573ae314_0.png",
+        "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/passDetailLargeTextScreenshot_Pass detail large text_44657ee4_0.png",
+        "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/passDetailHugeTextScreenshot_Pass detail huge text_9beb6ec2_0.png",
+        "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/quietPassDetailPhoneScreenshot_Quiet pass detail_9a2f9f8d_0.png"
+      ],
+      "record": "docs/ui-review-records/passes-current.json"
+    },
+    {
+      "id": "android-ui",
+      "kind": "android-ui",
+      "baselineCommit": "32177b176df3cd8d1baf091439fcdf73c869b4b1",
+      "sourceGlobs": [
+        "app/src/main/java/com/xteink/companion/ui/**/*.kt",
+        "app/src/main/java/com/xteink/companion/ui/*.kt",
+        "app/src/main/res/**/*"
+      ],
+      "excludeGlobs": [
+        "app/src/main/java/com/xteink/companion/ui/components/TicketContent.kt",
+        "app/src/main/java/com/xteink/companion/ui/components/ExpandingChoice.kt",
+        "app/src/main/java/com/xteink/companion/ui/components/MagneticPager.kt",
+        "app/src/main/java/com/xteink/companion/ui/components/PassCardLayoutPolicy.kt",
+        "app/src/main/java/com/xteink/companion/ui/components/PassModeLayoutPolicy.kt",
+        "app/src/main/java/com/xteink/companion/ui/components/PassMotionPolicy.kt",
         "app/src/main/java/com/xteink/companion/ui/components/TicketMetadataPresentation.kt",
         "app/src/main/java/com/xteink/companion/ui/CompanionUiState.kt",
         "app/src/main/java/com/xteink/companion/ui/TicketOperationPolicy.kt",
@@ -107,7 +198,31 @@
         "motion-interaction",
         "accessibility-adaptive"
       ],
-      "record": "docs/ui-review-records/passes-current.json"
+      "record": "docs/ui-review-records/android-ui-current.json"
+    },
+    {
+      "id": "x3-display",
+      "kind": "x3-display",
+      "baselineCommit": "32177b176df3cd8d1baf091439fcdf73c869b4b1",
+      "sourceGlobs": [
+        "firmware/src/activities/**/*.cpp",
+        "firmware/src/activities/**/*.h",
+        "firmware/src/activities/*.cpp",
+        "firmware/src/activities/*.h",
+        "firmware/lib/hal/HalDisplay.*"
+      ],
+      "requiredRoles": [
+        "ux-flow",
+        "hierarchy",
+        "layout-spacing-margins",
+        "typography",
+        "color-contrast",
+        "shape-affordance",
+        "motion-interaction",
+        "accessibility-adaptive",
+        "eink-scanner"
+      ],
+      "record": "docs/ui-review-records/x3-display-current.json"
     }
   ]
 }

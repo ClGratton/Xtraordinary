@@ -26,10 +26,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -306,13 +303,13 @@ private fun PassControlCard(
 ) {
     var requestedCodeFace by remember(pass.id) { mutableStateOf(false) }
     val turn by animateFloatAsState(
-        targetValue = if (requestedCodeFace) 1f else 0f,
+        targetValue = PassMotionPolicy.turnTarget(requestedCodeFace),
         // Compose's MotionDurationScale makes this immediately settle at a
         // system duration scale of zero.
-        animationSpec = tween(durationMillis = 220),
+        animationSpec = tween(durationMillis = PassMotionPolicy.turnDurationMillis),
         label = "pass vertical turn",
     )
-    val showCode = turn >= 0.5f
+    val showCode = PassMotionPolicy.showsCode(turn)
     Surface(
         modifier = modifier.height(cardHeight),
         color = containerColor,
@@ -771,17 +768,15 @@ private fun PassModeChooser(
 ) {
     val haptics = LocalHapticFeedback.current
     val optionHeight = PassModeLayoutPolicy.optionHeight(LocalDensity.current.fontScale)
+    val deployedSelectedPass = isOnX3 && deployedPassId == selectedPass.id
     val splitProgress by animateFloatAsState(
-        targetValue = if (isOnX3 && deployedPassId == selectedPass.id) 1f else 0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow,
-        ),
+        targetValue = PassMotionPolicy.actionMitosisTarget(deployedSelectedPass),
+        animationSpec = PassMotionPolicy.actionMitosisSpring,
         label = "ticket action mitosis",
     )
-    val splitGap by animateDpAsState(
-        targetValue = if (isOnX3 && deployedPassId == selectedPass.id) 8.dp else 0.dp,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+    val splitGapDp by animateFloatAsState(
+        targetValue = PassMotionPolicy.actionGapTarget(deployedSelectedPass),
+        animationSpec = PassMotionPolicy.actionGapSpring,
         label = "ticket action gap",
     )
     val sendAvailable = TicketOperationPolicy.canStartSend(ticketState)
@@ -803,8 +798,9 @@ private fun PassModeChooser(
             onSelect = { onSetMode(TicketMode.valueOf(it)) },
             enabled = TicketOperationPolicy.canChangeNextSendMode(ticketState),
             optionHeight = optionHeight,
-            selectedWeight = 1.45f,
-            unselectedWeight = 0.75f,
+            selectedWeight = PassMotionPolicy.selectedChoiceWeight,
+            unselectedWeight = PassMotionPolicy.restingChoiceWeight,
+            choiceWidthAnimationSpec = PassMotionPolicy.choiceSpring,
             optionContentPadding = 14.dp,
             optionContentSpacing = 4.dp,
             groupContentDescription = stringResource(R.string.mode_for_next_send),
@@ -812,7 +808,7 @@ private fun PassModeChooser(
         ) { key ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(splitGap),
+                horizontalArrangement = Arrangement.spacedBy(splitGapDp.dp),
             ) {
                 Button(
                     onClick = {

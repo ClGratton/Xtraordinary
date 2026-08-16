@@ -1,0 +1,19 @@
+name: UI review structure gate
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  review-structure:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify source-bound UI review receipts
+        shell: powershell
+        run: .\scripts\check-engineering-policies.ps1 -Mode Release
