@@ -2,6 +2,7 @@ package com.xteink.companion.ui.components
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.runtime.MonotonicFrameClock
 import androidx.compose.ui.MotionDurationScale
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -15,8 +16,17 @@ class PassReducedMotionTest {
         override val scaleFactor: Float = 0f
     }
 
+    private class SteppingFrameClock : MonotonicFrameClock {
+        private var frameTimeNanos = 0L
+
+        override suspend fun <R> withFrameNanos(onFrame: (Long) -> R): R {
+            frameTimeNanos += 16_000_000L
+            return onFrame(frameTimeNanos)
+        }
+    }
+
     @Test fun zeroDurationScaleReachesBothCardFacesAndChoiceWidths() = runBlocking {
-        withContext(ZeroMotionDurationScale) {
+        withContext(ZeroMotionDurationScale + SteppingFrameClock()) {
             val turn = Animatable(PassMotionPolicy.detailsFace)
             turn.animateTo(
                 PassMotionPolicy.turnTarget(showCode = true),
