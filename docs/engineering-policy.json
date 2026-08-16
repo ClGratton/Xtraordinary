@@ -19,8 +19,8 @@
       "id": "usb-commands-refresh-device-activity",
       "type": "required_pattern",
       "path": "firmware/src/main.cpp",
-      "pattern": "recognizedCommand[\\s\\S]*?if \\(!recognizedCommand\\) return[\\s\\S]*?lastActivityAtMs = millis\\(\\)[\\s\\S]*?powerManager\\.setPowerSaving\\(false\\)",
-      "message": "USB commands must restore full-speed processing and extend the shared inactivity deadline."
+      "pattern": "recognizedCommand[\\s\\S]*?if \\(!recognizedCommand\\) return[\\s\\S]*?lastActivityAtMs = millis\\(\\)[\\s\\S]*?powerManager\\.setPowerSaving\\(false\\)[\\s\\S]*?companion::companionService\\.wakeFastAdvertising\\(\\)",
+      "message": "USB commands must restore full-speed processing and keep the shared inactivity and companion-advertising deadlines synchronized."
     },
     {
       "id": "sleep-final-sync-is-power-interruptible",

@@ -78,6 +78,7 @@ Configurable app choices:
 - Boot, leaving Reading, leaving a static ticket, and Home button activity arm a fresh fast-discovery window.
 - A saved Live ticket is content, not an active runtime mode. Boot and Home always receive the complete fast-discovery window unless Focus is active or the Live ticket is actually open on the X3. This prevents a persisted ticket from showing the low-power chip immediately after boot.
 - Fast advertising transitions to the visible pulse-based standby state at the configured fast-window deadline.
+- Every recognized USB command is device activity. It extends the shared inactivity deadline, restores normal CPU processing for the bounded operation, and reuses `wakeFastAdvertising()` so the companion radio window is rearmed from the same event. Reading and a pinned static ticket retain their intentional radio-quiet guards. Resetting only the CPU deadline while leaving the older radio deadline running is forbidden because it can leave X3 awake with advertising permanently expired.
 - At the inactivity deadline, Home sleeps.
 - A phone connection does not alter pairing. Foreground alone no longer retains GATT: after the one-shot status probe or an ACKed command, Android disconnects unless durable work, a transfer, or a visible interactive owner still needs it. A running Focus session or displayed Live ticket keeps X3 awake and pulse-discoverable; it does not by itself justify a permanent GATT connection.
 

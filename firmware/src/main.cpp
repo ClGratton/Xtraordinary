@@ -677,6 +677,14 @@ void loop() {
       if (!recognizedCommand) return;
       lastActivityAtMs = millis();
       powerManager.setPowerSaving(false);
+#ifdef ENABLE_X3_COMPANION
+      // USB is real device activity, not merely a CPU-frequency hint. Reuse
+      // the same generic radio lifecycle as a Home button so the companion
+      // advertising window cannot expire against an older deadline while the
+      // shared inactivity deadline has just been extended. Reading and a
+      // pinned static ticket retain their intentional radio-quiet guards.
+      companion::companionService.wakeFastAdvertising();
+#endif
       if (cmd == "SCREENSHOT") {
         const uint32_t bufferSize = display.getBufferSize();
         logSerial.printf("SCREENSHOT_START:%d\n", bufferSize);
