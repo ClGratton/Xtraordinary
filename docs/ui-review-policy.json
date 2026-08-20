@@ -208,7 +208,9 @@
       "sourceGlobs": [
         "app/src/main/java/com/xteink/companion/ui/**/*.kt",
         "app/src/main/java/com/xteink/companion/ui/*.kt",
-        "app/src/main/res/**/*"
+        "app/src/main/res/**/*",
+        "app/src/test/java/com/xteink/companion/ui/CompanionPresentationStoreTest.kt",
+        "app/src/test/java/com/xteink/companion/ui/components/SetupActionLayoutPolicyTest.kt"
       ],
       "excludeGlobs": [
         "app/src/main/java/com/xteink/companion/ui/components/TicketContent.kt",
