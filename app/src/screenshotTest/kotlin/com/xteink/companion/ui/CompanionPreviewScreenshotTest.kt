@@ -409,7 +409,8 @@ fun quietPlayAdFreeScreenshot() {
             privacyOptionsRequired = true,
             testMode = true,
         ),
-        visualTheme = CompanionVisualTheme.Quiet,
+        visualTheme = CompanionVisualTheme.Minimal,
+        colorMode = CompanionColorMode.Dark,
     )
 }
 
@@ -417,8 +418,13 @@ fun quietPlayAdFreeScreenshot() {
 private fun MonetizationScreenshotContent(
     state: MonetizationRuntimeState,
     visualTheme: CompanionVisualTheme = CompanionVisualTheme.Expressive,
+    colorMode: CompanionColorMode = CompanionColorMode.Light,
 ) {
-    X3CompanionTheme(visualTheme = visualTheme, useDynamicColor = false) {
+    X3CompanionTheme(
+        visualTheme = visualTheme,
+        colorMode = colorMode,
+        useDynamicColor = false,
+    ) {
         Box(
             modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
             contentAlignment = Alignment.TopCenter,
