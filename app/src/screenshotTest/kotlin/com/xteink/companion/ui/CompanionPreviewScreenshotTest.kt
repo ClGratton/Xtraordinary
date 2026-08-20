@@ -391,9 +391,34 @@ fun playAdFreeLargeTextScreenshot() {
     )
 }
 
+@PreviewTest
+@Preview(name = "Quiet Play ad-free", widthDp = 360, heightDp = 680, showBackground = true)
 @Composable
-private fun MonetizationScreenshotContent(state: MonetizationRuntimeState) {
-    X3CompanionTheme(visualTheme = CompanionVisualTheme.Expressive, useDynamicColor = false) {
+fun quietPlayAdFreeScreenshot() {
+    MonetizationScreenshotContent(
+        state = MonetizationRuntimeState(
+            distribution = DistributionChannel.Play,
+            entitlement = EntitlementState.AdSupported,
+            consent = ConsentState.AdsAllowed,
+            purchasePhase = PurchasePhase.Ready,
+            product = StoreProductUi(
+                productId = "xtraordinary_ad_free",
+                title = "Xtraordinary Ad-Free",
+                formattedPrice = "€4.99",
+            ),
+            privacyOptionsRequired = true,
+            testMode = true,
+        ),
+        visualTheme = CompanionVisualTheme.Quiet,
+    )
+}
+
+@Composable
+private fun MonetizationScreenshotContent(
+    state: MonetizationRuntimeState,
+    visualTheme: CompanionVisualTheme = CompanionVisualTheme.Expressive,
+) {
+    X3CompanionTheme(visualTheme = visualTheme, useDynamicColor = false) {
         Box(
             modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
             contentAlignment = Alignment.TopCenter,
@@ -402,6 +427,7 @@ private fun MonetizationScreenshotContent(state: MonetizationRuntimeState) {
                 state = state,
                 onBuy = {},
                 onRestore = {},
+                onContinueFree = {},
                 onPrivacyOptions = {},
                 onOpenCommunitySource = {},
                 modifier = Modifier.padding(20.dp),

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -27,6 +28,7 @@ fun MonetizationSettingsCard(
     state: MonetizationRuntimeState,
     onBuy: () -> Unit,
     onRestore: () -> Unit,
+    onContinueFree: () -> Unit,
     onPrivacyOptions: () -> Unit,
     onOpenCommunitySource: () -> Unit,
     modifier: Modifier = Modifier,
@@ -94,6 +96,9 @@ fun MonetizationSettingsCard(
                     )
                 }
 
+                val secondaryActionColors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                     val compactActions = maxWidth < 320.dp
                     if (compactActions) {
@@ -101,6 +106,7 @@ fun MonetizationSettingsCard(
                             if (!state.isCommunity) {
                                 TextButton(
                                     onClick = onRestore,
+                                    colors = secondaryActionColors,
                                     enabled = state.purchasePhase !in setOf(
                                         PurchasePhase.Purchasing,
                                         PurchasePhase.Pending,
@@ -113,6 +119,7 @@ fun MonetizationSettingsCard(
                             if (state.privacyOptionsRequired) {
                                 TextButton(
                                     onClick = onPrivacyOptions,
+                                    colors = secondaryActionColors,
                                     modifier = Modifier.fillMaxWidth(),
                                 ) {
                                     Text(stringResource(R.string.ad_privacy))
@@ -124,6 +131,7 @@ fun MonetizationSettingsCard(
                             if (!state.isCommunity) {
                                 TextButton(
                                     onClick = onRestore,
+                                    colors = secondaryActionColors,
                                     enabled = state.purchasePhase !in setOf(
                                         PurchasePhase.Purchasing,
                                         PurchasePhase.Pending,
@@ -133,13 +141,28 @@ fun MonetizationSettingsCard(
                                 }
                             }
                             if (state.privacyOptionsRequired) {
-                                TextButton(onClick = onPrivacyOptions) { Text(stringResource(R.string.ad_privacy)) }
+                                TextButton(
+                                    onClick = onPrivacyOptions,
+                                    colors = secondaryActionColors,
+                                ) { Text(stringResource(R.string.ad_privacy)) }
                             }
                         }
                     }
                 }
+                if (!state.isCommunity && !state.isPurchased) {
+                    TextButton(
+                        onClick = onContinueFree,
+                        colors = secondaryActionColors,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.ad_free_continue_free))
+                    }
+                }
                 Spacer(Modifier.height(2.dp))
-                TextButton(onClick = onOpenCommunitySource) {
+                TextButton(
+                    onClick = onOpenCommunitySource,
+                    colors = secondaryActionColors,
+                ) {
                     Text(
                         stringResource(
                             if (state.isCommunity) R.string.ad_free_view_source else R.string.ad_free_community_source,

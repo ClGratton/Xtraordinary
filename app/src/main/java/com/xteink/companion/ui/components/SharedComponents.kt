@@ -693,6 +693,7 @@ fun SettingsSheetContent(
             state = monetizationState,
             onBuy = onBuyAdFree,
             onRestore = onRestorePurchase,
+            onContinueFree = onDismiss,
             onPrivacyOptions = onAdPrivacyOptions,
             onOpenCommunitySource = onOpenCommunitySource,
         )
