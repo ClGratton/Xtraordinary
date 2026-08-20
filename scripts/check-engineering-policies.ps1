@@ -122,7 +122,13 @@ $protectedVisualLanguageResource = 'docs/ui-visual-language-foundations.md'
 $protectedRoleChecks = [ordered]@{
     'ux-flow' = @('interaction-affordance-is-self-evident', 'icon-and-spatial-metaphor-are-coherent', 'immutable-pending-operation-truth', 'no-conflicting-ticket-operations', 'operational-copy-earns-space')
     'hierarchy' = @('front-hierarchy-order', 'contained-expanding-action', 'provenance-not-front-primary')
-    'layout-spacing-margins' = @('carousel-peek-equals-route-rail', 'front-back-bounds-match', 'adaptive-bounds-do-not-overlap')
+    'layout-spacing-margins' = @(
+        'carousel-peek-equals-route-rail',
+        'front-back-bounds-match',
+        'adaptive-bounds-do-not-overlap',
+        'first-viewport-space-is-assigned',
+        'sibling-actions-share-stable-lower-zone'
+    )
     'typography' = @('header-reflows-before-overlap', 'operational-facts-reflow-before-truncation', 'required-large-text-fixtures')
     'color-contrast' = @('primary-reserved-for-transaction', 'quiet-remains-grayscale', 'role-pair-contrast')
     'shape-affordance' = @('selected-action-contained', 'action-shape-and-target', 'glyph-geometry-is-optically-separated', 'resting-option-remains-selectable')

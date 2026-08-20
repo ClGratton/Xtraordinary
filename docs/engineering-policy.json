@@ -718,6 +718,26 @@
       "message": "Setup bottom anchoring and overflow expansion require a reusable tested placement policy."
     },
     {
+      "id": "adaptive-first-viewport-assigns-slack",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/components/ControlDeckFocusContent.kt",
+      "pattern": "calculateAdaptiveSurfaceHeight\\([\\s\\S]*?viewportHeight = maxHeight.value[\\s\\S]*?minimumSurfaceHeight = 270f",
+      "message": "Finite first-viewport screens must assign tall-screen slack to a useful breathing surface instead of capping early and leaving a dead band."
+    },
+    {
+      "id": "adaptive-first-viewport-policy-is-tested",
+      "type": "required_file",
+      "path": "app/src/test/java/com/xteink/companion/ui/components/AdaptiveViewportLayoutPolicyTest.kt",
+      "message": "Tall-screen fill and short-screen overflow behavior require a reusable tested viewport policy."
+    },
+    {
+      "id": "layout-review-blocks-dead-space-and-action-drift",
+      "type": "required_pattern",
+      "path": "docs/ui-reviewers/layout-spacing-margins.md",
+      "pattern": "large unassigned first-viewport band[\\s\\S]*?primary actions drift[\\s\\S]*?first-viewport-space-is-assigned[\\s\\S]*?sibling-actions-share-stable-lower-zone",
+      "message": "Permanent layout review must reject both unassigned tall-screen whitespace and sibling action-position drift."
+    },
+    {
       "id": "appearance-axes-remain-independent",
       "type": "required_pattern",
       "path": "app/src/main/java/com/xteink/companion/ui/CompanionPresentationStore.kt",

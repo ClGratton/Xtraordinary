@@ -82,3 +82,10 @@
 - Work performed: one primary-agent implementation batch covering measured setup action anchoring, independent scene-drag Light/Dark and Expressive/Minimal state, real Minimal shape/spacing/motion effects, direct legal/notices access, product-level license/trademark audit, and durable engineering guards. No reviewer wave or compiler ran in this interval.
 - Cause: repeated long-context primary-agent implementation and documentation rounds are themselves material weekly usage even without delegation or compilation.
 - Decision: permit one pushed `UiEvidenceCandidate` run for this settled batch. If it needs more than one evidence-based correction/rerun, stop and preserve the exact blocker instead of starting another compiler/reviewer loop.
+
+## 2026-08-20 - Consolidated Android evidence checkpoint
+
+- Previous checkpoint: 36% used. Post-build snapshot: 40% used; a four-point increase. This is the seven-day `10080`-minute allowance, resetting at Unix `1787838919` (2026-08-27 15:55 Europe/Rome), Plus plan, no credits.
+- Work performed: one pushed Community/Play unit-test and deterministic screenshot evidence build. The first wrapper invocation stopped before compilation because two new unit-test sources were not mapped to the Android UI surface; the mapping-only correction was pushed, and the bounded candidate then completed and generated both reference sets.
+- Evidence decision: setup Library and Device actions now share the measured lower action zone. The same render exposed a separate Focus defect: a fixed 304 dp maximum left a large unassigned band on taller viewports. No Terra review wave starts on rejected evidence.
+- Durable correction in progress: replace the fixed maximum with a reusable viewport-fill policy, protect it with pure geometry tests, and make unassigned first-viewport slack plus sibling action drift explicit blocking checks in the permanent layout course and policy.

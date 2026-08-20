@@ -67,7 +67,9 @@
       "requiredChecks": [
         "carousel-peek-equals-route-rail",
         "front-back-bounds-match",
-        "adaptive-bounds-do-not-overlap"
+        "adaptive-bounds-do-not-overlap",
+        "first-viewport-space-is-assigned",
+        "sibling-actions-share-stable-lower-zone"
       ]
     },
     {
@@ -210,7 +212,8 @@
         "app/src/main/java/com/xteink/companion/ui/*.kt",
         "app/src/main/res/**/*",
         "app/src/test/java/com/xteink/companion/ui/CompanionPresentationStoreTest.kt",
-        "app/src/test/java/com/xteink/companion/ui/components/SetupActionLayoutPolicyTest.kt"
+        "app/src/test/java/com/xteink/companion/ui/components/SetupActionLayoutPolicyTest.kt",
+        "app/src/test/java/com/xteink/companion/ui/components/AdaptiveViewportLayoutPolicyTest.kt"
       ],
       "excludeGlobs": [
         "app/src/main/java/com/xteink/companion/ui/components/TicketContent.kt",

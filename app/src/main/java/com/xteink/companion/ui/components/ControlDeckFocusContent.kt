@@ -72,7 +72,13 @@ fun ControlDeckFocusContent(
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val imageAspect = 1.60f
         val imageHeight = maxWidth / imageAspect
-        val durationHeight = (maxHeight - imageHeight - 168.dp).coerceIn(270.dp, 304.dp)
+        val verticalGap = if (visualTheme == CompanionVisualTheme.Minimal) 12.dp else 18.dp
+        val fixedContentHeight = imageHeight + 64.dp + verticalGap + verticalGap + 24.dp
+        val durationHeight = calculateAdaptiveSurfaceHeight(
+            viewportHeight = maxHeight.value,
+            fixedContentHeight = fixedContentHeight.value,
+            minimumSurfaceHeight = 270f,
+        ).dp
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -80,7 +86,7 @@ fun ControlDeckFocusContent(
                 .padding(horizontal = 16.dp)
                 .padding(top = 4.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(
-                if (visualTheme == CompanionVisualTheme.Minimal) 12.dp else 18.dp,
+                verticalGap,
             ),
         ) {
             X3ImageField(colorMode = colorMode)

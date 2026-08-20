@@ -53,6 +53,14 @@ Any failed item blocks approval even when semantics, target size, contrast, and 
 
 Contextual header actions that begin a task, import content, or mutate screen state must retain a recognizable control silhouette and one coherent object/action cue during the source-blind five-second inventory. Bare text that can be mistaken for a heading, status, or passive link is a blocking affordance failure. This rule does not turn ordinary navigation links into filled buttons; the container strength must match the action's consequence and place in the hierarchy.
 
+### Viewport ownership and action geography
+
+Every visible region of a finite first viewport needs an owner. A tall phone must not produce a large unassigned band merely because a card or control reached a fixed maximum height. Assign additional height to the surface intended to breathe, enlarge useful preview/content space, or preserve a deliberate bounded rhythm. Lists and naturally scrolling documents remain content-sized; do not stretch rows simply to fill a screen.
+
+Primary action groups on sibling setup or step pages occupy a stable lower action zone whenever the measured content fits. Do not let each page's content height pull its buttons to an unrelated vertical position. On short screens or at large text, preserve semantic minimum gaps and expand into the existing scroll path rather than clipping, shrinking type, or hiding an action.
+
+Review both directions: crowding is a failure, but so is unassigned slack beneath the last meaningful control. Fixed maximum heights require a documented optical or functional reason and evidence at the shortest and tallest supported viewports.
+
 ## 5. Required critique passes
 
 Review rendered evidence before source and perform all of these passes:
