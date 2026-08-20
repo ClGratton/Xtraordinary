@@ -89,3 +89,10 @@
 - Work performed: one pushed Community/Play unit-test and deterministic screenshot evidence build. The first wrapper invocation stopped before compilation because two new unit-test sources were not mapped to the Android UI surface; the mapping-only correction was pushed, and the bounded candidate then completed and generated both reference sets.
 - Evidence decision: setup Library and Device actions now share the measured lower action zone. The same render exposed a separate Focus defect: a fixed 304 dp maximum left a large unassigned band on taller viewports. No Terra review wave starts on rejected evidence.
 - Durable correction in progress: replace the fixed maximum with a reusable viewport-fill policy, protect it with pure geometry tests, and make unassigned first-viewport slack plus sibling action drift explicit blocking checks in the permanent layout course and policy.
+
+## 2026-08-20 - Final adaptive evidence checkpoint
+
+- Previous checkpoint: 40% used. Post-rerender snapshot: 43% used; a three-point increase. This is the seven-day `10080`-minute allowance, resetting at Unix `1787838919` (2026-08-27 15:55 Europe/Rome), Plus plan, no credits.
+- Work performed: one pushed, provenance-gated Community/Play evidence rerender for the single adaptive-layout correction. The 111-rule gate passed; both variants compiled, both unit-test suites passed, and both deterministic screenshot suites passed in 1 minute 11 seconds.
+- Render decision: Setup Library and Device actions share the same lower action edge; Expressive and Minimal Focus now assign tall-screen slack to the timer surface and keep the action directly above navigation; the large-text Focus fixture remains unclipped.
+- Budget decision: the consolidated Android implementation and evidence phase moved the weekly meter from 36% to 43%. Freeze these source and rendered references. Do not run another Android UI compiler before the final source-bound review records and canonical release build.
