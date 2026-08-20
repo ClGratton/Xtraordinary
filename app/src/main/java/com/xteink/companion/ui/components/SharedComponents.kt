@@ -5,6 +5,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +40,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,6 +54,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -66,6 +70,7 @@ import com.xteink.companion.ui.isFastWindowChoiceEnabled
 import com.xteink.companion.ui.selectFastWindow
 import com.xteink.companion.ui.selectSleepAfter
 import com.xteink.companion.ui.sceneArtworkFor
+import kotlinx.coroutines.launch
 
 private val FastDiscoveryMinuteChoices = listOf(1, 5, 10)
 private val SleepAfterMinuteChoices = listOf(5, 10, 20)
@@ -531,7 +536,7 @@ fun SettingsSheetContent(
         )
         Spacer(Modifier.height(8.dp))
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().selectableGroup(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             ThemeChip(
@@ -810,16 +815,13 @@ private fun PolicyChoiceRow(
         Text(label, style = MaterialTheme.typography.labelLarge)
         Spacer(Modifier.height(6.dp))
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().selectableGroup(),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             values.forEach { value ->
                 val isSelected = selected == value
                 val isEnabled = optionEnabled(value)
                 Surface(
-                    selected = isSelected,
-                    enabled = isEnabled,
-                    onClick = { onSelect(value) },
                     shape = MaterialTheme.shapes.medium,
                     color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer
                     else MaterialTheme.colorScheme.surfaceContainerLow,
@@ -832,8 +834,14 @@ private fun PolicyChoiceRow(
                     ),
                     modifier = Modifier
                         .weight(1f)
-                        .height(44.dp)
-                        .alpha(if (isEnabled) 1f else 0.38f),
+                        .height(48.dp)
+                        .alpha(if (isEnabled) 1f else 0.38f)
+                        .selectable(
+                            selected = isSelected,
+                            enabled = isEnabled,
+                            role = Role.RadioButton,
+                            onClick = { onSelect(value) },
+                        ),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Text(
@@ -858,6 +866,7 @@ private fun ColorModeCarousel(
         initialPage = colorMode.ordinal,
         pageCount = { modes.size },
     )
+    val scope = rememberCoroutineScope()
     LaunchedEffect(colorMode) {
         if (pagerState.settledPage != colorMode.ordinal) {
             pagerState.animateScrollToPage(colorMode.ordinal)
@@ -878,7 +887,7 @@ private fun ColorModeCarousel(
             restingContent = MaterialTheme.colorScheme.onSurfaceVariant,
             selectedContent = MaterialTheme.colorScheme.onSecondaryContainer,
         ),
-        modifier = Modifier.fillMaxWidth().height(152.dp),
+        modifier = Modifier.fillMaxWidth().height(152.dp).selectableGroup(),
     ) { page, containerColor, contentColor ->
         val mode = modes[page]
         val artwork = sceneArtworkFor(mode)
@@ -886,7 +895,11 @@ private fun ColorModeCarousel(
             color = containerColor,
             contentColor = contentColor,
             shape = MaterialTheme.shapes.large,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().selectable(
+                selected = pagerState.settledPage == page,
+                role = Role.RadioButton,
+                onClick = { scope.launch { pagerState.animateScrollToPage(page) } },
+            ),
         ) {
             Column {
                 Image(
@@ -918,11 +931,6 @@ private fun ThemeChip(
 ) {
     val haptics = LocalHapticFeedback.current
     Surface(
-        selected = selected,
-        onClick = {
-            if (!selected) haptics.performHapticFeedback(HapticFeedbackType.ToggleOn)
-            onClick()
-        },
         shape = MaterialTheme.shapes.large,
         color = if (selected) MaterialTheme.colorScheme.secondaryContainer
         else MaterialTheme.colorScheme.surfaceContainerLow,
@@ -932,7 +940,14 @@ private fun ThemeChip(
             if (selected) 2.dp else 1.dp,
             if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
         ),
-        modifier = modifier,
+        modifier = modifier.selectable(
+            selected = selected,
+            role = Role.RadioButton,
+            onClick = {
+                if (!selected) haptics.performHapticFeedback(HapticFeedbackType.ToggleOn)
+                onClick()
+            },
+        ),
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             ThemePreview(expressive = expressive, selected = selected)

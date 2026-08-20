@@ -152,6 +152,7 @@ The disabled backup button remains visible before consent so the relationship be
 - At the default 412 x 915 dp compact portrait viewport, all Welcome content and its button must fit without vertical scrolling.
 - Library and Device own one reusable measured action slot. When their content fits, the complete action group is anchored to the same lower content edge on every page; actions must not simply follow short copy and leave a dead lower half.
 - Extra height is assigned deliberately between the concept/content group and the lower action group. Do not leave a large accidental blank region below the last action, and do not scatter page-specific spacer constants to imitate bottom alignment.
+- The rule is structural, not setup-specific: finite sibling pages keep equivalent primary actions in a stable lower action zone, while the first viewport assigns remaining height to a named working surface or deliberate inter-group breathing space. A large ownerless white band and actions that jump vertically between sibling pages are both release blockers.
 - The action-slot policy measures the actual content, actions, minimum semantic gap, and available viewport. If they do not fit, it expands the page by exactly the required amount so the existing vertical-scroll fallback preserves every control.
 - Retain vertical scrolling only as a fallback for increased font/display scale, localization expansion, multi-window, or a shorter device.
 - Never hide or remove functionality to force a fit.

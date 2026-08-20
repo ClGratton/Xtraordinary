@@ -22,6 +22,19 @@ if (-not $manifest.rules -or $manifest.rules.Count -eq 0) {
     throw 'Engineering policy manifest must contain at least one rule.'
 }
 
+$protectedLayoutAndSelectionRuleIds = @(
+    'setup-actions-use-measured-bottom-slot',
+    'adaptive-first-viewport-assigns-slack',
+    'layout-review-blocks-dead-space-and-action-drift',
+    'settings-exclusive-choices-use-radio-semantics'
+)
+$manifestRuleIds = @($manifest.rules | ForEach-Object { $_.id })
+foreach ($protectedRuleId in $protectedLayoutAndSelectionRuleIds) {
+    if ($protectedRuleId -notin $manifestRuleIds) {
+        throw "Engineering policy manifest must retain protected UI rule '$protectedRuleId'."
+    }
+}
+
 # This bootstrap is intentionally outside manifest dispatch.  The manifest may
 # describe review details, but it may not silently remove the review gate.
 $uiReviewRule = @($manifest.rules | Where-Object { $_.id -eq 'ui-changes-require-stable-terra-reviews' })

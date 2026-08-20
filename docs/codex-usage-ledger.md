@@ -96,3 +96,15 @@
 - Work performed: one pushed, provenance-gated Community/Play evidence rerender for the single adaptive-layout correction. The 111-rule gate passed; both variants compiled, both unit-test suites passed, and both deterministic screenshot suites passed in 1 minute 11 seconds.
 - Render decision: Setup Library and Device actions share the same lower action edge; Expressive and Minimal Focus now assign tall-screen slack to the timer surface and keep the action directly above navigation; the large-text Focus fixture remains unclipped.
 - Budget decision: the consolidated Android implementation and evidence phase moved the weekly meter from 36% to 43%. Freeze these source and rendered references. Do not run another Android UI compiler before the final source-bound review records and canonical release build.
+
+## 2026-08-20 - Final-review early-stop checkpoint
+
+- Previous checkpoint: 43% used. Current snapshot: 48% used; a five-point increase, reported immediately. This is the seven-day `10080`-minute allowance, resetting at Unix `1787838919` (2026-08-27 15:55 Europe/Rome), Plus plan, no credits.
+- Work performed: exactly three independent history-free Terra roles reviewed the same frozen Android/Passes source and evidence: UX flow, motion/interaction, and accessibility/adaptive. UX and motion passed; accessibility blocked the generic Android surface because exclusive Settings choices lacked group/radio semantics, policy chips were 44 dp rather than 48 dp, and the Light/Dark pager lacked a non-gesture selection route.
+- Decision: stop the remaining five mandatory roles. Correct the central Settings selection primitive and carousel semantics first; do not spend five more reviews on source that is already known to be unacceptable. After one corrected evidence set, rerun the eight-role wave once.
+
+## 2026-08-20 - Consolidated accessibility and device-verifier checkpoint
+
+- Previous checkpoint: 48% used. Current snapshot: 52% used; a four-point increase. This is the seven-day `10080`-minute allowance, resetting at Unix `1787838918` (2026-08-27 15:55 Europe/Rome), Plus plan, no credits.
+- Work performed: the primary agent corrected mutually exclusive Settings controls to expose one radio group, 48 dp targets, and non-gesture scene selection; strengthened the permanent viewport/action-zone and accessibility contracts; and isolated a reconnect-verifier false negative caused by a single-line USB trace acknowledgement regex. No reviewer or compiler ran.
+- Budget decision: preserve the remaining 48% by running one pushed Community/Play evidence build for the settled Android source, then one eight-role final Terra wave only if that evidence is acceptable. Do not restart exploratory or preliminary reviewer loops.

@@ -60,12 +60,13 @@ function Invoke-X3UsbWake {
         $Serial.Write("CMD:RUNTIME_TRACE`n")
         $Deadline = [DateTime]::UtcNow.AddSeconds(5)
         $Text = ""
+        $RuntimeTraceAckPattern = 'RUNTIME_TRACE_ACTIVE[\s\S]*?power_held_ms='
         do {
             Start-Sleep -Milliseconds 100
             $Text += $Serial.ReadExisting()
         } while ([DateTime]::UtcNow -lt $Deadline -and
-                 $Text -notmatch 'RUNTIME_TRACE_ACTIVE.*power_held_ms=')
-        if ($Text -notmatch 'RUNTIME_TRACE_ACTIVE.*power_held_ms=') {
+                 $Text -notmatch $RuntimeTraceAckPattern)
+        if ($Text -notmatch $RuntimeTraceAckPattern) {
             throw "X3 did not acknowledge bounded USB activity on $WakeViaUsbPort."
         }
         $Trace = ($Text -split "`r?`n" |

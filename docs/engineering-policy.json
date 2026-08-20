@@ -701,7 +701,7 @@
       "id": "reconnect-verifier-requires-discovery-precondition",
       "type": "required_pattern",
       "path": "scripts/verify-x3-reconnect.ps1",
-      "pattern": "PersistentWorkAlreadyQueued[\\s\\S]*?WakeViaUsbPort[\\s\\S]*?foreground launch alone is only a 15-second one-shot probe[\\s\\S]*?Invoke-X3UsbWake",
+      "pattern": "PersistentWorkAlreadyQueued[\\s\\S]*?WakeViaUsbPort[\\s\\S]*?foreground launch alone is only a 15-second one-shot probe[\\s\\S]*?Invoke-X3UsbWake[\\s\\S]*?RUNTIME_TRACE_ACTIVE\\[\\\\s\\\\S\\]\\*\\?power_held_ms=",
       "message": "Reconnect acceptance must not mistake a foreground one-shot probe that misses a standby pulse for a transport failure; require durable work or an explicit generic wake."
     },
     {
@@ -750,6 +750,13 @@
       "path": "app/src/main/java/com/xteink/companion/ui/components/SharedComponents.kt",
       "pattern": "ColorModeCarousel[\\s\\S]*?onSetColorMode\\(settledMode\\)[\\s\\S]*?MagneticHorizontalPager\\([\\s\\S]*?sceneArtworkFor\\(mode\\)",
       "message": "Settings light/dark choice must remain a direct-manipulation sea/astronaut carousel rather than redundant chips."
+    },
+    {
+      "id": "settings-exclusive-choices-use-radio-semantics",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/components/SharedComponents.kt",
+      "pattern": "PolicyChoiceRow[\\s\\S]*?selectableGroup\\(\\)[\\s\\S]*?height\\(48\\.dp\\)[\\s\\S]*?Role\\.RadioButton[\\s\\S]*?ColorModeCarousel[\\s\\S]*?selectableGroup\\(\\)[\\s\\S]*?Role\\.RadioButton[\\s\\S]*?ThemeChip[\\s\\S]*?Role\\.RadioButton",
+      "message": "Every exclusive Settings choice must expose one radio group, a 48 dp target, and a non-gesture selection route."
     },
     {
       "id": "minimal-style-changes-more-than-color",

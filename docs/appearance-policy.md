@@ -8,7 +8,7 @@ Appearance has two independent persisted axes. They must never be collapsed back
 
 Light/dark is selected by directly dragging the scene carousel in Settings. The sea/lighthouse scene represents Light; the astronaut/space scene represents Dark. The selected scene controls the app color scheme, system-bar appearance, and the matching X3 artwork preview. The neighboring scene remains partially visible so the carousel is self-evidently draggable.
 
-The scene is the selector. Do not add a redundant Light/Dark chip row beside it. Programmatic state restoration may scroll the carousel, but a settled user drag owns the persisted choice.
+The scene is the selector. Do not add a redundant Light/Dark chip row beside it. Programmatic state restoration may scroll the carousel, but a settled user drag owns the persisted choice. Drag remains the primary visual interaction; tapping, keyboard-activating, or switch-activating either visible scene is the equivalent accessible selection route. The carousel exposes one mutually exclusive radio group, not two unrelated image buttons.
 
 ## Expressive and Minimal
 
