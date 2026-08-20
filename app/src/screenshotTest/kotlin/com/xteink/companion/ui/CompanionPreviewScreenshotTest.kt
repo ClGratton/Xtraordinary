@@ -106,7 +106,8 @@ fun setupDeviceScreenshot() {
 fun quietFocusPhoneScreenshot() {
     ScreenshotApp(
         state = CompanionUiState(
-            visualTheme = CompanionVisualTheme.Quiet,
+            visualTheme = CompanionVisualTheme.Minimal,
+            colorMode = CompanionColorMode.Dark,
             focus = FocusUiState(
                 task = "Finish protocol",
                 selectedMinutes = 25,
@@ -256,7 +257,8 @@ fun passDetailPhoneScreenshot() {
 fun quietPassDetailPhoneScreenshot() {
     ScreenshotApp(
         state = CompanionUiState(
-            visualTheme = CompanionVisualTheme.Quiet,
+            visualTheme = CompanionVisualTheme.Minimal,
+            colorMode = CompanionColorMode.Dark,
             surface = CompanionSurface.Tools,
             toolDestination = ToolDestination.Passes,
             ticket = linearPassPreviewState,
@@ -352,11 +354,13 @@ private fun SettingsScreenshotContent(cloudBackupState: CloudBackupState) {
             ) {
                 SettingsSheetContent(
                     visualTheme = CompanionVisualTheme.Expressive,
+                    colorMode = CompanionColorMode.Light,
                     radioPolicy = RadioPolicyUiState(fastWindowMinutes = 1, sleepAfterMinutes = 5),
                     minimumReadingPageSeconds = 5,
                     settingsSyncPending = true,
                     hasManagedDevice = true,
                     onSetVisualTheme = {},
+                    onSetColorMode = {},
                     onSetRadioPolicy = {},
                     onSetMinimumReadingPageSeconds = {},
                     onOpenSetup = {},
@@ -427,10 +431,15 @@ private fun DeviceSheetScreenshot(
 
 @Composable
 private fun ScreenshotApp(state: CompanionUiState) {
-    X3CompanionTheme(visualTheme = state.visualTheme, useDynamicColor = false) {
+    X3CompanionTheme(
+        visualTheme = state.visualTheme,
+        colorMode = state.colorMode,
+        useDynamicColor = false,
+    ) {
         X3CompanionApp(
             state = state,
             onSetVisualTheme = {},
+            onSetColorMode = {},
             onSetRadioPolicy = {},
             onSetDuration = {},
             onStartFocus = {},

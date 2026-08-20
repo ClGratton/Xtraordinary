@@ -68,3 +68,10 @@
 - Work performed: sequential source-bound UX, hierarchy, layout/spacing, typography, color/contrast, and shape/affordance reviews against one settled source commit and one Community/Play evidence set. No additional compiler ran.
 - Cause: the required independent specialist calls account for the metered interval. Each reviewer owned one role, inherited no long task history, and stopped after its verdict.
 - Durable correction: only the two still-mandatory roles, motion/interaction and accessibility/adaptive, continue. Optional review loops remain stopped; any blocker returns to one affected reviewer rather than restarting the wave.
+
+## 2026-08-20 - Weekly-budget and consolidation stop checkpoint
+
+- Previous checkpoint: 21% used. Current snapshot: 29% used; an eight-point increase, reported immediately. This is a seven-day `10080`-minute allowance, resetting at Unix `1787838918` (2026-08-27 15:55 Europe/Rome), Plus plan, no credits.
+- Work performed: one Passes candidate build correction path and source-bound accessibility, motion, shape, and UX re-reviews after a semantics-only lint fix. The remaining review cascade was stopped when the owner identified unresolved setup and appearance work on the same Android UI.
+- Workflow incident: the canonical meter reader failed under Windows PowerShell 5.1 because `ProcessStartInfo.ArgumentList` was exposed as null. The reader now falls back to a correctly quoted `Arguments` string and returned the signed-in snapshot successfully.
+- Durable correction: the workflow now explicitly treats `10080` minutes as weekly budget, requires that fact in usage reports, and requires known changes on the same UI surfaces to be consolidated before one mandatory specialist wave. No more Passes/setup/appearance reviewers or compiler runs occur until that implementation batch is settled.

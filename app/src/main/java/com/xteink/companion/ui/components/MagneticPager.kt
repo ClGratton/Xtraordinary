@@ -36,6 +36,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
+import com.xteink.companion.ui.CompanionVisualTheme
+import com.xteink.companion.ui.theme.LocalCompanionVisualTheme
 import kotlin.math.absoluteValue
 import kotlin.math.sign
 
@@ -66,6 +68,7 @@ internal fun MagneticHorizontalPager(
     config: MagneticSwipeConfig = DefaultMagneticSwipe,
     content: @Composable (page: Int, containerColor: Color, contentColor: Color) -> Unit,
 ) {
+    val expressiveMotion = LocalCompanionVisualTheme.current == CompanionVisualTheme.Expressive
     val isDragged by state.interactionSource.collectIsDraggedAsState()
     val resistanceBlend = remember { Animatable(0f) }
     val snapKick = remember { Animatable(0f) }
@@ -101,9 +104,13 @@ internal fun MagneticHorizontalPager(
         config = config,
         onThresholdChanged = { beyondThreshold = it },
     ) { direction ->
-        snapKick.snapTo(direction * 0.018f)
-        snapKick.animateTo(-direction * 0.006f, tween(durationMillis = 70))
-        snapKick.animateTo(0f, tween(durationMillis = 100))
+        if (expressiveMotion) {
+            snapKick.snapTo(direction * 0.018f)
+            snapKick.animateTo(-direction * 0.006f, tween(durationMillis = 70))
+            snapKick.animateTo(0f, tween(durationMillis = 100))
+        } else {
+            snapKick.snapTo(0f)
+        }
     }
 
     HorizontalPager(
@@ -135,8 +142,8 @@ internal fun MagneticHorizontalPager(
             modifier = Modifier.graphicsLayer {
                 translationX = size.width * (signedDrag - displayedProgress)
                 if (page == state.settledPage) translationX += snapKick.value * size.width
-                scaleX = 1f - pageOffset * 0.014f
-                scaleY = 1f - pageOffset * 0.010f
+                scaleX = if (expressiveMotion) 1f - pageOffset * 0.014f else 1f
+                scaleY = if (expressiveMotion) 1f - pageOffset * 0.010f else 1f
             },
         ) {
             content(page, containerColor, contentColor)

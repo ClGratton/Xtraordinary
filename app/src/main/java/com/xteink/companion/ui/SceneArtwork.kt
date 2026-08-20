@@ -8,12 +8,12 @@ data class SceneArtwork(
     @param:DrawableRes val x3PayloadCrop: Int,
 )
 
-fun sceneArtworkFor(theme: CompanionVisualTheme): SceneArtwork = when (theme) {
-    CompanionVisualTheme.Expressive -> SceneArtwork(
+fun sceneArtworkFor(mode: CompanionColorMode): SceneArtwork = when (mode) {
+    CompanionColorMode.Light -> SceneArtwork(
         phonePreview = R.drawable.art_lighthouse_full,
         x3PayloadCrop = R.drawable.x3_lighthouse_crop,
     )
-    CompanionVisualTheme.Quiet -> SceneArtwork(
+    CompanionColorMode.Dark -> SceneArtwork(
         phonePreview = R.drawable.art_astronaut_landscape,
         x3PayloadCrop = R.drawable.x3_astronaut_crop,
     )

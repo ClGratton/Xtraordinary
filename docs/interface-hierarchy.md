@@ -183,7 +183,7 @@ Gemini is not a flight-status source. It may extract fields from an airline noti
 
 ## Theme behavior
 
-Expressive and Quiet render the same hierarchy and states. Theme switching preserves:
+Light/Dark color mode and Expressive/Minimal visual style render the same hierarchy and states. Switching either axis preserves:
 
 - active Focus deadline and pause state;
 - selected Tools destination;
@@ -192,7 +192,7 @@ Expressive and Quiet render the same hierarchy and states. Theme switching prese
 - Static/Live pane choice;
 - settings/back-stack position.
 
-On Android 12+, Expressive pulls its Material dynamic light seed from the phone. Quiet stays on the deterministic grayscale palette so it remains monochrome rather than inheriting a wallpaper tint.
+On Android 12+, Light and Dark may each pull the corresponding Material dynamic scheme from the phone. Expressive/Minimal never chooses the color mode: it changes shape, density, decorative motion, and visual noise through the separate style policy.
 
 `On <model>` is a device-inventory filter, not a synonym for Android storage. The label follows the connected or last-known XTEINK model. CrossPoint enumerates the live SD filesystem; the companion requests a paged inventory on connection, merges PC-added files into the phone catalog, and retains rows until device-confirmed deletion. Long-press activates circular multi-select, Select all, connection checking at the trash action, and a destructive confirmation dialog.
 
@@ -200,12 +200,12 @@ On Android 12+, Expressive pulls its Material dynamic light seed from the phone.
 
 Phone artwork and X3 output are not the same bitmap. `SceneArtwork` maps a full phone composition to an independently prepared e-ink crop:
 
-| Theme | Phone preview | X3 payload crop |
+| Color mode | Phone preview | X3 payload crop |
 |---|---|---|
-| Expressive | full landscape lighthouse | wide horizontal lighthouse crop |
-| Quiet | full landscape astronaut | X3-ready astronaut crop |
+| Light | full landscape lighthouse/sea | wide horizontal lighthouse crop |
+| Dark | full landscape astronaut/space | X3-ready astronaut crop |
 
-Both phone previews use one fixed landscape frame, so switching themes cannot change the screen's geometry. Expressive uses the active Material tonal palette for the physical XTEINK frame and branding; Quiet keeps the enclosure white with black branding. The eventual renderer consumes `x3PayloadCrop`, converts it to one-bit physical framebuffer order, and never resizes the already-approved phone composition as a shortcut.
+Both phone previews use one fixed landscape frame, so changing color mode cannot change the screen's geometry. Light uses the active Material tonal palette for the physical XTEINK frame and branding; Dark keeps the enclosure white with black branding for the astronaut scene. The eventual renderer consumes `x3PayloadCrop`, converts it to one-bit physical framebuffer order, and never resizes the already-approved phone composition as a shortcut.
 
 The exact concept-board slices are retained as [lighthouse](assets/concept-lighthouse-reference.png) and [astronaut](assets/concept-astronaut-reference.png) references; production payload assets are normalized to the physical X3 dimensions.
 

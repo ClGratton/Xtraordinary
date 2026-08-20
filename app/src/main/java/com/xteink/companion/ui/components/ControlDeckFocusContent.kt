@@ -52,6 +52,7 @@ import com.xteink.companion.R
 import com.xteink.companion.ui.FocusPhase
 import com.xteink.companion.ui.FocusUiState
 import com.xteink.companion.ui.CompanionVisualTheme
+import com.xteink.companion.ui.CompanionColorMode
 import com.xteink.companion.ui.sceneArtworkFor
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -60,6 +61,7 @@ import kotlin.math.roundToInt
 fun ControlDeckFocusContent(
     focus: FocusUiState,
     visualTheme: CompanionVisualTheme,
+    colorMode: CompanionColorMode,
     onSetDuration: (Int) -> Unit,
     onStartFocus: () -> Unit,
     onTogglePause: () -> Unit,
@@ -77,9 +79,11 @@ fun ControlDeckFocusContent(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
                 .padding(top = 4.dp, bottom = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
+            verticalArrangement = Arrangement.spacedBy(
+                if (visualTheme == CompanionVisualTheme.Minimal) 12.dp else 18.dp,
+            ),
         ) {
-            X3ImageField(visualTheme = visualTheme)
+            X3ImageField(colorMode = colorMode)
             DurationControlDeck(
                 focus = focus,
                 onSetDuration = onSetDuration,
@@ -98,12 +102,12 @@ fun ControlDeckFocusContent(
 }
 
 @Composable
-private fun X3ImageField(visualTheme: CompanionVisualTheme) {
+private fun X3ImageField(colorMode: CompanionColorMode) {
     val description = stringResource(R.string.x3_preview_description)
-    val artwork = sceneArtworkFor(visualTheme).phonePreview
-    val frameColor = if (visualTheme == CompanionVisualTheme.Quiet) Color.White
+    val artwork = sceneArtworkFor(colorMode).phonePreview
+    val frameColor = if (colorMode == CompanionColorMode.Dark) Color.White
     else MaterialTheme.colorScheme.secondaryContainer
-    val brandColor = if (visualTheme == CompanionVisualTheme.Quiet) Color.Black
+    val brandColor = if (colorMode == CompanionColorMode.Dark) Color.Black
     else MaterialTheme.colorScheme.onSecondaryContainer
     Surface(
         modifier = Modifier

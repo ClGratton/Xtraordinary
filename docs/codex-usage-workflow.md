@@ -8,6 +8,8 @@ Usage discipline is repository state, not chat memory. Any change to this proced
 
 Run `scripts/read-codex-usage.ps1` outside the filesystem sandbox in the normal signed-in user context. The script performs the initialized local Codex app-server handshake and reads `account/rateLimits/read`; do not recreate that handshake ad hoc. Record `usedPercent`, `windowDurationMins`, and `resetsAt`. Public OpenAI API billing, token prices, and API rate-limit pages are different systems and must not be presented as the signed-in Codex weekly meter. A sandbox-context result is invalid because it resolves a different Codex home and may have no signed-in account.
 
+`windowDurationMins = 10080` is a seven-day allowance. Treat its percentage as weekly budget consumption, never as a short rolling window that can be casually spent within one task. State the window length whenever reporting the percentage.
+
 For a forensic task audit, read only top-level `token_count` events from the current task rollout. Report deltas for input, cached input, uncached input, output, reasoning output, total tokens, and model-call count. Do not sum forked-agent rollout totals: forked rollouts inherit counters/history and can duplicate usage.
 
 ## Required checkpoints
@@ -28,6 +30,7 @@ When twenty percent or less remains, stop optional review loops, research, and p
 - Use `fork_turns: "none"` and give each specialist a compact, source-bound packet.
 - Never fork the full history of this long-running task.
 - Use one active specialist by default. Add parallel specialists only when the user explicitly requests a full wave and the pre-wave meter permits it.
+- Consolidate all known changes to the same UI surfaces before their mandatory role wave. Do not pay eight independent reviews for a narrow intermediate fix when another known layout, appearance, or copy change on those surfaces is still pending.
 - Reuse one narrow reviewer for one re-review. Do not spawn a replacement swarm because a reviewer missed a defect.
 - The implementation owner writes code. Reviewers remain read-only and return a verdict plus exact evidence.
 - Stop after the required verdict; do not ask reviewers to restate other roles.

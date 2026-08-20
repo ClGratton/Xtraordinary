@@ -15,7 +15,7 @@ enum class LegalDocument(val title: String, val body: String) {
     Privacy(
         title = "Privacy policy",
         body = """
-            Effective 8 August 2026
+            Effective 20 August 2026
 
             Xtraordinary is an independent companion app for XTEINK displays, maintained by ClGratton. The app works locally without an account.
 
@@ -23,11 +23,13 @@ enum class LegalDocument(val title: String, val body: String) {
 
             Optional Google backup. If you choose Back up with Google, Xtraordinary requests the narrow Google Drive app-data permission plus basic profile information. It stores only reading sessions (book title, timestamps, page numbers, time per page, word counts, and derived reading pace) and the minimum-page-time preference in a private app-data file in your Google Drive. It does not upload EPUB files, covers, boarding passes, notification contents, Bluetooth identifiers, or Gemini prompts. Google processes this data under its own terms and privacy policy.
 
-            Other network use. Missing book metadata may be requested from Open Library. Firmware update checks contact GitHub. A future Gemini feature remains off until separately configured and disclosed.
+            Passes and flights. Pass photos are processed on the device with Google ML Kit. Imported pass files, decoded barcodes, passenger details, and cached flight fields remain local. A Wallet share link or pass-file import may contact the issuer named by that link. Live flight updates contact the configured Xtraordinary flight-status proxy only after you choose Live; a build without a configured proxy does not make that request. Always treat the issuer and airline as authoritative.
+
+            Other network use. Missing book metadata may be requested from Open Library. Firmware and community-release checks contact GitHub or the explicitly selected firmware publisher. The pinned OEM recovery image is downloaded from XTEINK's firmware host only when you choose it. The current builds contain no advertising, billing, or consent SDK and send no analytics or remote diagnostics. If those systems are added later, this policy and consent flow must be updated before they are enabled.
 
             Retention and deletion. Local reading history remains until app data is cleared or a future in-app delete action removes it. Google backup remains until you use Delete cloud backup in Settings, remove the app's Drive access in your Google Account, or delete it through Google Drive account controls. Disconnecting without deletion does not delete the cloud copy.
 
-            Security. Network traffic uses HTTPS. OAuth access tokens are short-lived and are not written to app storage. Xtraordinary does not operate a user-data server and does not sell reading data.
+            Security. Network traffic uses HTTPS. OAuth access tokens are short-lived and are not written to app storage. Bluetooth bonding keys remain in Android and X3 system storage. Xtraordinary does not sell reading data.
 
             Your choices. Google backup is optional and can be refused without losing local features. You can sync, delete the cloud backup, disconnect Google, or continue locally from Settings.
 
@@ -37,7 +39,7 @@ enum class LegalDocument(val title: String, val body: String) {
     Terms(
         title = "Terms of use",
         body = """
-            Effective 8 August 2026
+            Effective 20 August 2026
 
             Xtraordinary is independent, experimental companion software for XTEINK hardware. It is not affiliated with or endorsed by XTEINK, Google, airlines, or pass issuers.
 
@@ -54,6 +56,20 @@ enum class LegalDocument(val title: String, val body: String) {
             These terms may change when functionality or data use changes. Material changes will require a new acknowledgement before affected optional processing resumes.
 
             Support: https://github.com/ClGratton/Xtraordinary/issues. Public distribution still requires final developer identity, contact details, governing terms where appropriate, and review for the release jurisdictions.
+        """.trimIndent(),
+    ),
+    Notices(
+        title = "Open-source notices",
+        body = """
+            Xtraordinary app and companion additions are distributed under the MIT License. The reader firmware is a modified CrossPoint Reader work and includes the Open X4 SDK, both under MIT terms. Source and the complete release audit are available at https://github.com/ClGratton/Xtraordinary.
+
+            Android components include AndroidX and Kotlin (Apache-2.0), ZXing (Apache-2.0), Google ML Kit and Google Play services under Google's SDK terms, and JUnit for tests (EPL-1.0).
+
+            Firmware components include ArduinoJson and QRCode (MIT), PNGdec and JPEGDEC (Apache-2.0), SdFat (MIT), NimBLE-Arduino and Apache NimBLE (Apache-2.0 with NOTICE), ArduinoWebSockets (LGPL-2.1), Expat (MIT, with a CC0 SipHash file), and uzlib (zlib-style terms). Redistributed Noto and OpenDyslexic fonts use SIL OFL-1.1; Ubuntu fonts use the Ubuntu Font Licence 1.0.
+
+            XTEINK is a trademark of its owner. Xtraordinary is an independent compatibility project and is not affiliated with or endorsed by XTEINK, Google, airlines, or pass issuers. No third-party license or trademark grants endorsement.
+
+            This screen is a readable summary, not a replacement for required license texts, NOTICE files, source offers, or relinkable-material obligations. The repository's THIRD_PARTY_NOTICES.md and docs/legal-release-audit.md identify the exact release blockers that must be closed before public distribution.
         """.trimIndent(),
     ),
 }

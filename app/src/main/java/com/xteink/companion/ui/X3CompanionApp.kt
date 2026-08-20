@@ -2,6 +2,8 @@ package com.xteink.companion.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -42,6 +44,7 @@ import com.xteink.companion.ui.components.ToolsHubContent
 fun X3CompanionApp(
     state: CompanionUiState,
     onSetVisualTheme: (CompanionVisualTheme) -> Unit,
+    onSetColorMode: (CompanionColorMode) -> Unit,
     onSetRadioPolicy: (RadioPolicyUiState) -> Unit,
     onSetDuration: (Int) -> Unit,
     onStartFocus: () -> Unit,
@@ -177,13 +180,20 @@ fun X3CompanionApp(
             Box(modifier = Modifier.weight(1f)) {
                 AnimatedContent(
                     targetState = state.surface to state.toolDestination,
-                    transitionSpec = { fadeIn() togetherWith fadeOut() },
+                    transitionSpec = {
+                        if (state.visualTheme == CompanionVisualTheme.Minimal) {
+                            EnterTransition.None togetherWith ExitTransition.None
+                        } else {
+                            fadeIn() togetherWith fadeOut()
+                        }
+                    },
                     label = "primary destination",
                 ) { (surface, toolDestination) ->
                     when (surface) {
                         CompanionSurface.Focus -> ControlDeckFocusContent(
                             focus = state.focus,
                             visualTheme = state.visualTheme,
+                            colorMode = state.colorMode,
                             onSetDuration = onSetDuration,
                             onStartFocus = onStartFocus,
                             onTogglePause = onTogglePause,
@@ -240,11 +250,13 @@ fun X3CompanionApp(
     if (state.settingsVisible) {
         SettingsSheet(
             visualTheme = state.visualTheme,
+            colorMode = state.colorMode,
             radioPolicy = state.radioPolicy,
             minimumReadingPageSeconds = state.readingStats.minimumPageSeconds,
             settingsSyncPending = state.device.settingsSyncPending,
             hasManagedDevice = state.connectedDeviceModel != null,
             onSetVisualTheme = onSetVisualTheme,
+            onSetColorMode = onSetColorMode,
             onSetRadioPolicy = onSetRadioPolicy,
             onSetMinimumReadingPageSeconds = onSetMinimumReadingPageSeconds,
             onOpenSetup = onOpenSetup,

@@ -2,15 +2,18 @@ package com.xteink.companion.ui.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -19,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.IconButton
@@ -30,6 +34,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,10 +44,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -50,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import com.xteink.companion.R
 import com.xteink.companion.data.CloudBackupState
 import com.xteink.companion.ui.CompanionSurface
+import com.xteink.companion.ui.CompanionColorMode
 import com.xteink.companion.ui.CompanionVisualTheme
 import com.xteink.companion.ui.DevicePresence
 import com.xteink.companion.ui.RadioPolicyUiState
@@ -57,6 +65,7 @@ import com.xteink.companion.ui.devicePresence
 import com.xteink.companion.ui.isFastWindowChoiceEnabled
 import com.xteink.companion.ui.selectFastWindow
 import com.xteink.companion.ui.selectSleepAfter
+import com.xteink.companion.ui.sceneArtworkFor
 
 private val FastDiscoveryMinuteChoices = listOf(1, 5, 10)
 private val SleepAfterMinuteChoices = listOf(5, 10, 20)
@@ -429,11 +438,13 @@ fun SendToX3Icon(
 @Composable
 fun SettingsSheet(
     visualTheme: CompanionVisualTheme,
+    colorMode: CompanionColorMode,
     radioPolicy: RadioPolicyUiState,
     minimumReadingPageSeconds: Int,
     settingsSyncPending: Boolean,
     hasManagedDevice: Boolean,
     onSetVisualTheme: (CompanionVisualTheme) -> Unit,
+    onSetColorMode: (CompanionColorMode) -> Unit,
     onSetRadioPolicy: (RadioPolicyUiState) -> Unit,
     onSetMinimumReadingPageSeconds: (Int) -> Unit,
     onOpenSetup: () -> Unit,
@@ -446,11 +457,13 @@ fun SettingsSheet(
     ModalBottomSheet(onDismissRequest = onDismiss) {
         SettingsSheetContent(
             visualTheme = visualTheme,
+            colorMode = colorMode,
             radioPolicy = radioPolicy,
             minimumReadingPageSeconds = minimumReadingPageSeconds,
             settingsSyncPending = settingsSyncPending,
             hasManagedDevice = hasManagedDevice,
             onSetVisualTheme = onSetVisualTheme,
+            onSetColorMode = onSetColorMode,
             onSetRadioPolicy = onSetRadioPolicy,
             onSetMinimumReadingPageSeconds = onSetMinimumReadingPageSeconds,
             onOpenSetup = onOpenSetup,
@@ -469,11 +482,13 @@ fun SettingsSheet(
 @Composable
 fun SettingsSheetContent(
     visualTheme: CompanionVisualTheme,
+    colorMode: CompanionColorMode,
     radioPolicy: RadioPolicyUiState,
     minimumReadingPageSeconds: Int,
     settingsSyncPending: Boolean,
     hasManagedDevice: Boolean,
     onSetVisualTheme: (CompanionVisualTheme) -> Unit,
+    onSetColorMode: (CompanionColorMode) -> Unit,
     onSetRadioPolicy: (RadioPolicyUiState) -> Unit,
     onSetMinimumReadingPageSeconds: (Int) -> Unit,
     onOpenSetup: () -> Unit,
@@ -504,6 +519,17 @@ fun SettingsSheetContent(
             text = stringResource(R.string.settings_appearance),
             style = MaterialTheme.typography.titleMedium,
         )
+        Spacer(Modifier.height(8.dp))
+        ColorModeCarousel(
+            colorMode = colorMode,
+            onSetColorMode = onSetColorMode,
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = stringResource(R.string.settings_visual_style),
+            style = MaterialTheme.typography.titleSmall,
+        )
+        Spacer(Modifier.height(8.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -517,11 +543,11 @@ fun SettingsSheetContent(
                 modifier = Modifier.weight(1f),
             )
             ThemeChip(
-                label = stringResource(R.string.quiet_theme),
-                description = stringResource(R.string.quiet_theme_body),
+                label = stringResource(R.string.minimal_theme),
+                description = stringResource(R.string.minimal_theme_body),
                 expressive = false,
-                selected = visualTheme == CompanionVisualTheme.Quiet,
-                onClick = { onSetVisualTheme(CompanionVisualTheme.Quiet) },
+                selected = visualTheme == CompanionVisualTheme.Minimal,
+                onClick = { onSetVisualTheme(CompanionVisualTheme.Minimal) },
                 modifier = Modifier.weight(1f),
             )
         }
@@ -642,6 +668,22 @@ fun SettingsSheetContent(
             onDelete = onDeleteGoogleBackup,
             onOpenLegal = onOpenLegal,
         )
+        Spacer(Modifier.height(12.dp))
+        Text(stringResource(R.string.settings_legal), style = MaterialTheme.typography.titleMedium)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            TextButton(onClick = { onOpenLegal(LegalDocument.Privacy) }) {
+                Text(stringResource(R.string.setup_privacy))
+            }
+            TextButton(onClick = { onOpenLegal(LegalDocument.Terms) }) {
+                Text(stringResource(R.string.setup_terms))
+            }
+            TextButton(onClick = { onOpenLegal(LegalDocument.Notices) }) {
+                Text(stringResource(R.string.open_source_notices))
+            }
+        }
         Spacer(Modifier.height(12.dp))
         Surface(
             onClick = onOpenSetup,
@@ -801,6 +843,65 @@ private fun PolicyChoiceRow(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ColorModeCarousel(
+    colorMode: CompanionColorMode,
+    onSetColorMode: (CompanionColorMode) -> Unit,
+) {
+    val modes = CompanionColorMode.entries
+    val pagerState = rememberPagerState(
+        initialPage = colorMode.ordinal,
+        pageCount = { modes.size },
+    )
+    LaunchedEffect(colorMode) {
+        if (pagerState.settledPage != colorMode.ordinal) {
+            pagerState.animateScrollToPage(colorMode.ordinal)
+        }
+    }
+    LaunchedEffect(pagerState.settledPage) {
+        val settledMode = modes[pagerState.settledPage]
+        if (settledMode != colorMode) onSetColorMode(settledMode)
+    }
+
+    MagneticHorizontalPager(
+        state = pagerState,
+        contentPadding = PaddingValues(horizontal = 44.dp),
+        pageSpacing = 12.dp,
+        colors = MagneticPagerColors(
+            restingContainer = MaterialTheme.colorScheme.surfaceContainerLow,
+            selectedContainer = MaterialTheme.colorScheme.secondaryContainer,
+            restingContent = MaterialTheme.colorScheme.onSurfaceVariant,
+            selectedContent = MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
+        modifier = Modifier.fillMaxWidth().height(152.dp),
+    ) { page, containerColor, contentColor ->
+        val mode = modes[page]
+        val artwork = sceneArtworkFor(mode)
+        Surface(
+            color = containerColor,
+            contentColor = contentColor,
+            shape = MaterialTheme.shapes.large,
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            Column {
+                Image(
+                    painter = painterResource(artwork.phonePreview),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                )
+                Text(
+                    text = stringResource(
+                        if (mode == CompanionColorMode.Light) R.string.light_mode else R.string.dark_mode,
+                    ),
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                )
             }
         }
     }

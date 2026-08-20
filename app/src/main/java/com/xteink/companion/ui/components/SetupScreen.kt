@@ -11,6 +11,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -50,9 +51,12 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -63,6 +67,8 @@ import com.xteink.companion.R
 import com.xteink.companion.data.FirmwareSource
 import com.xteink.companion.data.CloudBackupState
 import com.xteink.companion.ui.DeviceUiState
+import com.xteink.companion.ui.CompanionVisualTheme
+import com.xteink.companion.ui.theme.LocalCompanionVisualTheme
 import kotlinx.coroutines.launch
 
 private enum class SetupPage {
@@ -309,49 +315,53 @@ private fun LibrarySetupPage(
     onChooseBookFolder: () -> Unit,
     onContinue: () -> Unit,
 ) {
-    SetupPageColumn {
-        SetupPageLabel(step = 2, label = stringResource(R.string.setup_library_tab))
-        LibrarySetupIllustration(
-            active = illustrationActive,
-            description = stringResource(R.string.setup_library_illustration_description),
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-        )
-        Text(
-            text = stringResource(R.string.setup_library_title),
-            style = MaterialTheme.typography.headlineMedium,
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            text = stringResource(R.string.setup_library_body),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceContainerHighest,
-            shape = MaterialTheme.shapes.medium,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(
-                text = stringResource(if (folderLinked) R.string.folder_linked else R.string.folder_not_linked),
-                style = MaterialTheme.typography.labelLarge,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(14.dp),
+    SetupActionPage(
+        content = {
+            SetupPageLabel(step = 2, label = stringResource(R.string.setup_library_tab))
+            LibrarySetupIllustration(
+                active = illustrationActive,
+                description = stringResource(R.string.setup_library_illustration_description),
+                modifier = Modifier.align(Alignment.CenterHorizontally),
             )
-        }
-        FilledTonalButton(
-            onClick = onChooseBookFolder,
-            modifier = Modifier.fillMaxWidth().height(SetupSpacing.FullButtonHeight),
-        ) {
-            Text(stringResource(if (folderLinked) R.string.change_epub_folder else R.string.choose_book_folder))
-        }
-        TextButton(
-            onClick = onContinue,
-            modifier = Modifier.fillMaxWidth().height(SetupSpacing.TextButtonHeight),
-        ) {
-            Text(stringResource(if (folderLinked) R.string.continue_setup else R.string.do_this_later))
-        }
-    }
+            Text(
+                text = stringResource(R.string.setup_library_title),
+                style = MaterialTheme.typography.headlineMedium,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = stringResource(R.string.setup_library_body),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = stringResource(if (folderLinked) R.string.folder_linked else R.string.folder_not_linked),
+                    style = MaterialTheme.typography.labelLarge,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(14.dp),
+                )
+            }
+        },
+        actions = {
+            FilledTonalButton(
+                onClick = onChooseBookFolder,
+                modifier = Modifier.fillMaxWidth().height(SetupSpacing.FullButtonHeight),
+            ) {
+                Text(stringResource(if (folderLinked) R.string.change_epub_folder else R.string.choose_book_folder))
+            }
+            TextButton(
+                onClick = onContinue,
+                modifier = Modifier.fillMaxWidth().height(SetupSpacing.TextButtonHeight),
+            ) {
+                Text(stringResource(if (folderLinked) R.string.continue_setup else R.string.do_this_later))
+            }
+        },
+    )
 }
 
 @Composable
@@ -360,37 +370,41 @@ private fun DeviceSetupPage(
     onConnectDevice: () -> Unit,
     onFinish: () -> Unit,
 ) {
-    SetupPageColumn {
-        SetupPageLabel(step = 3, label = stringResource(R.string.setup_device_tab))
-        DeviceSetupIllustration(
-            active = illustrationActive,
-            description = stringResource(R.string.setup_device_illustration_description),
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-        )
-        Text(
-            text = stringResource(R.string.setup_device_title),
-            style = MaterialTheme.typography.headlineMedium,
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            text = stringResource(R.string.setup_device_body),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        FilledTonalButton(
-            onClick = onConnectDevice,
-            modifier = Modifier.fillMaxWidth().height(SetupSpacing.FullButtonHeight),
-        ) {
-            Text(stringResource(R.string.choose_device))
-        }
-        Button(
-            onClick = onFinish,
-            modifier = Modifier.fillMaxWidth().height(SetupSpacing.FullButtonHeight),
-        ) {
-            Text(stringResource(R.string.finish_setup))
-        }
-    }
+    SetupActionPage(
+        content = {
+            SetupPageLabel(step = 3, label = stringResource(R.string.setup_device_tab))
+            DeviceSetupIllustration(
+                active = illustrationActive,
+                description = stringResource(R.string.setup_device_illustration_description),
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            )
+            Text(
+                text = stringResource(R.string.setup_device_title),
+                style = MaterialTheme.typography.headlineMedium,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = stringResource(R.string.setup_device_body),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        },
+        actions = {
+            FilledTonalButton(
+                onClick = onConnectDevice,
+                modifier = Modifier.fillMaxWidth().height(SetupSpacing.FullButtonHeight),
+            ) {
+                Text(stringResource(R.string.choose_device))
+            }
+            Button(
+                onClick = onFinish,
+                modifier = Modifier.fillMaxWidth().height(SetupSpacing.FullButtonHeight),
+            ) {
+                Text(stringResource(R.string.finish_setup))
+            }
+        },
+    )
 }
 
 @Composable
@@ -407,6 +421,62 @@ private fun SetupPageColumn(content: @Composable ColumnScope.() -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         content = content,
     )
+}
+
+@Composable
+private fun SetupActionPage(
+    content: @Composable ColumnScope.() -> Unit,
+    actions: @Composable ColumnScope.() -> Unit,
+) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val scrollState = rememberScrollState()
+        val verticalPadding = SetupSpacing.PageVertical
+        val density = LocalDensity.current
+        val viewportHeightPx = constraints.maxHeight - with(density) { verticalPadding.roundToPx() * 2 }
+        val minimumGapPx = with(density) { SetupSpacing.MajorGroup.roundToPx() }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(
+                    horizontal = SetupSpacing.PageHorizontal,
+                    vertical = verticalPadding,
+                ),
+        ) {
+            Layout(
+                content = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().layoutId("content"),
+                        verticalArrangement = Arrangement.spacedBy(SetupSpacing.MajorGroup),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        content = content,
+                    )
+                    Column(
+                        modifier = Modifier.fillMaxWidth().layoutId("actions"),
+                        verticalArrangement = Arrangement.spacedBy(SetupSpacing.Action),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        content = actions,
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) { measurables, layoutConstraints ->
+                val childConstraints = layoutConstraints.copy(minHeight = 0)
+                val contentPlaceable = measurables.first { it.layoutId == "content" }.measure(childConstraints)
+                val actionsPlaceable = measurables.first { it.layoutId == "actions" }.measure(childConstraints)
+                val placement = calculateSetupActionPlacement(
+                    viewportHeight = viewportHeightPx.coerceAtLeast(0),
+                    contentHeight = contentPlaceable.height,
+                    actionsHeight = actionsPlaceable.height,
+                    minimumGap = minimumGapPx,
+                )
+                layout(layoutConstraints.maxWidth, placement.layoutHeight) {
+                    contentPlaceable.placeRelative(0, 0)
+                    actionsPlaceable.placeRelative(0, placement.actionsY)
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -593,7 +663,9 @@ private fun SetupIllustrationFrame(
 
 @Composable
 private fun onboardingMotionProgress(active: Boolean, label: String): Float {
-    if (!active || LocalInspectionMode.current) return 0.46f
+    if (!active || LocalInspectionMode.current || LocalCompanionVisualTheme.current == CompanionVisualTheme.Minimal) {
+        return 0.46f
+    }
     val transition = rememberInfiniteTransition(label = label)
     val progress by transition.animateFloat(
         initialValue = 0f,

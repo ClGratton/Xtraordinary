@@ -6,8 +6,11 @@ import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -17,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.xteink.companion.ui.CompanionVisualTheme
+import com.xteink.companion.ui.CompanionColorMode
 
 private val ExpressiveColors = lightColorScheme(
     primary = ExpressivePrimary,
@@ -81,6 +85,16 @@ private val CompanionShapes = Shapes(
     large = RoundedCornerShape(36.dp),
     extraLarge = RoundedCornerShape(48.dp),
 )
+
+private val MinimalShapes = Shapes(
+    extraSmall = RoundedCornerShape(4.dp),
+    small = RoundedCornerShape(8.dp),
+    medium = RoundedCornerShape(12.dp),
+    large = RoundedCornerShape(16.dp),
+    extraLarge = RoundedCornerShape(20.dp),
+)
+
+val LocalCompanionVisualTheme = staticCompositionLocalOf { CompanionVisualTheme.Expressive }
 
 private val CompanionTypography = Typography(
     displayLarge = TextStyle(
@@ -152,21 +166,25 @@ private val CompanionTypography = Typography(
 @Composable
 fun X3CompanionTheme(
     visualTheme: CompanionVisualTheme = CompanionVisualTheme.Expressive,
+    colorMode: CompanionColorMode = CompanionColorMode.Light,
     useDynamicColor: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
     val dynamicColorAvailable = useDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val colorScheme = when {
-        dynamicColorAvailable && visualTheme == CompanionVisualTheme.Expressive -> dynamicLightColorScheme(context)
-        visualTheme == CompanionVisualTheme.Expressive -> ExpressiveColors
+        dynamicColorAvailable && colorMode == CompanionColorMode.Light -> dynamicLightColorScheme(context)
+        dynamicColorAvailable && colorMode == CompanionColorMode.Dark -> dynamicDarkColorScheme(context)
+        colorMode == CompanionColorMode.Light -> ExpressiveColors
         else -> QuietColors
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        shapes = CompanionShapes,
-        typography = CompanionTypography,
-        content = content,
-    )
+    CompositionLocalProvider(LocalCompanionVisualTheme provides visualTheme) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            shapes = if (visualTheme == CompanionVisualTheme.Minimal) MinimalShapes else CompanionShapes,
+            typography = CompanionTypography,
+            content = content,
+        )
+    }
 }

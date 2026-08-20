@@ -6,7 +6,12 @@ import com.xteink.companion.data.ReadingSessionStat
 
 enum class CompanionVisualTheme {
     Expressive,
-    Quiet,
+    Minimal,
+}
+
+enum class CompanionColorMode {
+    Light,
+    Dark,
 }
 
 enum class CompanionSurface {
@@ -248,6 +253,7 @@ data class RadioPolicyUiState(
 
 data class CompanionUiState(
     val visualTheme: CompanionVisualTheme = CompanionVisualTheme.Expressive,
+    val colorMode: CompanionColorMode = CompanionColorMode.Light,
     val surface: CompanionSurface = CompanionSurface.Focus,
     val toolDestination: ToolDestination = ToolDestination.Hub,
     val focus: FocusUiState = FocusUiState(),

@@ -167,6 +167,11 @@
     <string name="settings_flights">Flight updates</string>
     <string name="settings_flights_value">Notification source</string>
     <string name="settings_appearance">Appearance</string>
+    <string name="settings_legal">Legal &amp; attribution</string>
+    <string name="open_source_notices">Notices</string>
+    <string name="settings_visual_style">Visual style</string>
+    <string name="light_mode">Light · sea</string>
+    <string name="dark_mode">Dark · space</string>
     <string name="settings_radio_policy">Battery &amp; Bluetooth</string>
     <string name="settings_waiting_for_x3">Saved on phone · waiting for X3</string>
     <string name="settings_synced_to_x3">Synced to X3</string>
@@ -185,9 +190,9 @@
     <string name="settings_library_services">Library services</string>
     <string name="settings_library_services_value">Local EPUB · link accounts here when available</string>
     <string name="expressive_theme">Expressive</string>
-    <string name="expressive_theme_body">Bold shapes and warmer color</string>
-    <string name="quiet_theme">Quiet</string>
-    <string name="quiet_theme_body">Calm, compact and neutral</string>
+    <string name="expressive_theme_body">More shape, motion and breathing room</string>
+    <string name="minimal_theme">Minimal</string>
+    <string name="minimal_theme_body">Tighter spacing, quieter shapes and less motion</string>
     <string name="tools_title">Tools</string>
     <string name="tools_subtitle">Choose what the X3 should do while the phone stays face-down.</string>
     <string name="tool_passes">Passes &amp; codes</string>

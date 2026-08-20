@@ -12,9 +12,17 @@ if (-not (Test-Path -LiteralPath $codexJs -PathType Leaf)) {
 
 $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
 $startInfo.FileName = $nodeCommand.Source
-$startInfo.ArgumentList.Add($codexJs)
-$startInfo.ArgumentList.Add('app-server')
-$startInfo.ArgumentList.Add('--stdio')
+if ($null -ne $startInfo.ArgumentList) {
+    $startInfo.ArgumentList.Add($codexJs)
+    $startInfo.ArgumentList.Add('app-server')
+    $startInfo.ArgumentList.Add('--stdio')
+} else {
+    # Windows PowerShell 5.1 exposes ArgumentList but returns null because it
+    # runs on .NET Framework. Keep the canonical reader usable from both the
+    # desktop app and the repository's normal-user PowerShell workflow.
+    $escapedCodexJs = $codexJs.Replace('"', '\"')
+    $startInfo.Arguments = '"{0}" app-server --stdio' -f $escapedCodexJs
+}
 $startInfo.UseShellExecute = $false
 $startInfo.RedirectStandardInput = $true
 $startInfo.RedirectStandardOutput = $true

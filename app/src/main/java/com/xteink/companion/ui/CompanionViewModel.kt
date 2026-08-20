@@ -56,6 +56,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     private val initialFocus = focusSessionStore.load()
     private val presentationStore = CompanionPresentationStore(application)
     private val initialVisualTheme = presentationStore.loadVisualTheme()
+    private val initialColorMode = presentationStore.loadColorMode()
     private val radioPreferences =
         application.getSharedPreferences("xtraordinary_radio_policy", Application.MODE_PRIVATE)
     private val ticketPreferences =
@@ -91,6 +92,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     private val _uiState = MutableStateFlow(
         CompanionUiState(
             visualTheme = initialVisualTheme,
+            colorMode = initialColorMode,
             focus = initialFocus,
             radioPolicy = initialRadioPolicy,
             device = DeviceUiState(
@@ -368,6 +370,11 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     fun setVisualTheme(theme: CompanionVisualTheme) {
         presentationStore.saveVisualTheme(theme)
         _uiState.update { it.copy(visualTheme = theme) }
+    }
+
+    fun setColorMode(mode: CompanionColorMode) {
+        presentationStore.saveColorMode(mode)
+        _uiState.update { it.copy(colorMode = mode) }
     }
 
     fun setRadioPolicy(policy: RadioPolicyUiState) {

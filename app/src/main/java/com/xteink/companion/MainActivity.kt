@@ -40,7 +40,7 @@ import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.CommonStatusCodes
 import com.google.android.gms.common.api.Scope
 import com.xteink.companion.ui.CompanionViewModel
-import com.xteink.companion.ui.CompanionVisualTheme
+import com.xteink.companion.ui.CompanionColorMode
 import com.xteink.companion.ui.X3CompanionApp
 import com.xteink.companion.ui.components.SetupScreen
 import com.xteink.companion.ui.theme.X3CompanionTheme
@@ -225,7 +225,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
             SideEffect {
-                val lightSystemBars = state.visualTheme == CompanionVisualTheme.Expressive
+                val lightSystemBars = state.colorMode == CompanionColorMode.Light
                 WindowCompat.getInsetsController(window, window.decorView).apply {
                     isAppearanceLightStatusBars = lightSystemBars
                     isAppearanceLightNavigationBars = lightSystemBars
@@ -259,11 +259,12 @@ class MainActivity : ComponentActivity() {
                     requestGoogleAuthorization(CloudAction.Sync, interactive = false)
                 }
             }
-            X3CompanionTheme(visualTheme = state.visualTheme) {
+            X3CompanionTheme(visualTheme = state.visualTheme, colorMode = state.colorMode) {
                 if (setupComplete) {
                     X3CompanionApp(
                         state = state,
                         onSetVisualTheme = viewModel::setVisualTheme,
+                        onSetColorMode = viewModel::setColorMode,
                         onSetRadioPolicy = viewModel::setRadioPolicy,
                         onSetDuration = viewModel::setDuration,
                         onStartFocus = viewModel::startFocus,
