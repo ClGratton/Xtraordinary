@@ -155,3 +155,10 @@
 - User override: continue the minimum repository-closeable legal-release work despite the normal twenty-percent reserve stop.
 - Work performed without agents or compilers: resolved the exact Community/Play runtime graphs twice to close undeclared-POM coverage; generated the Android legal manifest; added Android/APK notice integrity gates, artwork integrity/provenance inventory, fail-closed release handling for the XTEINK OEM image, and source-bound firmware release records. The first legal-generation attempt stopped safely when it exposed six Community-only undeclared coordinates; the explicit override registry was completed before the successful rerun.
 - Budget decision: no UI review waves, screenshot runs, APK compiler, firmware compiler, install, or flash in this slice. Continue only legal/source integrity checks and one commit/push checkpoint.
+
+## 2026-08-20 - Legal-release overrun stop
+
+- Previous checkpoint: 90% used. Final signed-in snapshot: 96% used; a six-point increase, reported immediately. This is the seven-day `10080`-minute allowance, resetting 2026-08-27 15:55 Europe/Rome, Plus plan, no credits.
+- Work performed: completed, validated, committed, and pushed the repository-closeable legal slice at `4b3e1d25fd59e4ecd722b3adbc6ae40045a1da37`; then confirmed the live remote branch with the pushed-source verifier. No subagent, Android compiler, firmware compiler, screenshot renderer, device install, or flash ran.
+- Cost diagnosis: the overrun came from continuing inside an exceptionally long accumulated task context, several source/document inspections, and repeated exact Community/Play dependency-resolution checks. The work was substantive, but this task was no longer token-efficient.
+- Durable stop: make no further implementation, review, build, or device attempt in this weekly window. Start the next objective in a fresh task from `HANDOFF.md` and the tracker, using only the exact files for that objective. Preserve the remaining four percent for emergency handoff only.
