@@ -456,6 +456,11 @@ fun SettingsSheet(
     cloudBackupState: CloudBackupState,
     onSyncGoogleBackup: () -> Unit,
     onDeleteGoogleBackup: () -> Unit,
+    monetizationState: com.xteink.companion.monetization.MonetizationRuntimeState,
+    onBuyAdFree: () -> Unit,
+    onRestorePurchase: () -> Unit,
+    onAdPrivacyOptions: () -> Unit,
+    onOpenCommunitySource: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     var legalDocument by remember { mutableStateOf<LegalDocument?>(null) }
@@ -475,6 +480,11 @@ fun SettingsSheet(
             cloudBackupState = cloudBackupState,
             onSyncGoogleBackup = onSyncGoogleBackup,
             onDeleteGoogleBackup = onDeleteGoogleBackup,
+            monetizationState = monetizationState,
+            onBuyAdFree = onBuyAdFree,
+            onRestorePurchase = onRestorePurchase,
+            onAdPrivacyOptions = onAdPrivacyOptions,
+            onOpenCommunitySource = onOpenCommunitySource,
             onOpenLegal = { legalDocument = it },
             onDismiss = onDismiss,
         )
@@ -500,6 +510,11 @@ fun SettingsSheetContent(
     cloudBackupState: CloudBackupState,
     onSyncGoogleBackup: () -> Unit,
     onDeleteGoogleBackup: () -> Unit,
+    monetizationState: com.xteink.companion.monetization.MonetizationRuntimeState,
+    onBuyAdFree: () -> Unit,
+    onRestorePurchase: () -> Unit,
+    onAdPrivacyOptions: () -> Unit,
+    onOpenCommunitySource: () -> Unit,
     onOpenLegal: (LegalDocument) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
@@ -672,6 +687,14 @@ fun SettingsSheetContent(
             onConnectOrSync = onSyncGoogleBackup,
             onDelete = onDeleteGoogleBackup,
             onOpenLegal = onOpenLegal,
+        )
+        Spacer(Modifier.height(12.dp))
+        MonetizationSettingsCard(
+            state = monetizationState,
+            onBuy = onBuyAdFree,
+            onRestore = onRestorePurchase,
+            onPrivacyOptions = onAdPrivacyOptions,
+            onOpenCommunitySource = onOpenCommunitySource,
         )
         Spacer(Modifier.height(12.dp))
         Text(stringResource(R.string.settings_legal), style = MaterialTheme.typography.titleMedium)

@@ -33,6 +33,36 @@ class MonetizationPolicyTest {
         assertTrue(
             MonetizationPolicy.bannerDecision(allowed.copy(operationInProgress = true)) is BannerDecision.Hidden,
         )
+        MonetizationSurface.entries
+            .filterNot { it in setOf(
+                MonetizationSurface.ReadLibrary,
+                MonetizationSurface.ToolsHub,
+                MonetizationSurface.Passes,
+                MonetizationSurface.ReadingStats,
+            ) }
+            .forEach { surface ->
+                assertTrue(
+                    "$surface must never request an ad",
+                    MonetizationPolicy.bannerDecision(allowed.copy(surface = surface)) is BannerDecision.Hidden,
+                )
+            }
+        listOf(
+            EntitlementState.Unknown,
+            EntitlementState.UnknownOffline(2_000L),
+            EntitlementState.TrialActive(2_000L),
+            EntitlementState.Purchased,
+        ).forEach { entitlement ->
+            assertTrue(
+                "$entitlement must never request an ad",
+                MonetizationPolicy.bannerDecision(allowed.copy(entitlement = entitlement)) is BannerDecision.Hidden,
+            )
+        }
+        assertTrue(
+            MonetizationPolicy.bannerDecision(allowed.copy(consent = ConsentState.AdsNotAllowed)) is BannerDecision.Hidden,
+        )
+        assertTrue(
+            MonetizationPolicy.bannerDecision(allowed.copy(consent = ConsentState.Unknown)) is BannerDecision.Hidden,
+        )
     }
 
     @Test

@@ -33,6 +33,7 @@ import com.xteink.companion.data.CloudBackupState
 import com.xteink.companion.data.FirmwareSource
 import com.xteink.companion.data.GoogleDriveReadingSync
 import com.xteink.companion.data.OpenLibraryMetadataClient
+import com.xteink.companion.monetization.DistributionMonetizationGateway
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.auth.api.identity.RevokeAccessRequest
@@ -66,12 +67,14 @@ class MainActivity : ComponentActivity() {
     private val viewModel by viewModels<CompanionViewModel>()
     private lateinit var bookLibrary: BookLibraryRepository
     private lateinit var googleReadingSync: GoogleDriveReadingSync
+    private val monetizationGateway by lazy { DistributionMonetizationGateway() }
     private var externalResetPreparationRequested = false
 
     private enum class CloudAction { Sync, Delete }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        monetizationGateway.start(this)
         enableEdgeToEdge()
         bookLibrary = BookLibraryRepository(this)
         googleReadingSync = GoogleDriveReadingSync(this)
@@ -81,6 +84,7 @@ class MainActivity : ComponentActivity() {
         if (linkedFolder != null) syncLinkedFolder(showNotice = false) else refreshMissingBookMetadata()
         setContent {
             val state by viewModel.uiState.collectAsStateWithLifecycle()
+            val monetizationState by monetizationGateway.state.collectAsStateWithLifecycle()
             val setupPreferences = remember { getSharedPreferences("xtraordinary_setup", MODE_PRIVATE) }
             var setupComplete by rememberSaveable {
                 mutableStateOf(setupPreferences.getBoolean("setup_complete", false))
@@ -338,6 +342,18 @@ class MainActivity : ComponentActivity() {
                         onDeleteGoogleBackup = {
                             requestGoogleAuthorization(CloudAction.Delete, interactive = true)
                         },
+                        monetizationState = monetizationState,
+                        onBuyAdFree = { monetizationGateway.buy(this@MainActivity) },
+                        onRestorePurchase = monetizationGateway::restore,
+                        onAdPrivacyOptions = { monetizationGateway.showPrivacyOptions(this@MainActivity) },
+                        onOpenCommunitySource = {
+                            startActivity(
+                                Intent(
+                                    Intent.ACTION_VIEW,
+                                    android.net.Uri.parse(BuildConfig.COMMUNITY_SOURCE_URL),
+                                ),
+                            )
+                        },
                     )
                 } else {
                     SetupScreen(
@@ -427,6 +443,11 @@ class MainActivity : ComponentActivity() {
             }
             result.onSuccess(viewModel::importFlightPass).onFailure(viewModel::reportFlightPassImportFailure)
         }
+    }
+
+    override fun onDestroy() {
+        monetizationGateway.close()
+        super.onDestroy()
     }
 
     private fun importFlightPassPhoto(uri: android.net.Uri) {

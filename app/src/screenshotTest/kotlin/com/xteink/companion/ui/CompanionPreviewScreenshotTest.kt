@@ -13,6 +13,11 @@ import androidx.compose.ui.unit.dp
 import com.android.tools.screenshot.PreviewTest
 import com.xteink.companion.data.CloudBackupState
 import com.xteink.companion.data.FlightBarcodeFormat
+import com.xteink.companion.monetization.ConsentState
+import com.xteink.companion.monetization.DistributionChannel
+import com.xteink.companion.monetization.EntitlementState
+import com.xteink.companion.monetization.MonetizationRuntimeState
+import com.xteink.companion.monetization.PurchasePhase
 import com.xteink.companion.ui.components.SettingsSheetContent
 import com.xteink.companion.ui.components.DeviceConnectionSheetContent
 import com.xteink.companion.ui.components.DeviceSetupStep
@@ -374,6 +379,16 @@ private fun SettingsScreenshotContent(cloudBackupState: CloudBackupState) {
                     cloudBackupState = cloudBackupState,
                     onSyncGoogleBackup = {},
                     onDeleteGoogleBackup = {},
+                    monetizationState = MonetizationRuntimeState(
+                        distribution = DistributionChannel.Community,
+                        entitlement = EntitlementState.Purchased,
+                        consent = ConsentState.AdsNotAllowed,
+                        purchasePhase = PurchasePhase.Unavailable,
+                    ),
+                    onBuyAdFree = {},
+                    onRestorePurchase = {},
+                    onAdPrivacyOptions = {},
+                    onOpenCommunitySource = {},
                     onOpenLegal = {},
                     onDismiss = {},
                     modifier = Modifier.padding(top = 20.dp),

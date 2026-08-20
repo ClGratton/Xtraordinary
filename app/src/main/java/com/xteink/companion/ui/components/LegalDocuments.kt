@@ -25,7 +25,7 @@ enum class LegalDocument(val title: String, val body: String) {
 
             Passes and flights. Pass photos are processed on the device with Google ML Kit. Imported pass files, decoded barcodes, passenger details, and cached flight fields remain local. A Wallet share link or pass-file import may contact the issuer named by that link. Live flight updates contact the configured Xtraordinary flight-status proxy only after you choose Live; a build without a configured proxy does not make that request. Always treat the issuer and airline as authoritative.
 
-            Other network use. Missing book metadata may be requested from Open Library. Firmware and community-release checks contact GitHub or the explicitly selected firmware publisher. The pinned OEM recovery image is downloaded from XTEINK's firmware host only when you choose it. The current builds contain no advertising, billing, or consent SDK and send no analytics or remote diagnostics. If those systems are added later, this policy and consent flow must be updated before they are enabled.
+            Other network use. Missing book metadata may be requested from Open Library. Firmware and community-release checks contact GitHub or the explicitly selected firmware publisher. The pinned OEM recovery image is downloaded from XTEINK's firmware host only when you choose it. Community builds contain no advertising, billing, or consent SDK. Play builds include Google Play Billing, Google's User Messaging Platform, and Google Mobile Ads. The consent flow runs before an ad request. Xtraordinary does not send reading history, books, passes, Bluetooth identifiers, firmware state, Focus sessions, or device telemetry to Google for advertising, and it sends no app analytics or remote diagnostics.
 
             Retention and deletion. Local reading history remains until app data is cleared or a future in-app delete action removes it. Google backup remains until you use Delete cloud backup in Settings, remove the app's Drive access in your Google Account, or delete it through Google Drive account controls. Disconnecting without deletion does not delete the cloud copy.
 
@@ -53,6 +53,8 @@ enum class LegalDocument(val title: String, val body: String) {
 
             Google backup is optional. By enabling it, you authorize Xtraordinary to create and update the private app-data file described in the Privacy policy. You can delete that file and revoke access from Settings.
 
+            The Play build may offer a one-time ad-free product through Google Play. The price and purchase terms shown by Google Play control the transaction. Restore uses the current Play account. Purchase acknowledgement is not a substitute for server verification; a public release must verify entitlement before granting durable ad-free access and must honor refunds and revocations. Billing, cancellation, refund, and statutory consumer rights are also governed by Google Play and applicable law.
+
             These terms may change when functionality or data use changes. Material changes will require a new acknowledgement before affected optional processing resumes.
 
             Support: https://github.com/ClGratton/Xtraordinary/issues. Public distribution still requires final developer identity, contact details, governing terms where appropriate, and review for the release jurisdictions.
@@ -61,9 +63,9 @@ enum class LegalDocument(val title: String, val body: String) {
     Notices(
         title = "Open-source notices",
         body = """
-            Xtraordinary app and companion additions are distributed under the MIT License. The reader firmware is a modified CrossPoint Reader work and includes the Open X4 SDK, both under MIT terms. Source and the complete release audit are available at https://github.com/ClGratton/Xtraordinary.
+            Xtraordinary app and companion additions are distributed under the MIT License. The reader firmware is a modified CrossPoint Reader work and includes the Open X4 SDK, both under MIT terms. The optional firmware picker can also install separately published CrossPoint and CrossInk binaries; both are MIT-licensed community projects, and their own notices, source links, selected release tags, and binary digests remain required. Source and the complete release audit are available at https://github.com/ClGratton/Xtraordinary.
 
-            Android components include AndroidX and Kotlin (Apache-2.0), ZXing (Apache-2.0), Google ML Kit and Google Play services under Google's SDK terms, and JUnit for tests (EPL-1.0).
+            Android components include AndroidX and Kotlin (Apache-2.0), ZXing (Apache-2.0), Google ML Kit and Google Play services under Google's SDK terms, Google Play Billing 9.1.0, Google Mobile Ads 25.4.0, Google User Messaging Platform 4.0.0, and JUnit for tests (EPL-1.0). Billing, ads, and consent dependencies exist only in the Play distribution; the community distribution remains SDK-free and ad-free.
 
             Firmware components include ArduinoJson and QRCode (MIT), PNGdec and JPEGDEC (Apache-2.0), SdFat (MIT), NimBLE-Arduino and Apache NimBLE (Apache-2.0 with NOTICE), ArduinoWebSockets (LGPL-2.1), Expat (MIT, with a CC0 SipHash file), and uzlib (zlib-style terms). Redistributed Noto and OpenDyslexic fonts use SIL OFL-1.1; Ubuntu fonts use the Ubuntu Font Licence 1.0.
 

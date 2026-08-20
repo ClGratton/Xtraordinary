@@ -11,6 +11,9 @@ This inventory accompanies Xtraordinary source and release artifacts. It records
 | ZXing Core 3.5.3 | Barcode generation/decoding | Apache-2.0 | https://github.com/zxing/zxing |
 | Google ML Kit text recognition 16.0.1 and barcode scanning 17.3.0 | On-device pass-photo extraction | Google APIs Terms plus notices in the shipped SDK | https://developers.google.com/ml-kit/terms |
 | Google Play services Auth 21.6.0 | Optional Google authorization | Google APIs Terms plus notices in the shipped SDK | https://developers.google.com/terms |
+| Google Play Billing 9.1.0 (Play distribution only) | One-time ad-free purchase and restore | Google Play SDK terms and Play Billing requirements | https://developer.android.com/google/play/billing |
+| Google Mobile Ads 25.4.0 (Play distribution only) | Anchored adaptive banner on policy-approved browsing surfaces | Google Mobile Ads SDK terms | https://developers.google.com/admob/android/terms |
+| Google User Messaging Platform 4.0.0 (Play distribution only) | Advertising consent and privacy options before eligible ad requests | Google UMP / EU user consent policy | https://developers.google.com/admob/android/privacy |
 | JUnit 4.13.2 | Tests only | EPL-1.0 | https://github.com/junit-team/junit4 |
 
 The canonical release pack must also inventory transitive AAR/JAR dependencies from the exact resolved Gradle graph and preserve every packaged `META-INF` notice before changing packaging exclusions.
@@ -20,6 +23,8 @@ The canonical release pack must also inventory transitive AAR/JAR dependencies f
 | Component | Pinned input | License / notice |
 | --- | --- | --- |
 | CrossPoint Reader fork | baseline `2754a5ff01644d36cf0a17db98f28408666ba518` plus Xtraordinary commits | MIT; `firmware/LICENSE` |
+| CrossPoint release picker | separately published upstream binary selected by the user | MIT; retain upstream release tag, digest, source link, copyright and licence |
+| CrossInk release picker | separately published CrossPoint-derived binary selected by the user | MIT; retain CrossInk and inherited CrossPoint notices plus release tag, digest and source link |
 | Open X4 SDK | vendored under `firmware/open-x4-sdk` | MIT; `firmware/open-x4-sdk/LICENSE` |
 | ArduinoJson 7.4.2 | PlatformIO dependency | MIT |
 | QRCode 0.0.1, Richard Moore | PlatformIO dependency | MIT |

@@ -7,7 +7,7 @@ Status: **not release-cleared**. Last audited 20 August 2026. This is an enginee
 - Root Xtraordinary MIT license is present.
 - CrossPoint fork and Open X4 SDK retain their MIT license files and upstream identity.
 - Settings exposes Privacy, Terms, and Open-source notices without forcing setup replay.
-- Privacy now describes local pass/photo processing, optional Drive app-data backup, optional live-flight proxy traffic, Open Library, GitHub/firmware-host requests, Bluetooth storage, and the absence of current ads, billing, analytics, and remote diagnostics.
+- Privacy now describes local pass/photo processing, optional Drive app-data backup, optional live-flight proxy traffic, Open Library, GitHub/firmware-host requests, Bluetooth storage, the Play-only Billing/UMP/Mobile Ads boundary, and the absence of app analytics and remote diagnostics.
 - Terms state independent/unendorsed status, authorized-use limits, pass/flight limitations, firmware risk, and Google-backup authorization.
 - `THIRD_PARTY_NOTICES.md` inventories direct Android, firmware, font, artwork, and trademark surfaces.
 - The complete Ubuntu Font Licence 1.0 is stored beside the redistributed Ubuntu fonts.
@@ -26,7 +26,7 @@ Status: **not release-cleared**. Last audited 20 August 2026. This is an enginee
 | OEM firmware distribution | App can download a pinned OEM image from XTEINK's host | Confirm permission to deep-link, download, verify, and install the OEM image; otherwise change the product to open the official recovery route instead of redistributing/accessing it in-app |
 | CrossPoint fork obligations | Source fork is public and MIT notice retained | Publish exact corresponding source for every distributed firmware binary and clearly identify modifications/upstream commit in the release notes |
 | Legal identity/jurisdiction | Drafts still name only the maintainer and GitHub support | Add final legal publisher identity, direct privacy contact, governing/consumer terms, age/territory requirements, and verified public policy URLs |
-| Google/flight/store production terms | Development behavior is documented | Complete OAuth verification/branding, flight-provider/proxy contract, Play billing/ads/UMP terms if those SDKs are ever added, and update consent/policies before enablement |
+| Google/flight/store production terms | Play-only Billing 9.1.0, Mobile Ads 25.4.0 and UMP 4.0.0 development integration is inventoried; Community remains SDK-free | Complete OAuth verification/branding, flight-provider/proxy contract, Play product and license-test setup, production AdMob identifiers and consent messages, authenticated purchase-token verification, refund/revocation handling, Data safety declarations, and final Google terms review before release |
 | Scanner and travel claims | UI warns that passes are conveniences | Avoid promising issuer/airport acceptance until real scanner acceptance is recorded; keep delay/status source and freshness visible when live data is used |
 
 ## Release gate

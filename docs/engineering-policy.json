@@ -664,6 +664,41 @@
       "message": "Billing, ads, and consent SDKs must never enter the shared/community dependency graph."
     },
     {
+      "id": "play-monetization-dependencies-are-flavor-scoped",
+      "type": "required_pattern",
+      "path": "app/build.gradle.kts",
+      "pattern": "playImplementation.*play\\.billing[\\s\\S]*?playImplementation.*mobile\\.ads[\\s\\S]*?playImplementation.*google\\.ump",
+      "message": "Billing, Mobile Ads, and UMP must remain explicit Play-only dependencies."
+    },
+    {
+      "id": "community-monetization-runtime-is-sdk-free",
+      "type": "required_pattern",
+      "path": "app/src/community/java/com/xteink/companion/monetization/DistributionMonetizationGateway.kt",
+      "pattern": "DistributionChannel\\.Community[\\s\\S]*?EntitlementState\\.Purchased[\\s\\S]*?override fun buy\\(activity: Activity\\) = Unit",
+      "message": "The community distribution must remain ad-free and expose no billing behavior."
+    },
+    {
+      "id": "play-purchases-remain-verifying-outside-debug",
+      "type": "required_pattern",
+      "path": "app/src/play/java/com/xteink/companion/monetization/DistributionMonetizationGateway.kt",
+      "pattern": "if \\(!BuildConfig\\.DEBUG\\)[\\s\\S]*?PurchasePhase\\.Verifying[\\s\\S]*?waiting for server verification[\\s\\S]*?else if \\(!purchase\\.isAcknowledged\\)",
+      "message": "A release purchase must remain unacknowledged and non-entitled until server verification is implemented."
+    },
+    {
+      "id": "play-ads-remain-central-policy-controlled",
+      "type": "required_pattern",
+      "path": "app/src/play/java/com/xteink/companion/monetization/DistributionBanner.kt",
+      "pattern": "MonetizationPolicy\\.bannerDecision[\\s\\S]*?RequestAnchoredAdaptiveBanner[\\s\\S]*?loadAd",
+      "message": "The Play banner must load only after the centralized entitlement, consent, surface, and hardware-operation policy allows it."
+    },
+    {
+      "id": "legal-copy-discloses-play-sdk-boundary",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/components/LegalDocuments.kt",
+      "pattern": "Community builds contain no advertising, billing, or consent SDK[\\s\\S]*?Play builds include Google Play Billing[\\s\\S]*?consent flow runs before an ad request",
+      "message": "In-app legal copy must match the actual Community and Play dependency/network boundary."
+    },
+    {
       "id": "canonical-android-build-covers-both-distributions",
       "type": "required_pattern",
       "path": "scripts/build-xtraordinary-app.ps1",

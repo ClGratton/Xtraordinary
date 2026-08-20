@@ -30,6 +30,13 @@ import androidx.compose.ui.res.stringResource
 import com.xteink.companion.R
 import com.xteink.companion.data.FirmwareSource
 import com.xteink.companion.data.CloudBackupState
+import com.xteink.companion.monetization.ConsentState
+import com.xteink.companion.monetization.DistributionBanner
+import com.xteink.companion.monetization.DistributionChannel
+import com.xteink.companion.monetization.EntitlementState
+import com.xteink.companion.monetization.MonetizationRuntimeState
+import com.xteink.companion.monetization.MonetizationSurface
+import com.xteink.companion.monetization.PurchasePhase
 import com.xteink.companion.ui.components.CompanionNavigation
 import com.xteink.companion.ui.components.CompanionTopBar
 import com.xteink.companion.ui.components.ControlDeckFocusContent
@@ -88,6 +95,16 @@ fun X3CompanionApp(
     cloudBackupState: CloudBackupState = CloudBackupState(),
     onSyncGoogleBackup: () -> Unit = {},
     onDeleteGoogleBackup: () -> Unit = {},
+    monetizationState: MonetizationRuntimeState = MonetizationRuntimeState(
+        distribution = DistributionChannel.Community,
+        entitlement = EntitlementState.Purchased,
+        consent = ConsentState.AdsNotAllowed,
+        purchasePhase = PurchasePhase.Unavailable,
+    ),
+    onBuyAdFree: () -> Unit = {},
+    onRestorePurchase: () -> Unit = {},
+    onAdPrivacyOptions: () -> Unit = {},
+    onOpenCommunitySource: () -> Unit = {},
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     var devicesVisible by rememberSaveable { mutableStateOf(false) }
@@ -112,6 +129,21 @@ fun X3CompanionApp(
         null -> null
     }
     val undoText = stringResource(R.string.undo)
+    val monetizationSurface = when (state.surface) {
+        CompanionSurface.Focus -> MonetizationSurface.Focus
+        CompanionSurface.Read -> MonetizationSurface.ReadLibrary
+        CompanionSurface.Tools -> when (state.toolDestination) {
+            ToolDestination.Hub -> MonetizationSurface.ToolsHub
+            ToolDestination.Passes -> MonetizationSurface.Passes
+            ToolDestination.Stats -> MonetizationSurface.ReadingStats
+        }
+    }
+    val hardwareOperationInProgress = state.read.uploadingToX3 ||
+        state.ticket.sendPending || state.ticket.removalPending ||
+        state.device.firmwareCheckPhase in setOf(
+            FirmwareCheckPhase.Downloading,
+            FirmwareCheckPhase.Transferring,
+        )
 
     LaunchedEffect(noticeText) {
         if (noticeText != null) {
@@ -151,12 +183,19 @@ fun X3CompanionApp(
             }
         },
         bottomBar = {
-            CompanionNavigation(
-                selected = state.surface,
-                onShowFocus = onShowFocus,
-                onShowRead = onShowRead,
-                onShowTools = onShowTools,
-            )
+            Column {
+                DistributionBanner(
+                    runtime = monetizationState,
+                    surface = monetizationSurface,
+                    operationInProgress = hardwareOperationInProgress,
+                )
+                CompanionNavigation(
+                    selected = state.surface,
+                    onShowFocus = onShowFocus,
+                    onShowRead = onShowRead,
+                    onShowTools = onShowTools,
+                )
+            }
         },
     ) { scaffoldPadding ->
         Column(
@@ -263,6 +302,11 @@ fun X3CompanionApp(
             cloudBackupState = cloudBackupState,
             onSyncGoogleBackup = onSyncGoogleBackup,
             onDeleteGoogleBackup = onDeleteGoogleBackup,
+            monetizationState = monetizationState,
+            onBuyAdFree = onBuyAdFree,
+            onRestorePurchase = onRestorePurchase,
+            onAdPrivacyOptions = onAdPrivacyOptions,
+            onOpenCommunitySource = onOpenCommunitySource,
             onDismiss = { onShowSettings(false) },
         )
     }

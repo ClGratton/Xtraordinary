@@ -1,6 +1,6 @@
 # Trial, ads, and ad-free entitlement design
 
-- Status: Core policy implemented; production identity, billing, consent, and ad services remain external
+- Status: Play development integration implemented; production identity, entitlement verification, and store configuration remain external
 - Date: 2026-08-11
 
 ## Product requirements
@@ -14,11 +14,13 @@
 
 ## Current repository truth
 
-The Android app now has a pure centralized `EntitlementState`, injected `EntitlementClock`, server-snapshot reducer, offline grace state, surface-aware `MonetizationPolicy`, and compile-time `community`/`play` variants. The canonical build compiles and tests both variants. The community variant has no billing, consent, or ad SDK and is always ad-free; future dependencies are allowed only as `playImplementation`.
+The Android app has a pure centralized `EntitlementState`, injected `EntitlementClock`, server-snapshot reducer, offline grace state, surface-aware `MonetizationPolicy`, and compile-time `community`/`play` variants. The community variant has no billing, consent, or ad SDK and is always ad-free. The Play variant now integrates Google Play Billing 9.1.0, Google User Messaging Platform 4.0.0, and Google Mobile Ads 25.4.0 through `playImplementation` only.
 
-The repository still has no billing client, ad SDK, consent-management SDK, AdMob identifiers, Play product identifiers, authenticated entitlement backend, or production Google OAuth client. No banner placeholder is shown and no ad request is made until those production contracts exist.
+The Play runtime queries a one-time product, restores purchases, acknowledges completed purchases, requests consent information on launch, exposes required privacy options, and requests one anchored adaptive banner only when the centralized policy permits it. Debug builds use Google's published sample AdMob application/banner identifiers and expose an explicit test-configuration label. The Settings sheet exposes purchase, restore, privacy, and public community-source actions. Community builds compile against no Google billing/ad/consent class or manifest entry.
 
-It would therefore be false to claim that trial recovery prevention, purchase restoration, consent, or live ads can already be verified. The implemented reducer deliberately consumes server evidence; it does not use a resettable local install timestamp as entitlement truth.
+Production remains deliberately fail-closed. The repository has no authenticated entitlement backend, final Play product, production AdMob identifiers, published UMP consent messages, or production Google OAuth client. A non-debug Play build does not grant durable ad-free entitlement merely because a purchase was acknowledged; it remains in `Verifying` until server verification exists. Trial recovery prevention and refund/revocation handling likewise remain unimplemented because they require durable server evidence. The reducer does not use a resettable local install timestamp as entitlement truth.
+
+The sample identifiers are development inputs, never release credentials. A release must supply `xtraordinaryPlayAdFreeProductId`, `xtraordinaryAdMobAppId`, `xtraordinaryAdMobBannerId`, and `xtraordinaryEntitlementEndpoint`, and must fail release acceptance until the endpoint is actually consumed for purchase-token and entitlement verification.
 
 ## Recommended product model
 
@@ -101,7 +103,7 @@ No reading history, book metadata, Bluetooth identifier, firmware state, Drive i
 3. Fake clock crosses seven full days: state becomes `AdSupported`; the official AdMob test banner appears only on allowed app surfaces.
 4. Clear local app data and reinstall with the same identity: server still returns `AdSupported`; no new trial is created.
 5. Go offline after expiry: core functions remain available; no blocking upgrade flow appears.
-6. Complete a Play license-test purchase: backend verifies and acknowledges it; state becomes `Purchased`; the banner is removed immediately.
+6. Complete a Play license-test purchase in a debug/license-test environment: Play acknowledgement succeeds and the debug state becomes `Purchased`; the banner is removed immediately. Production acceptance separately requires backend token verification before `Purchased`.
 7. Reinstall and restore: `Purchased` returns after verification.
 8. Refund/revoke in a license-test environment: after verified revocation, state returns to `AdSupported`.
 9. Community build: no billing/ad/consent SDK classes or manifest entries exist, the app is ad-free, and the same core regression suite passes.

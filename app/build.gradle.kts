@@ -4,6 +4,8 @@ plugins {
     alias(libs.plugins.screenshot)
 }
 
+fun String.asBuildConfigString(): String = "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
 android {
     experimentalProperties["android.experimental.enableScreenshotTest"] = true
 
@@ -18,8 +20,8 @@ android {
         applicationId = "com.xteink.companion"
         minSdk = 26
         targetSdk = 36
-        versionCode = 48
-        versionName = "0.2.0-dev47"
+        versionCode = 49
+        versionName = "0.2.0-dev48"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -51,12 +53,30 @@ android {
             dimension = "distribution"
             buildConfigField("String", "DISTRIBUTION_CHANNEL", "\"community\"")
             buildConfigField("String", "FLIGHT_STATUS_PROXY_ENDPOINT", "\"\"")
+            buildConfigField("String", "PLAY_AD_FREE_PRODUCT_ID", "\"\"")
+            buildConfigField("String", "ADMOB_BANNER_UNIT_ID", "\"\"")
+            buildConfigField("String", "ENTITLEMENT_ENDPOINT", "\"\"")
+            buildConfigField("String", "COMMUNITY_SOURCE_URL", "\"https://github.com/ClGratton/Xtraordinary\"")
         }
         create("play") {
             dimension = "distribution"
             buildConfigField("String", "DISTRIBUTION_CHANNEL", "\"play\"")
             val flightStatusEndpoint = providers.gradleProperty("xtraordinaryFlightStatusProxy").orNull.orEmpty()
-            buildConfigField("String", "FLIGHT_STATUS_PROXY_ENDPOINT", "\"$flightStatusEndpoint\"")
+            val playProductId = providers.gradleProperty("xtraordinaryPlayAdFreeProductId")
+                .orNull.orEmpty().ifBlank { "xtraordinary_ad_free" }
+            val admobAppId = providers.gradleProperty("xtraordinaryAdMobAppId")
+                .orNull.orEmpty().ifBlank { "ca-app-pub-3940256099942544~3347511713" }
+            val admobBannerId = providers.gradleProperty("xtraordinaryAdMobBannerId")
+                .orNull.orEmpty().ifBlank { "ca-app-pub-3940256099942544/9214589741" }
+            val entitlementEndpoint = providers.gradleProperty("xtraordinaryEntitlementEndpoint").orNull.orEmpty()
+            val communitySourceUrl = providers.gradleProperty("xtraordinaryCommunitySourceUrl")
+                .orNull.orEmpty().ifBlank { "https://github.com/ClGratton/Xtraordinary" }
+            buildConfigField("String", "FLIGHT_STATUS_PROXY_ENDPOINT", flightStatusEndpoint.asBuildConfigString())
+            buildConfigField("String", "PLAY_AD_FREE_PRODUCT_ID", playProductId.asBuildConfigString())
+            buildConfigField("String", "ADMOB_BANNER_UNIT_ID", admobBannerId.asBuildConfigString())
+            buildConfigField("String", "ENTITLEMENT_ENDPOINT", entitlementEndpoint.asBuildConfigString())
+            buildConfigField("String", "COMMUNITY_SOURCE_URL", communitySourceUrl.asBuildConfigString())
+            manifestPlaceholders["adMobAppId"] = admobAppId
         }
     }
 
@@ -93,8 +113,7 @@ dependencies {
     screenshotTestImplementation(libs.androidx.compose.ui.tooling)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    "playImplementation"(libs.play.billing.ktx)
+    "playImplementation"(libs.google.mobile.ads)
+    "playImplementation"(libs.google.ump)
 }
-
-// Billing, consent, and advertising libraries must be added as
-// playImplementation only. The community variant intentionally has no such
-// classes, manifest components, identifiers, or network requests.

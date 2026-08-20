@@ -10,6 +10,9 @@ screenshot = "0.0.1-alpha15"
 mlkitText = "16.0.1"
 mlkitBarcode = "17.3.0"
 playServicesAuth = "21.6.0"
+playBilling = "9.1.0"
+googleMobileAds = "25.4.0"
+googleUmp = "4.0.0"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
@@ -31,6 +34,9 @@ screenshot-validation-api = { group = "com.android.tools.screenshot", name = "sc
 mlkit-text-recognition = { module = "com.google.mlkit:text-recognition", version.ref = "mlkitText" }
 mlkit-barcode-scanning = { module = "com.google.mlkit:barcode-scanning", version.ref = "mlkitBarcode" }
 play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "playServicesAuth" }
+play-billing-ktx = { module = "com.android.billingclient:billing-ktx", version.ref = "playBilling" }
+google-mobile-ads = { module = "com.google.android.gms:play-services-ads", version.ref = "googleMobileAds" }
+google-ump = { module = "com.google.android.ump:user-messaging-platform", version.ref = "googleUmp" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
