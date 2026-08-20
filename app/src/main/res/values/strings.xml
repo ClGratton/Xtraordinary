@@ -362,4 +362,5 @@
     <string name="ad_free_restore">Restore purchase</string>
     <string name="ad_privacy">Ad privacy</string>
     <string name="ad_free_community_source">Compile the ad-free community build from GitHub</string>
+    <string name="ad_free_view_source">View community source on GitHub</string>
 </resources>

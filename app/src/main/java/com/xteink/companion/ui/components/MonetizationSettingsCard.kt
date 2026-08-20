@@ -1,6 +1,7 @@
 package com.xteink.companion.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -91,25 +92,51 @@ fun MonetizationSettingsCard(
                 )
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                if (!state.isCommunity) {
-                    TextButton(
-                        onClick = onRestore,
-                        enabled = state.purchasePhase !in setOf(PurchasePhase.Purchasing, PurchasePhase.Pending),
-                    ) {
-                        Text(stringResource(R.string.ad_free_restore))
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val compactActions = maxWidth < 320.dp
+                if (compactActions) {
+                    Column {
+                        if (!state.isCommunity) {
+                            TextButton(
+                                onClick = onRestore,
+                                enabled = state.purchasePhase !in setOf(
+                                    PurchasePhase.Purchasing,
+                                    PurchasePhase.Pending,
+                                ),
+                            ) {
+                                Text(stringResource(R.string.ad_free_restore))
+                            }
+                        }
+                        if (state.privacyOptionsRequired) {
+                            TextButton(onClick = onPrivacyOptions) { Text(stringResource(R.string.ad_privacy)) }
+                        }
                     }
-                }
-                if (state.privacyOptionsRequired) {
-                    TextButton(onClick = onPrivacyOptions) { Text(stringResource(R.string.ad_privacy)) }
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        if (!state.isCommunity) {
+                            TextButton(
+                                onClick = onRestore,
+                                enabled = state.purchasePhase !in setOf(
+                                    PurchasePhase.Purchasing,
+                                    PurchasePhase.Pending,
+                                ),
+                            ) {
+                                Text(stringResource(R.string.ad_free_restore))
+                            }
+                        }
+                        if (state.privacyOptionsRequired) {
+                            TextButton(onClick = onPrivacyOptions) { Text(stringResource(R.string.ad_privacy)) }
+                        }
+                    }
                 }
             }
             Spacer(Modifier.height(2.dp))
             TextButton(onClick = onOpenCommunitySource) {
-                Text(stringResource(R.string.ad_free_community_source))
+                Text(
+                    stringResource(
+                        if (state.isCommunity) R.string.ad_free_view_source else R.string.ad_free_community_source,
+                    ),
+                )
             }
         }
     }
