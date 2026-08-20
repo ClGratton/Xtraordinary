@@ -682,6 +682,13 @@
       "path": "scripts/build-xtraordinary-app.ps1",
       "pattern": "UiEvidenceCandidate[\\s\\S]*?updateCommunityDebugScreenshotTest[\\s\\S]*?updatePlayDebugScreenshotTest[\\s\\S]*?may only update deterministic",
       "message": "Unreviewed UI candidates may only compile deterministic screenshot evidence through the pushed-source wrapper."
+    },
+    {
+      "id": "reconnect-verifier-requires-discovery-precondition",
+      "type": "required_pattern",
+      "path": "scripts/verify-x3-reconnect.ps1",
+      "pattern": "PersistentWorkAlreadyQueued[\\s\\S]*?WakeViaUsbPort[\\s\\S]*?foreground launch alone is only a 15-second one-shot probe[\\s\\S]*?Invoke-X3UsbWake",
+      "message": "Reconnect acceptance must not mistake a foreground one-shot probe that misses a standby pulse for a transport failure; require durable work or an explicit generic wake."
     }
   ]
 }
