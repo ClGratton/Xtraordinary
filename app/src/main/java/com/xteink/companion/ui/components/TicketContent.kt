@@ -56,7 +56,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -107,7 +106,6 @@ fun PassesToolContent(
         pageCount = { ticket.passes.size },
     )
     val pagerScope = rememberCoroutineScope()
-    val context = LocalContext.current
     LaunchedEffect(pagerState.settledPage) {
         ticket.passes.getOrNull(pagerState.settledPage)?.let { onSelectPass(it.id) }
     }
@@ -179,6 +177,13 @@ fun PassesToolContent(
                 )
             }
         }
+        val passPositionDescription = stringResource(
+            R.string.pass_position,
+            pagerState.settledPage + 1,
+            ticket.passes.size,
+        )
+        val previousPassLabel = stringResource(R.string.pass_previous)
+        val nextPassLabel = stringResource(R.string.pass_next)
         MagneticHorizontalPager(
             state = pagerState,
             contentPadding = PaddingValues(horizontal = 48.dp),
@@ -190,12 +195,12 @@ fun PassesToolContent(
                 selectedContent = MaterialTheme.colorScheme.onSurface,
             ),
             modifier = Modifier.fillMaxWidth().semantics {
-                contentDescription = context.getString(R.string.pass_position, pagerState.settledPage + 1, ticket.passes.size)
+                contentDescription = passPositionDescription
                 customActions = buildList {
-                    if (pagerState.settledPage > 0) add(CustomAccessibilityAction(context.getString(R.string.pass_previous)) {
+                    if (pagerState.settledPage > 0) add(CustomAccessibilityAction(previousPassLabel) {
                         pagerScope.launch { pagerState.animateScrollToPage(pagerState.settledPage - 1) }; true
                     })
-                    if (pagerState.settledPage < ticket.passes.lastIndex) add(CustomAccessibilityAction(context.getString(R.string.pass_next)) {
+                    if (pagerState.settledPage < ticket.passes.lastIndex) add(CustomAccessibilityAction(nextPassLabel) {
                         pagerScope.launch { pagerState.animateScrollToPage(pagerState.settledPage + 1) }; true
                     })
                 }
