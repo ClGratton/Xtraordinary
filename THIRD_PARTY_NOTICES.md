@@ -38,6 +38,8 @@ The canonical release pack must also inventory transitive AAR/JAR dependencies f
 
 The embedded static use of LGPL-2.1 ArduinoWebSockets is a release blocker until counsel-approved compliance is implemented (for example, the required source/relinkable-material offer) or the dependency is replaced with a compatible permissive implementation. Do not describe the firmware binary as release-ready while this remains open.
 
+The complete firmware-side texts are tracked in `release-notices/firmware`. `MANIFEST.sha256` binds the 25 files, including the full CC0-1.0 legal text for Expat's vendored `siphash.h`; `scripts/check-firmware-release-notices.ps1` verifies the inventory and hashes before the engineering policy gate permits a compiler to start.
+
 ## Fonts and artwork
 
 | Asset | License / provenance state |

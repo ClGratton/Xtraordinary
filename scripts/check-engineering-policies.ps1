@@ -5,6 +5,11 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$firmwareNoticeCheck = Join-Path $PSScriptRoot 'check-firmware-release-notices.ps1'
+if (-not (Test-Path -LiteralPath $firmwareNoticeCheck)) {
+    throw "Firmware release-notices verifier is missing: $firmwareNoticeCheck"
+}
+& $firmwareNoticeCheck
 $repoRoot = Split-Path -Parent $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($ManifestPath)) {
     $ManifestPath = Join-Path $repoRoot 'docs\engineering-policy.json'

@@ -13,13 +13,14 @@ Status: **not release-cleared**. Last audited 20 August 2026. This is an enginee
 - The complete Ubuntu Font Licence 1.0 is stored beside the redistributed Ubuntu fonts.
 - Vendored uzlib is identified as version 2.9.8 and has a normalized complete zlib-style license file beside its source.
 - `docs/firmware-brand-release-rights.md` separately inventories Xtraordinary, CrossPoint, CrossInk, Open X4, XTEINK trademark/device representation, and the pinned OEM-binary path; open-source licensing is not treated as trademark or OEM permission.
+- `release-notices/firmware` now tracks 25 complete licence/NOTICE files for the pinned Xtraordinary/CrossPoint/CrossInk/Open X4 firmware stack, embedded libraries, and fonts. Its SHA-256 manifest is verified by `scripts/check-firmware-release-notices.ps1`, which the engineering gate runs before any compiler.
 
 ## Blocking before public distribution
 
 | Area | Current evidence | Required closeout |
 | --- | --- | --- |
 | Exact Android dependency notices | Direct Gradle dependencies inventoried | Generate and inspect the exact release variant's full resolved/transitive graph; bundle every required license/NOTICE text; verify current `META-INF` exclusions do not discard mandatory notices |
-| Firmware release pack | Direct PlatformIO and vendored libraries inventoried from the current environment | Copy version-pinned full license/NOTICE texts into a tracked release-notices directory and generate a manifest/hash list from the canonical firmware environment |
+| Firmware artifact/source binding | The tracked 25-file firmware notice pack and manifest now pass a mandatory pre-compiler verifier | For every public binary, bind the exact source commit, firmware size/SHA-256, notice-manifest SHA-256, modification summary, and corresponding-source URL in the release record; re-review and regenerate the pack whenever a dependency or asset changes |
 | ArduinoWebSockets LGPL-2.1 | License confirmed in `.pio/libdeps/.../WebSockets/LICENSE`; firmware links embedded code statically | Obtain a compliance decision and ship source/relinkable material and written offer as required, or replace it with a compatible permissive implementation |
 | Generated art | Production and concept PNGs are in source | Record generator/account, prompt/source ownership, output date, and the commercial-output terms that applied; keep a human approval record |
 | XTEINK name/logo/product imagery | App and docs use XTEINK text; source includes X3 outlines and compatibility claims | Get written permission where logo/product imagery is used, or remove those assets; have counsel approve nominative compatibility wording and store listing |
