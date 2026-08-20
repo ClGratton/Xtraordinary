@@ -10,6 +10,18 @@ if (-not (Test-Path -LiteralPath $firmwareNoticeCheck)) {
     throw "Firmware release-notices verifier is missing: $firmwareNoticeCheck"
 }
 & $firmwareNoticeCheck
+if ($Mode -ne 'FirmwareRelease') {
+    $androidNoticeCheck = Join-Path $PSScriptRoot 'generate-android-release-notices.ps1'
+    if (-not (Test-Path -LiteralPath $androidNoticeCheck)) {
+        throw "Android release-notices verifier is missing: $androidNoticeCheck"
+    }
+    & $androidNoticeCheck -Check
+    $artworkProvenanceCheck = Join-Path $PSScriptRoot 'check-artwork-provenance.ps1'
+    if (-not (Test-Path -LiteralPath $artworkProvenanceCheck)) {
+        throw "Artwork provenance verifier is missing: $artworkProvenanceCheck"
+    }
+    & $artworkProvenanceCheck
+}
 $repoRoot = Split-Path -Parent $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($ManifestPath)) {
     $ManifestPath = Join-Path $repoRoot 'docs\engineering-policy.json'

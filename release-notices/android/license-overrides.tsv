@@ -1,0 +1,39 @@
+group	module	version	resolution	evidenceUrl
+androidx.appcompat	appcompat	1.6.1	Apache-2.0	https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt
+androidx.appcompat	appcompat-resources	1.6.1	Apache-2.0	https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt
+androidx.cursoradapter	cursoradapter	1.0.0	Apache-2.0	https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt
+androidx.drawerlayout	drawerlayout	1.0.0	Apache-2.0	https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt
+androidx.emoji2	emoji2-views-helper	1.4.0	Apache-2.0	https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt
+androidx.exifinterface	exifinterface	1.0.0	Apache-2.0	https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt
+androidx.fragment	fragment	1.5.7	Apache-2.0	https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt
+androidx.loader	loader	1.1.0	Apache-2.0	https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt
+androidx.resourceinspection	resourceinspection-annotation	1.0.1	Apache-2.0	https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt
+com.android.billingclient	billing-ktx	9.1.0	Google SDK terms	https://developer.android.com/google/play/billing/integrate
+com.google.android.datatransport	transport-api	2.2.1	Apache-2.0	https://github.com/google/transport-runtime/blob/main/LICENSE
+com.google.android.datatransport	transport-backend-cct	2.3.3	Apache-2.0	https://github.com/google/transport-runtime/blob/main/LICENSE
+com.google.android.datatransport	transport-runtime	2.2.6	Apache-2.0	https://github.com/google/transport-runtime/blob/main/LICENSE
+com.google.android.gms	play-services-auth	21.6.0	Google SDK terms	https://developers.google.com/mobile/terms
+com.google.android.gms	play-services-auth-api-phone	18.0.2	Google SDK terms	https://developers.google.com/mobile/terms
+com.google.android.gms	play-services-auth-base	18.0.10	Google SDK terms	https://developers.google.com/mobile/terms
+com.google.android.gms	play-services-fido	20.0.1	Google SDK terms	https://developers.google.com/mobile/terms
+com.google.android.gms	play-services-mlkit-barcode-scanning	18.3.1	ML Kit terms	https://developers.google.com/ml-kit/terms
+com.google.android.gms	play-services-mlkit-text-recognition	19.0.1	ML Kit terms	https://developers.google.com/ml-kit/terms
+com.google.android.gms	play-services-mlkit-text-recognition-common	19.1.0	ML Kit terms	https://developers.google.com/ml-kit/terms
+com.google.android.odml	image	1.0.0-beta1	Google SDK terms	https://developers.google.com/terms
+com.google.firebase	firebase-annotations	16.0.0	Apache-2.0	https://github.com/firebase/firebase-android-sdk/blob/main/LICENSE
+com.google.firebase	firebase-components	16.1.0	Apache-2.0	https://github.com/firebase/firebase-android-sdk/blob/main/LICENSE
+com.google.firebase	firebase-encoders	16.1.0	Apache-2.0	https://github.com/firebase/firebase-android-sdk/blob/main/LICENSE
+com.google.firebase	firebase-encoders-json	17.1.0	Apache-2.0	https://github.com/firebase/firebase-android-sdk/blob/main/LICENSE
+com.google.guava	failureaccess	1.0.1	Apache-2.0	https://github.com/google/guava/blob/master/COPYING
+com.google.guava	guava	31.1-android	Apache-2.0	https://github.com/google/guava/blob/v31.1/README.md
+com.google.guava	listenablefuture	1.0	Apache-2.0	https://github.com/google/guava/blob/master/COPYING
+com.google.guava	listenablefuture	9999.0-empty-to-avoid-conflict-with-guava	Apache-2.0	https://github.com/google/guava/blob/master/COPYING
+com.google.mlkit	barcode-scanning	17.3.0	ML Kit terms	https://developers.google.com/ml-kit/terms
+com.google.mlkit	barcode-scanning-common	17.0.0	ML Kit terms	https://developers.google.com/ml-kit/terms
+com.google.mlkit	common	18.11.0	ML Kit terms	https://developers.google.com/ml-kit/terms
+com.google.mlkit	text-recognition	16.0.1	ML Kit terms	https://developers.google.com/ml-kit/terms
+com.google.mlkit	text-recognition-bundled-common	17.0.0	ML Kit terms	https://developers.google.com/ml-kit/terms
+com.google.mlkit	vision-common	17.3.0	ML Kit terms	https://developers.google.com/ml-kit/terms
+com.google.mlkit	vision-interfaces	16.3.0	ML Kit terms	https://developers.google.com/ml-kit/terms
+com.google.zxing	core	3.5.3	Apache-2.0	https://github.com/zxing/zxing/blob/zxing-3.5.3/LICENSE
+org.jetbrains.kotlinx	kotlinx-coroutines-play-services	1.9.0	Apache-2.0	https://github.com/Kotlin/kotlinx.coroutines/blob/1.9.0/LICENSE.txt

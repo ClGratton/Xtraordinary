@@ -1536,7 +1536,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 reconciled += ImportedBookUiState(
                     id = "xteink:${path.hashCode().toUInt().toString(16)}",
                     title = fileName.substringBeforeLast('.'),
-                    author = "On XTEINK",
+                    author = "On X3",
                     fileName = fileName,
                     fileSizeBytes = size,
                     isOnPhone = false,

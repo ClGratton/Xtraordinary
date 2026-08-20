@@ -19,6 +19,7 @@ $gradle = Join-Path $repoRoot '.tools\gradle-9.5.0\bin\gradle.bat'
 $toolchainScript = Join-Path $PSScriptRoot 'use-toolchains.ps1'
 $policyCheck = Join-Path $PSScriptRoot 'check-engineering-policies.ps1'
 $sourceCheck = Join-Path $PSScriptRoot 'assert-pushed-source.ps1'
+$apkNoticeCheck = Join-Path $PSScriptRoot 'check-android-apk-notices.ps1'
 
 if (-not (Test-Path -LiteralPath $gradle)) {
     throw "Bundled Gradle was not found at $gradle"
@@ -31,6 +32,9 @@ if (-not (Test-Path -LiteralPath $policyCheck)) {
 }
 if (-not (Test-Path -LiteralPath $sourceCheck)) {
     throw "Pushed-source gate was not found at $sourceCheck"
+}
+if (-not (Test-Path -LiteralPath $apkNoticeCheck)) {
+    throw "APK release-notices verifier was not found at $apkNoticeCheck"
 }
 
 if ($UiEvidenceCandidate) {
@@ -77,4 +81,16 @@ try {
     }
 } finally {
     Pop-Location
+}
+
+$apkChecks = @{
+    ':app:assembleCommunityDebug' = Join-Path $repoRoot 'app\build\outputs\apk\community\debug\app-community-debug.apk'
+    ':app:assemblePlayDebug' = Join-Path $repoRoot 'app\build\outputs\apk\play\debug\app-play-debug.apk'
+    ':app:assembleCommunityRelease' = Join-Path $repoRoot 'app\build\outputs\apk\community\release\app-community-release-unsigned.apk'
+    ':app:assemblePlayRelease' = Join-Path $repoRoot 'app\build\outputs\apk\play\release\app-play-release-unsigned.apk'
+}
+foreach ($task in $apkChecks.Keys) {
+    if ($task -in $Tasks) {
+        & $apkNoticeCheck -ApkPath $apkChecks[$task]
+    }
 }

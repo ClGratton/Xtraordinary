@@ -710,7 +710,7 @@ class BluetoothCompanionClient(private val context: Context) {
     }
 
     private fun send(type: MessageType, payload: ByteArray, awaitAck: Boolean): CompletableDeferred<Unit>? {
-        check(_state.value.phase == LinkPhase.Connected) { "XTEINK is not connected" }
+        check(_state.value.phase == LinkPhase.Connected) { "X3 is not connected" }
         val id = messageIds.getAndIncrement().toUInt()
         val deferred = if (awaitAck) CompletableDeferred<Unit>().also { pendingAcks[id] = it } else null
         val bytes = EnvelopeCodec.encode(Envelope(messageType = type, messageId = id, payload = payload))
@@ -739,7 +739,7 @@ class BluetoothCompanionClient(private val context: Context) {
         writeInFlight = true
         val currentGatt = gatt ?: run {
             writeInFlight = false
-            failLink("XTEINK transport disappeared before write")
+            failLink("X3 transport disappeared before write")
             return
         }
         val started = if (Build.VERSION.SDK_INT >= 33) {
@@ -756,7 +756,7 @@ class BluetoothCompanionClient(private val context: Context) {
         }
         if (!started) {
             writeInFlight = false
-            failLink("Could not write to XTEINK")
+            failLink("Could not write to X3")
         }
     }
 
@@ -778,7 +778,7 @@ class BluetoothCompanionClient(private val context: Context) {
                 val message = if (status == GattConnectionTimeoutStatus) {
                     "X3 connection timed out. Toggle Bluetooth once if it remains stuck, then retry."
                 } else {
-                    "XTEINK disconnected (Bluetooth status $status)"
+                    "X3 disconnected (Bluetooth status $status)"
                 }
                 failLink(message)
                 return
@@ -825,7 +825,7 @@ class BluetoothCompanionClient(private val context: Context) {
                 return
             }
             if (status != BluetoothGatt.GATT_SUCCESS) {
-                failLink("Could not subscribe to XTEINK")
+                failLink("Could not subscribe to X3")
                 return
             }
             _state.value = _state.value.copy(phase = LinkPhase.Connected, message = null)
@@ -845,7 +845,7 @@ class BluetoothCompanionClient(private val context: Context) {
                 send(MessageType.GetReadingStats, byteArrayOf(), awaitAck = false)
             }.onFailure { error ->
                 if (gatt === this@BluetoothCompanionClient.gatt) {
-                    failLink(error.message ?: "XTEINK disconnected during setup")
+                    failLink(error.message ?: "X3 disconnected during setup")
                 }
             }
         }
@@ -853,7 +853,7 @@ class BluetoothCompanionClient(private val context: Context) {
         override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
             Log.i(LogTag, "write complete uuid=${characteristic.uuid} status=$status")
             writeInFlight = false
-            if (status == BluetoothGatt.GATT_SUCCESS) drainWrites() else failLink("XTEINK rejected a write ($status)")
+            if (status == BluetoothGatt.GATT_SUCCESS) drainWrites() else failLink("X3 rejected a write ($status)")
         }
 
         override fun onCharacteristicChanged(

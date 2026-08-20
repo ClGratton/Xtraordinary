@@ -113,8 +113,6 @@ private fun X3ImageField(colorMode: CompanionColorMode) {
     val artwork = sceneArtworkFor(colorMode).phonePreview
     val frameColor = if (colorMode == CompanionColorMode.Dark) Color.White
     else MaterialTheme.colorScheme.secondaryContainer
-    val brandColor = if (colorMode == CompanionColorMode.Dark) Color.Black
-    else MaterialTheme.colorScheme.onSecondaryContainer
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -126,7 +124,7 @@ private fun X3ImageField(colorMode: CompanionColorMode) {
         Column(
             modifier = Modifier.padding(10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(5.dp),
+            verticalArrangement = Arrangement.Center,
         ) {
             Surface(
                 modifier = Modifier
@@ -142,13 +140,6 @@ private fun X3ImageField(colorMode: CompanionColorMode) {
                     contentScale = ContentScale.Crop,
                 )
             }
-            Text(
-                text = stringResource(R.string.x3_brand),
-                color = brandColor,
-                fontSize = 9.sp,
-                letterSpacing = 1.sp,
-                fontWeight = FontWeight.Bold,
-            )
         }
     }
 }

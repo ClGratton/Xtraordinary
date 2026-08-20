@@ -1,3 +1,5 @@
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -27,9 +29,24 @@ android {
         vectorDrawables.useSupportLibrary = true
     }
 
+    val oemPermissionAcknowledged = providers
+        .gradleProperty("xtraordinaryXteinkOemPermissionAcknowledged")
+        .orNull
+        ?.equals("true", ignoreCase = true) == true
     buildTypes {
+        getByName("debug") {
+            // Private maintenance builds retain the known recovery route.
+            buildConfigField("boolean", "XTEINK_OEM_FIRMWARE_ALLOWED", "true")
+        }
         release {
             isMinifyEnabled = false
+            // Public/release variants fail closed unless written OEM permission
+            // has been recorded and the release invocation opts in explicitly.
+            buildConfigField(
+                "boolean",
+                "XTEINK_OEM_FIRMWARE_ALLOWED",
+                oemPermissionAcknowledged.toString(),
+            )
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
@@ -81,7 +98,33 @@ android {
     }
 
     packaging {
-        resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        // Keep one copy of conventional duplicate licence entries instead of
+        // deleting them from every APK.
+        resources.pickFirsts += setOf("/META-INF/AL2.0", "/META-INF/LGPL2.1")
+    }
+
+    sourceSets.getByName("main").assets.srcDir(rootProject.file("release-notices"))
+}
+
+tasks.register("writeLegalRuntimeDependencyReports") {
+    val reportDirectory = layout.buildDirectory.dir("legal/runtime-dependencies")
+    outputs.dir(reportDirectory)
+
+    doLast {
+        listOf("communityReleaseRuntimeClasspath", "playReleaseRuntimeClasspath").forEach { configurationName ->
+            val coordinates = configurations.getByName(configurationName)
+                .incoming.resolutionResult.allComponents
+                .mapNotNull { component ->
+                    val id = component.id as? ModuleComponentIdentifier ?: return@mapNotNull null
+                    "${id.group}\t${id.module}\t${id.version}"
+                }
+                .distinct()
+                .sorted()
+            reportDirectory.get().file("$configurationName.tsv").asFile.apply {
+                parentFile.mkdirs()
+                writeText("group\tmodule\tversion\n${coordinates.joinToString("\n")}\n")
+            }
+        }
     }
 }
 

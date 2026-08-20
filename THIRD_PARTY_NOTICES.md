@@ -12,11 +12,11 @@ This inventory accompanies Xtraordinary source and release artifacts. It records
 | Google ML Kit text recognition 16.0.1 and barcode scanning 17.3.0 | On-device pass-photo extraction | Google APIs Terms plus notices in the shipped SDK | https://developers.google.com/ml-kit/terms |
 | Google Play services Auth 21.6.0 | Optional Google authorization | Google APIs Terms plus notices in the shipped SDK | https://developers.google.com/terms |
 | Google Play Billing 9.1.0 (Play distribution only) | One-time ad-free purchase and restore | Google Play SDK terms and Play Billing requirements | https://developer.android.com/google/play/billing |
-| Google Mobile Ads 25.4.0 (Play distribution only) | Anchored adaptive banner on policy-approved browsing surfaces | Google Mobile Ads SDK terms | https://developers.google.com/admob/android/terms |
+| Google Mobile Ads 25.4.0 (Play distribution only) | Anchored adaptive banner on policy-approved browsing surfaces | Google Mobile Ads SDK / Google Developers terms | https://developers.google.com/admob/android/sdk |
 | Google User Messaging Platform 4.0.0 (Play distribution only) | Advertising consent and privacy options before eligible ad requests | Google UMP / EU user consent policy | https://developers.google.com/admob/android/privacy |
 | JUnit 4.13.2 | Tests only | EPL-1.0 | https://github.com/junit-team/junit4 |
 
-The canonical release pack must also inventory transitive AAR/JAR dependencies from the exact resolved Gradle graph and preserve every packaged `META-INF` notice before changing packaging exclusions.
+The canonical Android release pack is tracked in `release-notices/android`: 147 Community and 180 Play release-runtime coordinates, their POM licence names/URLs/hashes, 38 exact overrides for undeclared POMs, full current Apache-2.0 and Checker Framework MIT texts, and official Google terms pointers. Its SHA-256 manifest is rechecked against fresh dependency resolution before compilation. The app preserves one conventional duplicate `META-INF/AL2.0`/`LGPL2.1` entry, embeds both legal packs as assets, and the build wrapper compares every embedded notice byte-for-byte with the reviewed source pack.
 
 ## Reader firmware and embedded libraries
 
@@ -47,7 +47,7 @@ The complete firmware-side texts are tracked in `release-notices/firmware`. `MAN
 | Noto Sans, Noto Serif, Noto Sans Hebrew | SIL OFL-1.1; local `OFL.txt` files are present |
 | OpenDyslexic | SIL OFL-1.1; local `OFL.txt` is present |
 | Ubuntu font files | Ubuntu Font Licence 1.0; complete text is vendored beside the fonts in `firmware/lib/EpdFont/builtinFonts/source/Ubuntu/ubuntu-font-licence-1.0.txt` |
-| Lighthouse/sea, astronaut/space, and onboarding PNGs | Project-generated editorial assets; preserve source-generation/provenance records and confirm the generation service's commercial-output terms for the creating account |
+| Lighthouse/sea, astronaut/space, onboarding PNGs, and retained concepts | Hash/dimension/commit/date/author inventory in `docs/artwork-provenance.tsv`; generator account, prompt/source chain, commercial-output terms, and human approval remain explicitly missing and release-blocking |
 | Code-drawn app icons and shapes | Project source under the repository MIT license; functional icon geometry must remain documented in the UI course/contract |
 
 ## Names and trademarks

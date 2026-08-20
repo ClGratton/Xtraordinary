@@ -391,6 +391,27 @@
       "message": "The OEM XTEINK stock source must remain distinct and checksum-pinned."
     },
     {
+      "id": "oem-stock-release-builds-fail-closed",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/data/FirmwareReleaseRepository.kt",
+      "pattern": "requireFirmwareSourceDistributionAllowed[\\s\\S]*?FirmwareSource\\.XteinkStock \\|\\| xteinkOemFirmwareAllowed[\\s\\S]*?disabled in public builds until distribution permission is recorded",
+      "message": "Public builds must not fetch the pinned XTEINK OEM image unless explicit distribution permission has been recorded."
+    },
+    {
+      "id": "oem-stock-release-opt-in-is-explicit",
+      "type": "required_pattern",
+      "path": "app/build.gradle.kts",
+      "pattern": "xtraordinaryXteinkOemPermissionAcknowledged[\\s\\S]*?equals\\(\"true\", ignoreCase = true\\) == true[\\s\\S]*?release \\{[\\s\\S]*?XTEINK_OEM_FIRMWARE_ALLOWED[\\s\\S]*?oemPermissionAcknowledged\\.toString\\(\\)",
+      "message": "Release variants must default the OEM route to disabled and require an explicit permission acknowledgement property."
+    },
+    {
+      "id": "ordinary-ui-avoids-decorative-xteink-branding",
+      "type": "forbidden_pattern",
+      "path": "app/src/main/res/values/strings.xml",
+      "pattern": "<string name=\"x3_brand\">|<string name=\"xteink_device\">XTEINK|<string name=\"xteink_device_short\">XTEINK|<string name=\"setup_value_proposition\">[^<]*XTEINK|<string name=\"setup_device_title\">[^<]*XTEINK",
+      "message": "Ordinary app UI must use X3/device wording; XTEINK is reserved for necessary compatibility, OEM-source, protocol, and legal identification."
+    },
+    {
       "id": "usb-setup-reset-is-nvs-bounded",
       "type": "required_pattern",
       "path": "app/src/main/java/com/xteink/companion/data/UsbEspFlasher.kt",
@@ -841,6 +862,20 @@
       "path": "docs/legal-release-audit.md",
       "pattern": "Status: [*][*]not release-cleared[*][*][\\s\\S]*?Android dependency notices[\\s\\S]*?ArduinoWebSockets LGPL-2\\.1[\\s\\S]*?XTEINK name/logo/product imagery[\\s\\S]*?Legal identity/jurisdiction[\\s\\S]*?## Release gate",
       "message": "Product release must retain explicit license, trademark, source-offer, and legal-identity blockers until evidence closes them."
+    },
+    {
+      "id": "android-packaging-preserves-release-notices",
+      "type": "required_pattern",
+      "path": "app/build.gradle.kts",
+      "pattern": "resources\\.pickFirsts[\\s\\S]*?META-INF/AL2\\.0[\\s\\S]*?META-INF/LGPL2\\.1[\\s\\S]*?sourceSets\\.getByName\\(\"main\"\\)\\.assets\\.srcDir\\(rootProject\\.file\\(\"release-notices\"\\)\\)",
+      "message": "Android packaging must preserve conventional licence entries and embed the complete reviewed notice packs."
+    },
+    {
+      "id": "android-apks-byte-verify-release-notices",
+      "type": "required_pattern",
+      "path": "scripts/build-xtraordinary-app.ps1",
+      "pattern": "check-android-apk-notices\\.ps1[\\s\\S]*?assembleCommunityDebug[\\s\\S]*?assemblePlayDebug[\\s\\S]*?assembleCommunityRelease[\\s\\S]*?assemblePlayRelease",
+      "message": "Every assembled Android variant must verify its embedded notice trees against reviewed source bytes."
     },
     {
       "id": "app-exposes-privacy-terms-and-notices",

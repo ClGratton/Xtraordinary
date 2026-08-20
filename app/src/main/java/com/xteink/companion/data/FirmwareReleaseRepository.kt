@@ -2,6 +2,7 @@ package com.xteink.companion.data
 
 import android.content.Context
 import android.net.Uri
+import com.xteink.companion.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -33,6 +34,10 @@ class FirmwareReleaseRepository(private val context: Context) {
         model: String,
         source: FirmwareSource = FirmwareSource.Xtraordinary,
     ): FirmwareRelease = withContext(Dispatchers.IO) {
+        requireFirmwareSourceDistributionAllowed(
+            source = source,
+            xteinkOemFirmwareAllowed = BuildConfig.XTEINK_OEM_FIRMWARE_ALLOWED,
+        )
         fixedRelease(model, source)?.let { return@withContext it }
         when (source) {
             FirmwareSource.Xtraordinary -> latestXtraordinary(model)
@@ -226,6 +231,15 @@ class FirmwareReleaseRepository(private val context: Context) {
         private const val CROSSINK_RELEASE_URL =
             "https://api.github.com/repos/uxjulia/CrossInk/releases/latest"
         private const val MANIFEST_NAME = "firmware-manifest.json"
+    }
+}
+
+internal fun requireFirmwareSourceDistributionAllowed(
+    source: FirmwareSource,
+    xteinkOemFirmwareAllowed: Boolean,
+) {
+    require(source != FirmwareSource.XteinkStock || xteinkOemFirmwareAllowed) {
+        "XTEINK OEM recovery is disabled in public builds until distribution permission is recorded"
     }
 }
 

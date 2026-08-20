@@ -11,6 +11,7 @@ $platformIo = Join-Path $repoRoot '.tools\platformio-venv\Scripts\platformio.exe
 $coreDir = Join-Path $repoRoot '.tools\platformio-core'
 $policyCheck = Join-Path $PSScriptRoot 'check-engineering-policies.ps1'
 $sourceCheck = Join-Path $PSScriptRoot 'assert-pushed-source.ps1'
+$releaseRecordWriter = Join-Path $PSScriptRoot 'write-firmware-release-record.ps1'
 
 if (-not (Test-Path -LiteralPath $platformIo)) {
     throw "Bundled PlatformIO was not found at $platformIo"
@@ -20,6 +21,9 @@ if (-not (Test-Path -LiteralPath $policyCheck)) {
 }
 if (-not (Test-Path -LiteralPath $sourceCheck)) {
     throw "Pushed-source gate was not found at $sourceCheck"
+}
+if (-not (Test-Path -LiteralPath $releaseRecordWriter)) {
+    throw "Firmware release-record writer was not found at $releaseRecordWriter"
 }
 
 & $sourceCheck
@@ -42,3 +46,5 @@ try {
 } finally {
     Pop-Location
 }
+
+& $releaseRecordWriter -Version $Version
