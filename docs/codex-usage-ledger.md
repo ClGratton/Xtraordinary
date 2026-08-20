@@ -108,3 +108,9 @@
 - Previous checkpoint: 48% used. Current snapshot: 52% used; a four-point increase. This is the seven-day `10080`-minute allowance, resetting at Unix `1787838918` (2026-08-27 15:55 Europe/Rome), Plus plan, no credits.
 - Work performed: the primary agent corrected mutually exclusive Settings controls to expose one radio group, 48 dp targets, and non-gesture scene selection; strengthened the permanent viewport/action-zone and accessibility contracts; and isolated a reconnect-verifier false negative caused by a single-line USB trace acknowledgement regex. No reviewer or compiler ran.
 - Budget decision: preserve the remaining 48% by running one pushed Community/Play evidence build for the settled Android source, then one eight-role final Terra wave only if that evidence is acceptable. Do not restart exploratory or preliminary reviewer loops.
+
+## 2026-08-20 - Consolidated Android final-evidence checkpoint
+
+- Pre-build snapshot: 52% used. Post-build snapshot: 53% used; a one-point increase. This is the seven-day `10080`-minute allowance, resetting at Unix `1787838918` (2026-08-27 15:55 Europe/Rome), Plus plan, no credits.
+- Work performed: one pushed-source `UiEvidenceCandidate` run. The 112-rule policy gate passed, Community and Play compiled, both unit-test suites passed, and both deterministic screenshot suites regenerated in 1 minute 8 seconds.
+- Render decision: Settings retains the edge-peeking sea/astronaut selector and distinct Expressive/Minimal controls; policy selectors have 48 dp targets. Setup Library/Device actions share the lower action zone, and Focus assigns tall-screen slack to the timer surface. Freeze this evidence; do not run another Android compiler before final reviews.
