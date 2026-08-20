@@ -54,3 +54,10 @@
 - Work performed: one canonical dev36 firmware build, one guarded application-only flash, post-flash encrypted bootstrap, reset-free USB-to-fast-radio acceptance, two clean reconnect cycles, one invalid one-shot-probe diagnosis, reconnect-harness/policy repair, and the correctly configured ten-minute deep-sleep observation. No Android compiler or UI reviewer ran in this interval.
 - Cause: device deployment and physical acceptance required many short orchestration rounds plus one ten-minute hardware boundary; the single firmware compiler did not move the meter from its 2% post-build checkpoint.
 - Durable correction: the reconnect verifier now refuses to confuse an idle foreground one-shot probe with durable pending work and requires either `-PersistentWorkAlreadyQueued` or `-WakeViaUsbPort`; rule 99 protects the contract. The next UI wave begins from this 8% snapshot and uses sequential, history-free Terra packets.
+
+## 2026-08-20 - First Passes review probe checkpoint
+
+- Start snapshot: 8% used. End snapshot: 15% used; a seven-point increase, reported and recorded before the evidence compiler. Seven-day window remains `10080` minutes and resets at Unix `1787838918` (2026-08-27 15:55 Europe/Rome); Plus plan, no credits.
+- Work performed: three compact history-free read-only probes covered UX flow, hierarchy, and the deterministic layout detector. The wave stopped at the first actionable UX blocker instead of dispatching the remaining specialists. The primary agent then implemented the contextual Import flight action and hardened the shared course, UX reviewer prompt, Passes contract, and machine policy.
+- Cause: the three review calls and implementation/reconciliation traffic accounted for the metered interval; no compiler ran in this interval.
+- Durable correction: task-starting contextual header actions must now retain a recognizable control silhouette and coherent cue, rule 100 protects the Passes implementation, and UX receipts may cite only evidence types approved by `docs/ui-review-policy.json`. Remaining specialists run sequentially from a compact source-and-evidence packet.
