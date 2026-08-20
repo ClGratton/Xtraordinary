@@ -780,6 +780,27 @@
       "message": "Minimal must own a distinct shape and motion/density policy rather than acting as dark recoloring."
     },
     {
+      "id": "firmware-and-brand-rights-remain-provider-specific",
+      "type": "required_pattern",
+      "path": "docs/firmware-brand-release-rights.md",
+      "pattern": "Xtraordinary firmware[\\s\\S]*?CrossPoint picker[\\s\\S]*?CrossInk picker[\\s\\S]*?Open X4 SDK[\\s\\S]*?XTEINK word mark and device representation[\\s\\S]*?XTEINK OEM firmware[\\s\\S]*?The Android firmware picker is not itself permission evidence",
+      "message": "Firmware source licences, provider notices, XTEINK brand use, and OEM-binary permission must remain separate release gates."
+    },
+    {
+      "id": "redistributed-ubuntu-fonts-retain-complete-license",
+      "type": "required_pattern",
+      "path": "firmware/lib/EpdFont/builtinFonts/source/Ubuntu/ubuntu-font-licence-1.0.txt",
+      "pattern": "Ubuntu Font Licence[\\s\\S]*?Version 1\\.0[\\s\\S]*?PERMISSION & CONDITIONS[\\s\\S]*?This licence becomes null and void[\\s\\S]*?THE FONT SOFTWARE IS PROVIDED",
+      "message": "Redistributed Ubuntu fonts must retain the complete Ubuntu Font Licence 1.0 beside the font files."
+    },
+    {
+      "id": "vendored-uzlib-retains-versioned-license",
+      "type": "required_pattern",
+      "path": "firmware/lib/uzlib/LICENSE.txt",
+      "pattern": "uzlib 2\\.9\\.8[\\s\\S]*?Copyright \\(c\\) 2003 by Joergen Ibsen[\\s\\S]*?Copyright \\(c\\) 2014-2018 by Paul Sokolovsky[\\s\\S]*?This notice may not be removed or altered",
+      "message": "Vendored uzlib must remain version-identified with its complete zlib-style license text."
+    },
+    {
       "id": "legal-release-audit-remains-explicitly-gated",
       "type": "required_pattern",
       "path": "docs/legal-release-audit.md",

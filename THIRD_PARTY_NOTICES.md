@@ -29,7 +29,7 @@ The canonical release pack must also inventory transitive AAR/JAR dependencies f
 | SdFat | transitive SDK dependency | MIT |
 | NimBLE-Arduino 2.5.0 and Apache NimBLE | companion builds | Apache-2.0 plus NOTICE and bundled component notices |
 | Expat | vendored under `firmware/lib/expat` | MIT; `siphash.h` is CC0 |
-| uzlib | vendored under `firmware/lib/uzlib` | zlib-style terms retained in source headers; release text still needs normalization |
+| uzlib 2.9.8 | vendored under `firmware/lib/uzlib` | zlib-style terms; complete normalized text in `firmware/lib/uzlib/LICENSE.txt` |
 
 The embedded static use of LGPL-2.1 ArduinoWebSockets is a release blocker until counsel-approved compliance is implemented (for example, the required source/relinkable-material offer) or the dependency is replaced with a compatible permissive implementation. Do not describe the firmware binary as release-ready while this remains open.
 
@@ -39,10 +39,12 @@ The embedded static use of LGPL-2.1 ArduinoWebSockets is a release blocker until
 | --- | --- |
 | Noto Sans, Noto Serif, Noto Sans Hebrew | SIL OFL-1.1; local `OFL.txt` files are present |
 | OpenDyslexic | SIL OFL-1.1; local `OFL.txt` is present |
-| Ubuntu font files | Ubuntu Font Licence 1.0; the corresponding license text is not currently vendored beside the font files and must be added before release |
+| Ubuntu font files | Ubuntu Font Licence 1.0; complete text is vendored beside the fonts in `firmware/lib/EpdFont/builtinFonts/source/Ubuntu/ubuntu-font-licence-1.0.txt` |
 | Lighthouse/sea, astronaut/space, and onboarding PNGs | Project-generated editorial assets; preserve source-generation/provenance records and confirm the generation service's commercial-output terms for the creating account |
 | Code-drawn app icons and shapes | Project source under the repository MIT license; functional icon geometry must remain documented in the UI course/contract |
 
 ## Names and trademarks
 
 XTEINK and third-party product/provider names belong to their owners. Xtraordinary uses them only to identify compatibility, selected firmware sources, and data providers. The project states that it is independent and not endorsed. Public store assets, product imagery, logo use, and naming still require a written permission/nominative-use decision recorded in `docs/legal-release-audit.md`.
+
+The provider-by-provider distribution and rights evidence is maintained in `docs/firmware-brand-release-rights.md`. MIT-licensed CrossPoint/CrossInk source does not grant XTEINK trademark, product-image, OEM-firmware, or endorsement rights.

@@ -114,3 +114,10 @@
 - Pre-build snapshot: 52% used. Post-build snapshot: 53% used; a one-point increase. This is the seven-day `10080`-minute allowance, resetting at Unix `1787838918` (2026-08-27 15:55 Europe/Rome), Plus plan, no credits.
 - Work performed: one pushed-source `UiEvidenceCandidate` run. The 112-rule policy gate passed, Community and Play compiled, both unit-test suites passed, and both deterministic screenshot suites regenerated in 1 minute 8 seconds.
 - Render decision: Settings retains the edge-peeking sea/astronaut selector and distinct Expressive/Minimal controls; policy selectors have 48 dp targets. Setup Library/Device actions share the lower action zone, and Focus assigns tall-screen slack to the timer surface. Freeze this evidence; do not run another Android compiler before final reviews.
+
+## 2026-08-20 - UI-review overrun and product-scope stop
+
+- Previous recorded checkpoint: 53% used. Current snapshot: 64% used; an eleven-point increase, reported immediately. This is the seven-day `10080`-minute allowance, resetting at Unix `1787838918` (2026-08-27 15:55 Europe/Rome), Plus plan, no credits.
+- Work performed: three final history-free Terra roles reviewed the frozen Android/Passes candidate; two blockers prompted one source-only viewport/evidence-policy correction through pushed commit `4a9997e`. No compiler, APK install, firmware build, flash, or physical-device acceptance ran in this interval.
+- Scope failure: too much weekly budget was spent iterating visual evidence while release licensing, Play Billing, entitlement-backend, UMP, and AdMob work remained incomplete. The missing product integrations were already explicit in `HANDOFF.md`, `docs/monetization-entitlement-design.md`, and `docs/legal-release-audit.md` and should have been prioritized earlier.
+- Durable correction: stop the Android UI review/rerender loop in this task. Do not dispatch more specialists or run another UI compiler. Separate repository-closeable license artifacts and integration boundaries from external Play/AdMob/backend/trademark/legal inputs, and never describe the existing entitlement reducer as an in-app purchase implementation.
