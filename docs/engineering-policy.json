@@ -422,8 +422,15 @@
       "id": "codex-usage-workflow-is-durable",
       "type": "required_pattern",
       "path": "docs/codex-usage-workflow.md",
-      "pattern": "## Authoritative meter[\\s\\S]*?account/rateLimits/read[\\s\\S]*?## Required checkpoints[\\s\\S]*?30 minutes[\\s\\S]*?## Delegation budget[\\s\\S]*?fork_turns[\\s\\S]*?## Build budget[\\s\\S]*?## Ledger rule",
+      "pattern": "## Authoritative meter[\\s\\S]*?scripts/read-codex-usage\\.ps1[\\s\\S]*?account/rateLimits/read[\\s\\S]*?## Required checkpoints[\\s\\S]*?30 minutes[\\s\\S]*?## Delegation budget[\\s\\S]*?fork_turns[\\s\\S]*?## Build budget[\\s\\S]*?## Ledger rule",
       "message": "Long-running work must retain signed-in usage checkpoints, bounded delegation/build rules, and a durable ledger."
+    },
+    {
+      "id": "codex-usage-reader-keeps-initialized-app-server-handshake",
+      "type": "required_pattern",
+      "path": "scripts/read-codex-usage.ps1",
+      "pattern": "normal signed-in user context[\\s\\S]*?app-server[\\s\\S]*?initialize[\\s\\S]*?initialized[\\s\\S]*?account/rateLimits/read[\\s\\S]*?usedPercent[\\s\\S]*?windowDurationMins[\\s\\S]*?resetsAt",
+      "message": "The canonical signed-in usage reader must preserve the initialized app-server handshake and required weekly-meter fields."
     },
     {
       "id": "codex-usage-ledger-records-the-reviewed-incident",

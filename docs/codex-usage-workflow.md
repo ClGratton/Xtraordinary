@@ -6,7 +6,7 @@ Usage discipline is repository state, not chat memory. Any change to this proced
 
 ## Authoritative meter
 
-Read the signed-in Codex plan meter through the local Codex app-server method `account/rateLimits/read`. Record `usedPercent`, `windowDurationMins`, and `resetsAt`. Public OpenAI API billing, token prices, and API rate-limit pages are different systems and must not be presented as the signed-in Codex weekly meter.
+Run `scripts/read-codex-usage.ps1` outside the filesystem sandbox in the normal signed-in user context. The script performs the initialized local Codex app-server handshake and reads `account/rateLimits/read`; do not recreate that handshake ad hoc. Record `usedPercent`, `windowDurationMins`, and `resetsAt`. Public OpenAI API billing, token prices, and API rate-limit pages are different systems and must not be presented as the signed-in Codex weekly meter. A sandbox-context result is invalid because it resolves a different Codex home and may have no signed-in account.
 
 For a forensic task audit, read only top-level `token_count` events from the current task rollout. Report deltas for input, cached input, uncached input, output, reasoning output, total tokens, and model-call count. Do not sum forked-agent rollout totals: forked rollouts inherit counters/history and can duplicate usage.
 

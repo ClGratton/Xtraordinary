@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "surfaceId": "passes",
+  "sourceCommit": "118027ddce6148a6ec0ef912ae04fd7508840188",
+  "implementationOwnerId": "codex-root-passes-118027dd",
+  "findings": [],
+  "reviewedFiles": {
+    "app/src/main/java/com/xteink/companion/ui/components/TicketContent.kt": "3aba4792a5ecc92347b4c5de1aaef0bbc89ae21484c75a3a021ce9895ae6ba82",
+    "app/src/main/java/com/xteink/companion/ui/components/ExpandingChoice.kt": "c71bed66c87817ebfc98773a42fad216cfc6fd4a07f83f4ed227f7f4282dbdd2",
+    "app/src/main/java/com/xteink/companion/ui/components/MagneticPager.kt": "1369a10ebea745acce907c9c513e47c9620feb3c1db24af27e265ec8aa6425fb",
+    "app/src/main/java/com/xteink/companion/ui/components/MagneticSwipe.kt": "15771c8792d0d8ad83b688b835b786ee79a7c2fd7ceb0410e00e4fb75d3857ac",
+    "app/src/main/java/com/xteink/companion/ui/components/PassCardLayoutPolicy.kt": "25bdb297e74af3e6121d28f5f0906c5840abe73d69ff9440cba40fc84f57d018",
+    "app/src/main/java/com/xteink/companion/ui/components/PassModeLayoutPolicy.kt": "8b18946a444ac75b7fd47c4361ead011a217df12389ee667b7e7aa9a0afa549f",
+    "app/src/main/java/com/xteink/companion/ui/components/PassMotionPolicy.kt": "400830544f40457eb0125db838659e020cc1d8004d6bc89fe29aec8f89634afd",
+    "app/src/main/java/com/xteink/companion/ui/components/PassTurnAffordancePolicy.kt": "81fe5ed7be02b211400184acfe9ded185f12b289a607be7167c2f722eff3d276",
+    "app/src/main/java/com/xteink/companion/ui/components/TicketMetadataPresentation.kt": "6580b37f60d6c77543302a80032a37945e394a3c379b555a19a262430c112133",
+    "app/src/main/java/com/xteink/companion/ui/CompanionUiState.kt": "7a6f598424bd0a02762ce14ba21ebd81e21342be7783c8d00c66faa653eea17b",
+    "app/src/main/java/com/xteink/companion/ui/TicketOperationPolicy.kt": "dba20d2cd37eeb5ffe2594754663b2e2b7b7bcdd71220f7706aeddc32417540c",
+    "app/src/main/java/com/xteink/companion/ui/CompanionViewModel.kt": "7ba4445d6840d433081a0464e403b412eef04aa5b5f0ee4815b637404b564e8a",
+    "app/src/test/java/com/xteink/companion/ui/TicketOperationPolicyTest.kt": "c23de82e6867a0081b6ef17bcd63e938db95722076888249fa05e04681197506",
+    "app/src/test/java/com/xteink/companion/ui/components/PassReducedMotionTest.kt": "319cc67037b019af6e677a6b4decd100ab09d949e8cf5ef66b217c0852158884",
+    "app/src/test/java/com/xteink/companion/ui/components/PassModeLayoutPolicyTest.kt": "14ef3105056de014008eb84ec51ed1274575795fe75830cc6842baf695bb292e",
+    "app/src/test/java/com/xteink/companion/ui/components/PassCardLayoutPolicyTest.kt": "6a4cb5833b025ce3f4230c012f95ac5a73ccf86d8d8a1a943348c1832ebbbb73",
+    "app/src/test/java/com/xteink/companion/ui/components/PassTurnAffordancePolicyTest.kt": "9ca9df3f2e70cb5737315d12e1676106798ea0fd622ce0bc0cdb5126d771c512",
+    "app/src/test/java/com/xteink/companion/ui/components/MagneticSwipeTest.kt": "227550677a2c5c266b8fc03698f78dc806021c90b9da413580073be5356047ef",
+    "app/src/screenshotTest/kotlin/com/xteink/companion/ui/CompanionPreviewScreenshotTest.kt": "4ab22fe802f798e969e8b876b75f271be5a78b538af13fea091579ffde22d5cc"
+  },
+  "receipts": [
+    {
+      "role": "ux-flow",
+      "reviewerId": "terra-ux-flow-passes-118027dd-20260820-r2",
+      "reviewerTaskId": "/root/passes_ux_flow",
+      "agentType": "terra_medium",
+      "verdict": "pass",
+      "findings": [],
+      "checks": [
+        "interaction-affordance-is-self-evident",
+        "icon-and-spatial-metaphor-are-coherent",
+        "immutable-pending-operation-truth",
+        "no-conflicting-ticket-operations",
+        "operational-copy-earns-space"
+      ],
+      "checkEvidence": {
+        "interaction-affordance-is-self-evident": [{"path": "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/passDetailPhoneScreenshot_Pass detail phone_8d24a6c6_0.png", "sha256": "104fbddde45ed307e71699187e7c5f166faca28de5d2616c63fc3398640825ae"}],
+        "icon-and-spatial-metaphor-are-coherent": [{"path": "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/quietPassDetailPhoneScreenshot_Quiet pass detail_9a2f9f8d_0.png", "sha256": "ab06b831558e9968f92f3df81e552f7678719958869379fc4e4ed283963c4ff3"}],
+        "immutable-pending-operation-truth": [{"path": "app/src/test/java/com/xteink/companion/ui/TicketOperationPolicyTest.kt", "sha256": "c23de82e6867a0081b6ef17bcd63e938db95722076888249fa05e04681197506"}],
+        "no-conflicting-ticket-operations": [{"path": "app/src/test/java/com/xteink/companion/ui/components/MagneticSwipeTest.kt", "sha256": "227550677a2c5c266b8fc03698f78dc806021c90b9da413580073be5356047ef"}],
+        "operational-copy-earns-space": [{"path": "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/passDetailLargeTextScreenshot_Pass detail large text_44657ee4_0.png", "sha256": "a7378cae5ec25cbd5d59bddbf2af0a3e9c14a547e20df791b5267664cb1d554a"}]
+      }
+    },
+    {
+      "role": "hierarchy",
+      "reviewerId": "terra-hierarchy-passes-20260820-118027dd",
+      "reviewerTaskId": "/root/passes_hierarchy@118027dd",
+      "agentType": "terra_medium",
+      "verdict": "pass",
+      "findings": [],
+      "checks": ["front-hierarchy-order", "contained-expanding-action", "provenance-not-front-primary"],
+      "checkEvidence": {
+        "front-hierarchy-order": [{"path": "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/passDetailPhoneScreenshot_Pass detail phone_8d24a6c6_0.png", "sha256": "104fbddde45ed307e71699187e7c5f166faca28de5d2616c63fc3398640825ae"}],
+        "contained-expanding-action": [{"path": "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/quietPassDetailPhoneScreenshot_Quiet pass detail_9a2f9f8d_0.png", "sha256": "ab06b831558e9968f92f3df81e552f7678719958869379fc4e4ed283963c4ff3"}],
+        "provenance-not-front-primary": [{"path": "app/src/screenshotTest/kotlin/com/xteink/companion/ui/CompanionPreviewScreenshotTest.kt", "sha256": "4ab22fe802f798e969e8b876b75f271be5a78b538af13fea091579ffde22d5cc"}]
+      }
+    },
+    {
+      "role": "layout-spacing-margins",
+      "reviewerId": "terra-layout-spacing-margins-118027dd-20260820-final",
+      "reviewerTaskId": "passes-layout-final-118027dd",
+      "agentType": "terra_medium",
+      "verdict": "pass",
+      "findings": [],
+      "checks": ["carousel-peek-equals-route-rail", "front-back-bounds-match", "adaptive-bounds-do-not-overlap"],
+      "checkEvidence": {
+        "carousel-peek-equals-route-rail": [{"path": "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/passDetailCompactScreenshot_Pass detail compact_573ae314_0.png", "sha256": "189e3511c2a9fab2a323c5edb13a9240429582e922bbcd169e5cec4b502f6917"}],
+        "front-back-bounds-match": [
+          {"path": "app/src/test/java/com/xteink/companion/ui/components/PassCardLayoutPolicyTest.kt", "sha256": "6a4cb5833b025ce3f4230c012f95ac5a73ccf86d8d8a1a943348c1832ebbbb73"},
+          {"path": "app/src/test/java/com/xteink/companion/ui/components/PassTurnAffordancePolicyTest.kt", "sha256": "9ca9df3f2e70cb5737315d12e1676106798ea0fd622ce0bc0cdb5126d771c512"}
+        ],
+        "adaptive-bounds-do-not-overlap": [{"path": "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/passDetailHugeTextScreenshot_Pass detail huge text_9beb6ec2_0.png", "sha256": "d3dd46abc3b61af2017c8dbec33946d29475251411ae7941a81bae851b27da03"}]
+      }
+    },
+    {
+      "role": "typography",
+      "reviewerId": "terra-medium-typography-20260820-118027dd",
+      "reviewerTaskId": "passes-typography-final-118027dd",
+      "agentType": "terra_medium",
+      "verdict": "pass",
+      "findings": [],
+      "checks": ["header-reflows-before-overlap", "operational-facts-reflow-before-truncation", "required-large-text-fixtures"],
+      "checkEvidence": {
+        "header-reflows-before-overlap": [{"path": "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/passDetailHugeTextScreenshot_Pass detail huge text_9beb6ec2_0.png", "sha256": "d3dd46abc3b61af2017c8dbec33946d29475251411ae7941a81bae851b27da03"}],
+        "operational-facts-reflow-before-truncation": [{"path": "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/passDetailLargeTextScreenshot_Pass detail large text_44657ee4_0.png", "sha256": "a7378cae5ec25cbd5d59bddbf2af0a3e9c14a547e20df791b5267664cb1d554a"}],
+        "required-large-text-fixtures": [{"path": "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/passDetailCompactScreenshot_Pass detail compact_573ae314_0.png", "sha256": "189e3511c2a9fab2a323c5edb13a9240429582e922bbcd169e5cec4b502f6917"}]
+      }
+    },
+    {
+      "role": "color-contrast",
+      "reviewerId": "terra-medium-color-contrast-8f3c1d90",
+      "reviewerTaskId": "passes-color-contrast-final-118027dd",
+      "agentType": "terra_medium",
+      "verdict": "pass",
+      "findings": [],
+      "checks": ["primary-reserved-for-transaction", "quiet-remains-grayscale", "role-pair-contrast"],
+      "checkEvidence": {
+        "primary-reserved-for-transaction": [{"path": "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/passDetailPhoneScreenshot_Pass detail phone_8d24a6c6_0.png", "sha256": "104fbddde45ed307e71699187e7c5f166faca28de5d2616c63fc3398640825ae"}],
+        "quiet-remains-grayscale": [{"path": "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/quietPassDetailPhoneScreenshot_Quiet pass detail_9a2f9f8d_0.png", "sha256": "ab06b831558e9968f92f3df81e552f7678719958869379fc4e4ed283963c4ff3"}],
+        "role-pair-contrast": [{"path": "app/src/screenshotTest/kotlin/com/xteink/companion/ui/CompanionPreviewScreenshotTest.kt", "sha256": "4ab22fe802f798e969e8b876b75f271be5a78b538af13fea091579ffde22d5cc"}]
+      }
+    },
+    {
+      "role": "shape-affordance",
+      "reviewerId": "terra-shape-affordance-118027dd-20260820",
+      "reviewerTaskId": "passes-shape-affordance-final-118027dd",
+      "agentType": "terra_medium",
+      "verdict": "pass",
+      "findings": [],
+      "checks": ["selected-action-contained", "action-shape-and-target", "glyph-geometry-is-optically-separated", "resting-option-remains-selectable"],
+      "checkEvidence": {
+        "selected-action-contained": [{"path": "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/passDetailPhoneScreenshot_Pass detail phone_8d24a6c6_0.png", "sha256": "104fbddde45ed307e71699187e7c5f166faca28de5d2616c63fc3398640825ae"}],
+        "action-shape-and-target": [{"path": "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/passDetailCompactScreenshot_Pass detail compact_573ae314_0.png", "sha256": "189e3511c2a9fab2a323c5edb13a9240429582e922bbcd169e5cec4b502f6917"}],
+        "glyph-geometry-is-optically-separated": [{"path": "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/quietPassDetailPhoneScreenshot_Quiet pass detail_9a2f9f8d_0.png", "sha256": "ab06b831558e9968f92f3df81e552f7678719958869379fc4e4ed283963c4ff3"}],
+        "resting-option-remains-selectable": [{"path": "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/quietPassDetailPhoneScreenshot_Quiet pass detail_9a2f9f8d_0.png", "sha256": "ab06b831558e9968f92f3df81e552f7678719958869379fc4e4ed283963c4ff3"}]
+      }
+    },
+    {
+      "role": "motion-interaction",
+      "reviewerId": "terra-motion-passes-final-118027dd",
+      "reviewerTaskId": "/root/passes_motion_final",
+      "agentType": "terra_medium",
+      "verdict": "pass",
+      "findings": [],
+      "checks": ["page-and-turn-gesture-ownership", "chooser-bounds-stable-through-morph", "reduced-motion-final-state"],
+      "checkEvidence": {
+        "page-and-turn-gesture-ownership": [{"path": "app/src/test/java/com/xteink/companion/ui/components/MagneticSwipeTest.kt", "sha256": "227550677a2c5c266b8fc03698f78dc806021c90b9da413580073be5356047ef"}],
+        "chooser-bounds-stable-through-morph": [{"path": "app/src/test/java/com/xteink/companion/ui/components/PassModeLayoutPolicyTest.kt", "sha256": "14ef3105056de014008eb84ec51ed1274575795fe75830cc6842baf695bb292e"}],
+        "reduced-motion-final-state": [{"path": "app/src/test/java/com/xteink/companion/ui/components/PassReducedMotionTest.kt", "sha256": "319cc67037b019af6e677a6b4decd100ab09d949e8cf5ef66b217c0852158884"}]
+      }
+    },
+    {
+      "role": "accessibility-adaptive",
+      "reviewerId": "terra-accessibility-adaptive-final-20260820-01",
+      "reviewerTaskId": "passes-accessibility-final-118027dd-20260820",
+      "agentType": "terra_medium",
+      "verdict": "pass",
+      "findings": [],
+      "checks": ["single-selected-radio-and-owned-action", "no-duplicate-route-or-provenance-announcement", "all-controls-reachable-at-required-scales"],
+      "checkEvidence": {
+        "single-selected-radio-and-owned-action": [{"path": "app/src/test/java/com/xteink/companion/ui/TicketOperationPolicyTest.kt", "sha256": "c23de82e6867a0081b6ef17bcd63e938db95722076888249fa05e04681197506"}],
+        "no-duplicate-route-or-provenance-announcement": [{"path": "app/src/screenshotTest/kotlin/com/xteink/companion/ui/CompanionPreviewScreenshotTest.kt", "sha256": "4ab22fe802f798e969e8b876b75f271be5a78b538af13fea091579ffde22d5cc"}],
+        "all-controls-reachable-at-required-scales": [{"path": "app/src/test/java/com/xteink/companion/ui/components/PassCardLayoutPolicyTest.kt", "sha256": "6a4cb5833b025ce3f4230c012f95ac5a73ccf86d8d8a1a943348c1832ebbbb73"}]
+      }
+    }
+  ]
+}

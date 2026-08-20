@@ -61,3 +61,10 @@
 - Work performed: three compact history-free read-only probes covered UX flow, hierarchy, and the deterministic layout detector. The wave stopped at the first actionable UX blocker instead of dispatching the remaining specialists. The primary agent then implemented the contextual Import flight action and hardened the shared course, UX reviewer prompt, Passes contract, and machine policy.
 - Cause: the three review calls and implementation/reconciliation traffic accounted for the metered interval; no compiler ran in this interval.
 - Durable correction: task-starting contextual header actions must now retain a recognizable control silhouette and coherent cue, rule 100 protects the Passes implementation, and UX receipts may cite only evidence types approved by `docs/ui-review-policy.json`. Remaining specialists run sequentially from a compact source-and-evidence packet.
+
+## 2026-08-20 - Passes mandatory review-wave checkpoint
+
+- Start snapshot: 16% used after the evidence build and canonical usage-reader validation. End snapshot: 21% used; a five-point increase, reported immediately. Seven-day window remains `10080` minutes and resets at Unix `1787838918` (2026-08-27 15:55 Europe/Rome); Plus plan, no credits.
+- Work performed: sequential source-bound UX, hierarchy, layout/spacing, typography, color/contrast, and shape/affordance reviews against one settled source commit and one Community/Play evidence set. No additional compiler ran.
+- Cause: the required independent specialist calls account for the metered interval. Each reviewer owned one role, inherited no long task history, and stopped after its verdict.
+- Durable correction: only the two still-mandatory roles, motion/interaction and accessibility/adaptive, continue. Optional review loops remain stopped; any blocker returns to one affected reviewer rather than restarting the wave.
