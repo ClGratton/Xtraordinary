@@ -425,19 +425,22 @@ private fun MonetizationScreenshotContent(
         colorMode = colorMode,
         useDynamicColor = false,
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
-            contentAlignment = Alignment.TopCenter,
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background,
+            contentColor = MaterialTheme.colorScheme.onBackground,
         ) {
-            MonetizationSettingsCard(
-                state = state,
-                onBuy = {},
-                onRestore = {},
-                onContinueFree = {},
-                onPrivacyOptions = {},
-                onOpenCommunitySource = {},
-                modifier = Modifier.padding(20.dp),
-            )
+            Box(contentAlignment = Alignment.TopCenter) {
+                MonetizationSettingsCard(
+                    state = state,
+                    onBuy = {},
+                    onRestore = {},
+                    onContinueFree = {},
+                    onPrivacyOptions = {},
+                    onOpenCommunitySource = {},
+                    modifier = Modifier.padding(20.dp),
+                )
+            }
         }
     }
 }
