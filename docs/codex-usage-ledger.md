@@ -75,3 +75,10 @@
 - Work performed: one Passes candidate build correction path and source-bound accessibility, motion, shape, and UX re-reviews after a semantics-only lint fix. The remaining review cascade was stopped when the owner identified unresolved setup and appearance work on the same Android UI.
 - Workflow incident: the canonical meter reader failed under Windows PowerShell 5.1 because `ProcessStartInfo.ArgumentList` was exposed as null. The reader now falls back to a correctly quoted `Arguments` string and returned the signed-in snapshot successfully.
 - Durable correction: the workflow now explicitly treats `10080` minutes as weekly budget, requires that fact in usage reports, and requires known changes on the same UI surfaces to be consolidated before one mandatory specialist wave. No more Passes/setup/appearance reviewers or compiler runs occur until that implementation batch is settled.
+
+## 2026-08-20 - Consolidated Android candidate pre-build checkpoint
+
+- Previous checkpoint: 29% used. Pre-build snapshot: 36% used; a seven-point increase, reported immediately. Seven-day window remains `10080` minutes and resets at Unix `1787838919` (2026-08-27 15:55 Europe/Rome), Plus plan, no credits.
+- Work performed: one primary-agent implementation batch covering measured setup action anchoring, independent scene-drag Light/Dark and Expressive/Minimal state, real Minimal shape/spacing/motion effects, direct legal/notices access, product-level license/trademark audit, and durable engineering guards. No reviewer wave or compiler ran in this interval.
+- Cause: repeated long-context primary-agent implementation and documentation rounds are themselves material weekly usage even without delegation or compilation.
+- Decision: permit one pushed `UiEvidenceCandidate` run for this settled batch. If it needs more than one evidence-based correction/rerun, stop and preserve the exact blocker instead of starting another compiler/reviewer loop.
