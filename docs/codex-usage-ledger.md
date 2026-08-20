@@ -47,3 +47,10 @@
 - Current snapshot: 92% used; an eleven-point increase, reported immediately. Seven-day window remains `10080` minutes and resets at Unix `1787510643` (2026-08-23 20:44 Europe/Rome); Plus plan, no credits.
 - Work performed: guarded application-only X3 flash, encrypted post-flash bootstrap, rapid Settings stress and ACK reconciliation, retained crash/runtime diagnostics, repeated reconnect attempts, and source-level isolation of the standby advertising path. No additional compiler or reviewer wave ran.
 - Decision: stop all builds, optional research, and specialist work. Use the remaining task only to preserve exact physical evidence, diagnose with existing binaries and logs, and leave the repository and handoff safe. A new firmware or Android candidate must wait for a later usage window.
+
+## 2026-08-20 - Dev36 deployment and pre-review checkpoint
+
+- Start snapshot: 2% used after the weekly reset. Pre-review snapshot: 8% used; a six-point increase, reported and recorded immediately. Seven-day window remains `10080` minutes and resets at Unix `1787838919` (2026-08-27 15:55 Europe/Rome); Plus plan, no credits.
+- Work performed: one canonical dev36 firmware build, one guarded application-only flash, post-flash encrypted bootstrap, reset-free USB-to-fast-radio acceptance, two clean reconnect cycles, one invalid one-shot-probe diagnosis, reconnect-harness/policy repair, and the correctly configured ten-minute deep-sleep observation. No Android compiler or UI reviewer ran in this interval.
+- Cause: device deployment and physical acceptance required many short orchestration rounds plus one ten-minute hardware boundary; the single firmware compiler did not move the meter from its 2% post-build checkpoint.
+- Durable correction: the reconnect verifier now refuses to confuse an idle foreground one-shot probe with durable pending work and requires either `-PersistentWorkAlreadyQueued` or `-WakeViaUsbPort`; rule 99 protects the contract. The next UI wave begins from this 8% snapshot and uses sequential, history-free Terra packets.

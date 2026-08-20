@@ -51,6 +51,8 @@ A visible pill is not automatically good design. Judge the entire control:
 
 Any failed item blocks approval even when semantics, target size, contrast, and click handling pass.
 
+Contextual header actions that begin a task, import content, or mutate screen state must retain a recognizable control silhouette and one coherent object/action cue during the source-blind five-second inventory. Bare text that can be mistaken for a heading, status, or passive link is a blocking affordance failure. This rule does not turn ordinary navigation links into filled buttons; the container strength must match the action's consequence and place in the hierarchy.
+
 ## 5. Required critique passes
 
 Review rendered evidence before source and perform all of these passes:
@@ -86,6 +88,7 @@ Block the candidate when:
 - icon placement contradicts the direction it communicates;
 - a reviewer says only "the button is visible" without judging metaphor and optical construction;
 - the label is doing all the explanatory work while the icon predicts a different result;
+- a task-starting contextual header action is visually indistinguishable from passive header text;
 - a decorative cue becomes a second accessibility target for the same action.
 
 ## Primary references

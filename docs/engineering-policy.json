@@ -447,6 +447,13 @@
       "message": "The selected Static/Live surface must expand and own its action instead of using detached equal chips and an external send row."
     },
     {
+      "id": "passes-import-is-recognizable-contextual-action",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/components/TicketContent.kt",
+      "pattern": "private fun ImportFlightAction\\([\\s\\S]*?FilledTonalButton\\([\\s\\S]*?heightIn\\(min = 48\\.dp\\)[\\s\\S]*?testTag\\(\"passes_import_flight\"\\)[\\s\\S]*?FlightSilhouetteIcon\\(\\)",
+      "message": "Import flight must remain a shaped 48 dp contextual action with a coherent flight cue instead of regressing to bare header text."
+    },
+    {
       "id": "passes-turn-affordance-is-a-visible-control",
       "type": "required_pattern",
       "path": "app/src/main/java/com/xteink/companion/ui/components/TicketContent.kt",

@@ -49,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -134,11 +135,10 @@ fun PassesToolContent(
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
                     modifier = Modifier.align(Alignment.Start),
                 ) { Text("←  ${stringResource(R.string.back_to_tools)}") }
-                TextButton(
+                ImportFlightAction(
                     onClick = { importChoiceVisible = true },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
                     modifier = Modifier.align(Alignment.End),
-                ) { Text(stringResource(R.string.import_flight)) }
+                )
             }
         } else {
             Row(
@@ -153,10 +153,9 @@ fun PassesToolContent(
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
                 ) { Text("←  ${stringResource(R.string.back_to_tools)}") }
                 Spacer(modifier = Modifier.weight(1f))
-                TextButton(
+                ImportFlightAction(
                     onClick = { importChoiceVisible = true },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
-                ) { Text(stringResource(R.string.import_flight)) }
+                )
             }
         }
         if (fontScale >= 1.6f) {
@@ -291,6 +290,56 @@ fun PassesToolContent(
                 TextButton(onClick = { walletLinkVisible = false }) { Text(stringResource(R.string.cancel)) }
             },
         )
+    }
+}
+
+@Composable
+private fun ImportFlightAction(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    FilledTonalButton(
+        onClick = onClick,
+        modifier = modifier
+            .heightIn(min = 48.dp)
+            .testTag("passes_import_flight"),
+        shape = MaterialTheme.shapes.medium,
+        contentPadding = PaddingValues(horizontal = 14.dp),
+    ) {
+        FlightSilhouetteIcon()
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(stringResource(R.string.import_flight))
+    }
+}
+
+@Composable
+private fun FlightSilhouetteIcon() {
+    val iconColor = LocalContentColor.current
+    Canvas(
+        modifier = Modifier
+            .size(20.dp)
+            .clearAndSetSemantics { },
+    ) {
+        val plane = Path().apply {
+            moveTo(size.width * 0.50f, size.height * 0.04f)
+            lineTo(size.width * 0.59f, size.height * 0.40f)
+            lineTo(size.width * 0.95f, size.height * 0.57f)
+            lineTo(size.width * 0.95f, size.height * 0.68f)
+            lineTo(size.width * 0.58f, size.height * 0.61f)
+            lineTo(size.width * 0.56f, size.height * 0.83f)
+            lineTo(size.width * 0.70f, size.height * 0.91f)
+            lineTo(size.width * 0.70f, size.height * 0.98f)
+            lineTo(size.width * 0.50f, size.height * 0.92f)
+            lineTo(size.width * 0.30f, size.height * 0.98f)
+            lineTo(size.width * 0.30f, size.height * 0.91f)
+            lineTo(size.width * 0.44f, size.height * 0.83f)
+            lineTo(size.width * 0.42f, size.height * 0.61f)
+            lineTo(size.width * 0.05f, size.height * 0.68f)
+            lineTo(size.width * 0.05f, size.height * 0.57f)
+            lineTo(size.width * 0.41f, size.height * 0.40f)
+            close()
+        }
+        drawPath(plane, color = iconColor)
     }
 }
 

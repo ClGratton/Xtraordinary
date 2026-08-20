@@ -23,7 +23,7 @@ Opening Passes, turning a card, or paging must not acquire, retry, or renew the 
 
 The screen order is fixed:
 
-1. Back and Import flight share the first action row.
+1. Back and Import flight share the first action row. Back remains a conventional navigation action. Import flight is a shaped contextual action with a minimum 48 dp target and one clean flight/object cue; it must remain recognizable as an action before its label is read and must never collapse into bare header typography.
 2. A separate context row contains the large left-aligned `Passes & codes` title and right-aligned count.
 3. The selected pass is the dominant object in an edge-peeking carousel.
 4. Compact deployment status states acknowledged or pending X3 truth with pass identity.
