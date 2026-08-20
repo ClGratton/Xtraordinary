@@ -136,7 +136,7 @@ Use a four-dp quantum and purpose-named tokens. The default vocabulary is 4, 8, 
 
 Normal-scale header, card, deployment status, and mode/action fit the first content viewport at 412 by 915 and 360 by 800. At larger text scales scrolling is allowed; clipping and overlap are not.
 
-At normal text scale the pass height is viewport-responsive within reviewed minimum and maximum bounds: compact screens keep the minimum, while taller phones give the pass the otherwise unused vertical space. Font-scale expansion remains a separate policy so accessibility growth is never inferred from screen height.
+At normal text scale the pass height is viewport-responsive: compact screens keep the reviewed minimum, while taller supported phone viewports give the pass all remaining height after the named header, status, chooser, spacing, and navigation budget. Do not impose an arbitrary maximum that recreates an ownerless band below the chooser. Font-scale expansion remains a separate policy so accessibility growth is never inferred from screen height.
 
 ## X3 ticket contract
 

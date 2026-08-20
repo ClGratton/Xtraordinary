@@ -239,6 +239,24 @@
         "motion-interaction",
         "accessibility-adaptive"
       ],
+      "requiredEvidenceFiles": [
+        "app/src/test/java/com/xteink/companion/ui/CompanionPresentationStoreTest.kt",
+        "app/src/test/java/com/xteink/companion/ui/components/SetupActionLayoutPolicyTest.kt",
+        "app/src/test/java/com/xteink/companion/ui/components/AdaptiveViewportLayoutPolicyTest.kt",
+        "app/src/screenshotTest/kotlin/com/xteink/companion/ui/CompanionPreviewScreenshotTest.kt",
+        "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/settingsThemesScreenshot_Settings themes_a8a8a3e5_0.png",
+        "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/setupLibraryScreenshot_Setup library_b04839c0_0.png",
+        "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/setupDeviceScreenshot_Setup device_bca57e3c_0.png",
+        "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/expressiveFocusPhoneScreenshot_Expressive focus phone_2b759c68_0.png",
+        "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/expressiveFocusLargeTextScreenshot_Expressive focus large text_b52189d6_0.png",
+        "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/firstRunSetupCompactScreenshot_First-run setup compact height_77370774_0.png",
+        "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/settingsThemesScreenshot_Settings themes_a8a8a3e5_0.png",
+        "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/setupLibraryScreenshot_Setup library_b04839c0_0.png",
+        "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/setupDeviceScreenshot_Setup device_bca57e3c_0.png",
+        "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/expressiveFocusPhoneScreenshot_Expressive focus phone_2b759c68_0.png",
+        "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/expressiveFocusLargeTextScreenshot_Expressive focus large text_b52189d6_0.png",
+        "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/firstRunSetupCompactScreenshot_First-run setup compact height_77370774_0.png"
+      ],
       "record": "docs/ui-review-records/android-ui-current.json"
     },
     {

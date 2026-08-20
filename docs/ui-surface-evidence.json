@@ -6,7 +6,8 @@
       "id": "focus",
       "implementation": "app/src/main/java/com/xteink/companion/ui/components/ControlDeckFocusContent.kt",
       "defaultPreview": "expressiveFocusPhoneScreenshot",
-      "adaptivePreview": "expressiveFocusLargeTextScreenshot"
+      "adaptivePreview": "expressiveFocusLargeTextScreenshot",
+      "compactPreview": "expressiveFocusCompactScreenshot"
     },
     {
       "id": "setup",

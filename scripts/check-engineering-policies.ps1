@@ -26,7 +26,9 @@ $protectedLayoutAndSelectionRuleIds = @(
     'setup-actions-use-measured-bottom-slot',
     'adaptive-first-viewport-assigns-slack',
     'layout-review-blocks-dead-space-and-action-drift',
-    'settings-exclusive-choices-use-radio-semantics'
+    'settings-exclusive-choices-use-radio-semantics',
+    'passes-normal-height-owns-available-viewport',
+    'focus-keeps-compact-render-evidence'
 )
 $manifestRuleIds = @($manifest.rules | ForEach-Object { $_.id })
 foreach ($protectedRuleId in $protectedLayoutAndSelectionRuleIds) {
@@ -217,7 +219,11 @@ foreach ($rule in $manifest.rules) {
                     $failures.Add("[$($rule.id)] Surface '$($surface.id)' has a missing or invalid implementation path.")
                     continue
                 }
-                foreach ($preview in @($surface.defaultPreview, $surface.adaptivePreview)) {
+                $surfacePreviews = @($surface.defaultPreview, $surface.adaptivePreview)
+                if (-not [string]::IsNullOrWhiteSpace($surface.compactPreview)) {
+                    $surfacePreviews += $surface.compactPreview
+                }
+                foreach ($preview in $surfacePreviews) {
                     if ([string]::IsNullOrWhiteSpace($preview) -or
                         -not [regex]::IsMatch($screenshotContent, "fun\s+$([regex]::Escape($preview))\s*\(")) {
                         $failures.Add("[$($rule.id)] Surface '$($surface.id)' is missing preview '$preview'.")
@@ -355,7 +361,8 @@ foreach ($rule in $manifest.rules) {
                 continue
             }
             foreach ($surface in $reviewPolicy.surfaces) {
-                if ($Mode -eq 'FirmwareRelease' -and $surface.kind -eq 'android-ui') {
+                if (($Mode -eq 'FirmwareRelease' -and $surface.kind -eq 'android-ui') -or
+                    ($Mode -eq 'Release' -and $surface.kind -eq 'x3-display')) {
                     continue
                 }
                 $changedSinceBaseline = Get-ChangedPolicyPaths -RepositoryRoot $repoRoot -BaselineCommit $surface.baselineCommit

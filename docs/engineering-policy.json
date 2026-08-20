@@ -731,6 +731,20 @@
       "message": "Tall-screen fill and short-screen overflow behavior require a reusable tested viewport policy."
     },
     {
+      "id": "passes-normal-height-owns-available-viewport",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/components/PassCardLayoutPolicy.kt",
+      "pattern": "normalScreenChrome[\\s\\S]*?viewportHeight - normalScreenChrome[\\s\\S]*?coerceAtLeast\\(minimumNormalHeight\\)",
+      "message": "Normal Passes must assign remaining supported-phone viewport height to the card instead of recreating an ownerless band with an arbitrary maximum."
+    },
+    {
+      "id": "focus-keeps-compact-render-evidence",
+      "type": "required_pattern",
+      "path": "app/src/screenshotTest/kotlin/com/xteink/companion/ui/CompanionPreviewScreenshotTest.kt",
+      "pattern": "Preview\\(name = \"Expressive focus compact\", widthDp = 360, heightDp = 800[\\s\\S]*?fun expressiveFocusCompactScreenshot",
+      "message": "Focus must retain a compact-width rendered fixture in addition to normal and large-text evidence."
+    },
+    {
       "id": "layout-review-blocks-dead-space-and-action-drift",
       "type": "required_pattern",
       "path": "docs/ui-reviewers/layout-spacing-margins.md",

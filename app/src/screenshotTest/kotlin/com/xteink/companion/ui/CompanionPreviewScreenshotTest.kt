@@ -28,6 +28,13 @@ fun expressiveFocusPhoneScreenshot() {
 }
 
 @PreviewTest
+@Preview(name = "Expressive focus compact", widthDp = 360, heightDp = 800, showBackground = true)
+@Composable
+fun expressiveFocusCompactScreenshot() {
+    ScreenshotApp(state = CompanionUiState())
+}
+
+@PreviewTest
 @Preview(name = "First-run setup", widthDp = 412, heightDp = 915, showBackground = true)
 @Composable
 fun firstRunSetupScreenshot() {
