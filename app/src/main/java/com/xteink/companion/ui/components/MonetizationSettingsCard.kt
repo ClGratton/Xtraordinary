@@ -105,12 +105,18 @@ fun MonetizationSettingsCard(
                                         PurchasePhase.Purchasing,
                                         PurchasePhase.Pending,
                                     ),
+                                    modifier = Modifier.fillMaxWidth(),
                                 ) {
                                     Text(stringResource(R.string.ad_free_restore))
                                 }
                             }
                             if (state.privacyOptionsRequired) {
-                                TextButton(onClick = onPrivacyOptions) { Text(stringResource(R.string.ad_privacy)) }
+                                TextButton(
+                                    onClick = onPrivacyOptions,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Text(stringResource(R.string.ad_privacy))
+                                }
                             }
                         }
                     } else {
