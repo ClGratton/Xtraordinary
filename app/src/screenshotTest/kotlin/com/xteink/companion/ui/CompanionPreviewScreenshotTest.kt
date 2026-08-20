@@ -18,7 +18,9 @@ import com.xteink.companion.monetization.DistributionChannel
 import com.xteink.companion.monetization.EntitlementState
 import com.xteink.companion.monetization.MonetizationRuntimeState
 import com.xteink.companion.monetization.PurchasePhase
+import com.xteink.companion.monetization.StoreProductUi
 import com.xteink.companion.ui.components.SettingsSheetContent
+import com.xteink.companion.ui.components.MonetizationSettingsCard
 import com.xteink.companion.ui.components.DeviceConnectionSheetContent
 import com.xteink.companion.ui.components.DeviceSetupStep
 import com.xteink.companion.ui.components.ReadContent
@@ -351,6 +353,57 @@ fun settingsGoogleConnectedScreenshot() {
 @Composable
 fun settingsGoogleLargeTextScreenshot() {
     SettingsScreenshotContent(cloudBackupState = CloudBackupState())
+}
+
+@PreviewTest
+@Preview(name = "Community ad-free", widthDp = 360, heightDp = 560, showBackground = true)
+@Composable
+fun communityAdFreeScreenshot() {
+    MonetizationScreenshotContent(
+        state = MonetizationRuntimeState(
+            distribution = DistributionChannel.Community,
+            entitlement = EntitlementState.Purchased,
+            consent = ConsentState.AdsNotAllowed,
+            purchasePhase = PurchasePhase.Unavailable,
+        ),
+    )
+}
+
+@PreviewTest
+@Preview(name = "Play ad-free large text", widthDp = 360, heightDp = 720, fontScale = 1.3f, showBackground = true)
+@Composable
+fun playAdFreeLargeTextScreenshot() {
+    MonetizationScreenshotContent(
+        state = MonetizationRuntimeState(
+            distribution = DistributionChannel.Play,
+            entitlement = EntitlementState.AdSupported,
+            consent = ConsentState.AdsAllowed,
+            purchasePhase = PurchasePhase.Ready,
+            product = StoreProductUi(
+                productId = "xtraordinary_ad_free",
+                title = "Xtraordinary Ad-Free",
+                formattedPrice = "€4.99",
+            ),
+            privacyOptionsRequired = true,
+            testMode = true,
+        ),
+    )
+}
+
+@Composable
+private fun MonetizationScreenshotContent(state: MonetizationRuntimeState) {
+    X3CompanionTheme(visualTheme = CompanionVisualTheme.Expressive, useDynamicColor = false) {
+        Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
+            MonetizationSettingsCard(
+                state = state,
+                onBuy = {},
+                onRestore = {},
+                onPrivacyOptions = {},
+                onOpenCommunitySource = {},
+                modifier = Modifier.padding(20.dp),
+            )
+        }
+    }
 }
 
 @Composable
