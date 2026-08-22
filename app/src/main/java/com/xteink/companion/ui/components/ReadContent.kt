@@ -20,10 +20,10 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -70,6 +70,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -109,6 +110,7 @@ fun ReadContent(
     initialSelectedBookIds: Set<String> = emptySet(),
 ) {
     val haptics = LocalHapticFeedback.current
+    val adaptiveTextLayout = LocalDensity.current.fontScale > 1.15f
     val deviceLabel = connectedDeviceModel ?: stringResource(R.string.xteink_device_short)
     var selectedBookIds by remember(initialSelectedBookIds) { mutableStateOf(initialSelectedBookIds) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
@@ -184,12 +186,7 @@ fun ReadContent(
         ) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(stringResource(R.string.read_title), style = MaterialTheme.typography.headlineLarge)
+                    val librarySummary: @Composable () -> Unit = {
                         if (state.syncing) {
                             CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                         } else {
@@ -202,7 +199,24 @@ fun ReadContent(
                                 ),
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
                             )
+                        }
+                    }
+                    if (adaptiveTextLayout) {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(stringResource(R.string.read_title), style = MaterialTheme.typography.headlineLarge)
+                            librarySummary()
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(stringResource(R.string.read_title), style = MaterialTheme.typography.headlineLarge)
+                            librarySummary()
                         }
                     }
                     Box(
@@ -850,6 +864,13 @@ private fun ImportedBookCard(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
+    val fontScale = LocalDensity.current.fontScale
+    val adaptiveTextLayout = fontScale > 1.15f
+    val minimumCardHeight = when {
+        fontScale >= 1.6f -> 240.dp
+        adaptiveTextLayout -> 176.dp
+        else -> 112.dp
+    }
     val bitmap = remember(book.coverPath) {
         book.coverPath?.let { path -> BitmapFactory.decodeFile(path)?.asImageBitmap() }
     }
@@ -870,15 +891,15 @@ private fun ImportedBookCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(112.dp)
+                .heightIn(min = minimumCardHeight)
                 .padding(10.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = if (adaptiveTextLayout) Alignment.Top else Alignment.CenterVertically,
         ) {
             Box(
                 modifier = Modifier
                     .width(62.dp)
-                    .fillMaxHeight(),
+                    .height(92.dp),
             ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -920,14 +941,14 @@ private fun ImportedBookCard(
                 Text(
                     book.title,
                     style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
+                    maxLines = if (adaptiveTextLayout) 2 else 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     book.author,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    maxLines = if (adaptiveTextLayout) 2 else 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
@@ -938,7 +959,7 @@ private fun ImportedBookCard(
                     ).joinToString(" · ").ifBlank { book.fileName },
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    maxLines = if (adaptiveTextLayout) 2 else 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 val locationText = if (book.isOnX3) {
@@ -955,7 +976,7 @@ private fun ImportedBookCard(
                         stringResource(R.string.uploading_book_progress, (uploadProgress * 100f).toInt()),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
+                        maxLines = 2,
                     )
                     LinearProgressIndicator(
                         progress = { uploadProgress.coerceIn(0f, 1f) },
@@ -971,7 +992,8 @@ private fun ImportedBookCard(
                             locationText,
                             style = MaterialTheme.typography.labelSmall,
                             modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
-                            maxLines = 1,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 } else {
@@ -979,7 +1001,8 @@ private fun ImportedBookCard(
                         locationText,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
