@@ -453,6 +453,7 @@ private fun TransferMethodRow(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
+    val badgeSize = if (LocalDensity.current.fontScale >= 1.6f) 72.dp else 48.dp
     Surface(
         onClick = onClick,
         enabled = enabled,
@@ -470,7 +471,7 @@ private fun TransferMethodRow(
                 color = if (enabled) MaterialTheme.colorScheme.primaryContainer
                 else MaterialTheme.colorScheme.surfaceContainerHighest,
             ) {
-                Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(badgeSize), contentAlignment = Alignment.Center) {
                     Text(badge, style = MaterialTheme.typography.labelLarge)
                 }
             }
