@@ -1,5 +1,13 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-22 build/deploy milestone checkpoint and next-task handoff
+
+The explicit, non-default release-debt controls are pushed at `c3c4cf8` and `c09c6a7`. Android Release still fails by default on the same 27 correlated `ui-changes-require-stable-terra-reviews` findings. `-AllowDeferredUiReviewDebt` accepts only that exact rule after a documented ledger authorization, prints every deferred finding, and leaves the other 148 engineering rules fail-closed. `-AllowDocumentedWeeklyReserveOverride` accepts only the documented weekly-meter reserve exception and cannot waive replay or task-growth safety.
+
+No compiler or deployment started. The fresh build task reached 84% signed-in weekly use with only 2% task-local growth, but its recent replay median grew 93% to 84,602 tokens. The independent replay guard correctly rejected the weekly override before source provenance/compiler entry. No ADB/mDNS discovery, APK install, firmware build/flash, Bluetooth-bond change, Pixel app-data change, X3 NVS/SD write, or book-library mutation occurred.
+
+The next substantial milestone is a compaction-safe canonical build/deploy/physical-acceptance task. It must first run the bounded regression-impact audit against the existing power/sync/pairing/state/legal policies and measured hardware evidence, then run a fresh task-local usage audit. If replay passes, invoke `scripts/build-xtraordinary-app.ps1 -AllowDeferredUiReviewDebt -AllowDocumentedWeeklyReserveOverride`, install with `adb install -r`, determine whether firmware differs from installed dev36 before any application-only flash, and execute the preserved-data transfer/background/reconnect acceptance matrix. The remaining product backlog stays authoritative in `docs/x3-takeover-tracker.md`; duplicate historical entries are evidence history, not permission to rerun proven work.
+
 ## 2026-08-22 bounded book-transfer milestone checkpoint
 
 Pushed `e743bc886f55f911d9491ad98b4e732481364e10` completes the source-side reconciliation correction and the bounded-milestone governance rule. A successful BLE upload now returns its final revisioned `LibraryPage` snapshot to the transfer owner; that snapshot, rather than a `CommitBookUpload` ACK, is the only source that marks a phone book present on X3. USB uses the same snapshot when BLE is already ready and otherwise keeps the phone library conservatively unreconciled until a later BLE snapshot. The durable queue still clears only after a successful transfer transaction; terminal rejection, unreadable/empty source, validation failure, explicit Stop, and task swipe remain non-replayable through the shared lifecycle policy.

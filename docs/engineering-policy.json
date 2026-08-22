@@ -475,6 +475,20 @@
       "message": "Each substantial milestone must retain one fresh Terra execution owner with bounded end-to-end responsibility and no mid-milestone replacement."
     },
     {
+      "id": "milestones-audit-regression-impact-and-handoff-visibly",
+      "type": "required_pattern",
+      "path": "docs/codex-usage-workflow.md",
+      "pattern": "Before milestone implementation begins[\\s\\S]*?bounded regression-impact audit[\\s\\S]*?power, synchronization, pairing, state-truth, and legal policies[\\s\\S]*?measured hardware evidence[\\s\\S]*?Existing measured behavior is a constraint[\\s\\S]*?document the evidence-backed decision before editing[\\s\\S]*?never silently regress a policy or replace measured behavior with an assumption[\\s\\S]*?normalize the completed result and remaining authoritative backlog[\\s\\S]*?automatically create a new user-visible Codex task[\\s\\S]*?immediately navigate to and open it in the app[\\s\\S]*?end the old coordinator[\\s\\S]*?Do not keep one coordinator alive across milestones[\\s\\S]*?do not require user intervention",
+      "message": "Every substantial milestone must audit compatibility with measured behavior and hand the next milestone to an immediately opened user-visible task."
+    },
+    {
+      "id": "agents-enforce-regression-impact-and-visible-milestone-handoff",
+      "type": "required_pattern",
+      "path": "AGENTS.md",
+      "pattern": "Before every substantial milestone implementation[\\s\\S]*?bounded regression-impact audit[\\s\\S]*?power, synchronization, pairing, state-truth, and legal policies[\\s\\S]*?measured hardware evidence[\\s\\S]*?document an explicit compatibility decision backed by evidence before editing[\\s\\S]*?never silently regress a policy or replace measurements with assumptions[\\s\\S]*?automatically create the next substantial milestone as a new user-visible Codex task[\\s\\S]*?immediately navigate/open it in the app[\\s\\S]*?end the old coordinator[\\s\\S]*?without requiring user intervention",
+      "message": "Repository agents must audit regression impact and visibly hand off each next substantial milestone."
+    },
+    {
       "id": "codex-usage-reader-keeps-initialized-app-server-handshake",
       "type": "required_pattern",
       "path": "scripts/read-codex-usage.ps1",

@@ -66,6 +66,10 @@ Do not replace that execution owner mid-milestone and do not create a reviewer s
 
 At the milestone end, the owner checkpoints code, evidence, handoff, tracker, and usage ledger, then terminates. This is bounded milestone ownership, not persistent whole-project ownership or unbounded work assignment.
 
+Before milestone implementation begins, the execution owner runs a bounded regression-impact audit against the existing power, synchronization, pairing, state-truth, and legal policies plus measured hardware evidence relevant to the change. Existing measured behavior is a constraint. If a proposed fix conflicts with it, evaluate compatibility explicitly and document the evidence-backed decision before editing; never silently regress a policy or replace measured behavior with an assumption.
+
+At the milestone checkpoint, normalize the completed result and remaining authoritative backlog in `HANDOFF.md` and the tracker. When another substantial milestone remains, automatically create a new user-visible Codex task for that milestone, immediately navigate to and open it in the app, and end the old coordinator. Do not keep one coordinator alive across milestones and do not require user intervention for the handoff.
+
 ## User-visible task continuity and status
 
 An automatic continuation or move may create or select another user-visible Codex task. When it does, the visible coordinator must immediately navigate to and open that task in the Codex app with the available task-navigation tool. Never leave the user on the Subagents page, and never treat merely providing a task name or ID as a handoff. The user must land in the task where visible coordination continues.
