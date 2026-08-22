@@ -454,6 +454,34 @@
       "message": "The canonical signed-in usage reader must preserve the initialized app-server handshake and required weekly-meter fields."
     },
     {
+      "id": "codex-task-audit-enforces-hard-stop-thresholds",
+      "type": "required_pattern",
+      "path": "scripts/audit-codex-task-usage.ps1",
+      "pattern": "MaxTaskWeeklyIncreasePercent = 5[\\s\\S]*?MaxModelCalls = 20[\\s\\S]*?MaxMedianInputTokens = 75000[\\s\\S]*?MaxLastInputTokens = 120000[\\s\\S]*?MaxCompactions = 0[\\s\\S]*?MaxWeeklyUsedPercent = 80[\\s\\S]*?handoff-required[\\s\\S]*?EnforceStageGate",
+      "message": "The rollout audit must fail closed on excessive task growth, model calls, repeated context replay, compactions, or weekly depletion."
+    },
+    {
+      "id": "android-wrapper-enforces-codex-task-budget",
+      "type": "required_pattern",
+      "path": "scripts/build-xtraordinary-app.ps1",
+      "pattern": "audit-codex-task-usage\\.ps1[\\s\\S]*?-EnforceStageGate[\\s\\S]*?durable handoff and fresh task",
+      "message": "The Android compiler wrapper must stop an over-budget Codex task before compilation."
+    },
+    {
+      "id": "firmware-wrapper-enforces-codex-task-budget",
+      "type": "required_pattern",
+      "path": "scripts/build-x3-firmware.ps1",
+      "pattern": "audit-codex-task-usage\\.ps1[\\s\\S]*?-EnforceStageGate[\\s\\S]*?durable handoff and fresh task",
+      "message": "The firmware compiler wrapper must stop an over-budget Codex task before compilation."
+    },
+    {
+      "id": "agents-obey-codex-task-audit-stop",
+      "type": "required_pattern",
+      "path": "AGENTS.md",
+      "pattern": "audit-codex-task-usage\\.ps1 -EnforceStageGate[\\s\\S]*?task entry[\\s\\S]*?after every 10 root model calls[\\s\\S]*?handoff-required[\\s\\S]*?fresh task",
+      "message": "Agents must treat the machine-audited context and weekly ceilings as a mandatory fresh-task boundary."
+    },
+    {
       "id": "codex-usage-ledger-records-the-reviewed-incident",
       "type": "required_pattern",
       "path": "docs/codex-usage-ledger.md",

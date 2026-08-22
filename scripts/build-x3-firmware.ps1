@@ -12,6 +12,7 @@ $coreDir = Join-Path $repoRoot '.tools\platformio-core'
 $policyCheck = Join-Path $PSScriptRoot 'check-engineering-policies.ps1'
 $sourceCheck = Join-Path $PSScriptRoot 'assert-pushed-source.ps1'
 $releaseRecordWriter = Join-Path $PSScriptRoot 'write-firmware-release-record.ps1'
+$usageAudit = Join-Path $PSScriptRoot 'audit-codex-task-usage.ps1'
 
 if (-not (Test-Path -LiteralPath $platformIo)) {
     throw "Bundled PlatformIO was not found at $platformIo"
@@ -25,7 +26,14 @@ if (-not (Test-Path -LiteralPath $sourceCheck)) {
 if (-not (Test-Path -LiteralPath $releaseRecordWriter)) {
     throw "Firmware release-record writer was not found at $releaseRecordWriter"
 }
+if (-not (Test-Path -LiteralPath $usageAudit)) {
+    throw "Codex task-usage audit was not found at $usageAudit"
+}
 
+& $usageAudit -EnforceStageGate
+if ($LASTEXITCODE -ne 0) {
+    throw "Codex task budget requires a durable handoff and fresh task before another compiler run. An explicit user override must be recorded in docs/codex-usage-ledger.md before changing the protected thresholds."
+}
 & $sourceCheck
 & $policyCheck -Mode FirmwareRelease
 if (-not $?) {

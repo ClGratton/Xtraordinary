@@ -12,6 +12,22 @@ Run `scripts/read-codex-usage.ps1` outside the filesystem sandbox in the normal 
 
 For a forensic task audit, read only top-level `token_count` events from the current task rollout. Report deltas for input, cached input, uncached input, output, reasoning output, total tokens, and model-call count. Do not sum forked-agent rollout totals: forked rollouts inherit counters/history and can duplicate usage.
 
+Run `scripts/audit-codex-task-usage.ps1` instead of broad text searches over rollout JSONL. It streams the file, counts only typed records, and reports cache effectiveness, per-call input distribution, compactions, tool-call concentration, task-local weekly growth, and lifetime totals without printing message bodies back into the model context.
+
+## Hard context and call ceilings
+
+The following are stop conditions, not advisory warnings:
+
+- more than 20 top-level model calls in the current weekly slice of one task;
+- median input above 75,000 tokens after three calls, or any single call above 120,000 input tokens;
+- any context compaction in the current weekly slice;
+- more than five percentage points of weekly allowance consumed by one task;
+- the signed-in weekly meter reaching 80% used.
+
+At any stop condition, do not dispatch another reviewer, compiler, renderer, install, flash, or exploratory search in the bloated task. Immediately update `HANDOFF.md`, the tracker, and the usage ledger, restore temporary device settings, then continue the same implementation from those durable artifacts in a fresh Codex task. The boundary is continuity work, not abandonment. A user may explicitly authorize additional budget, but the override and its exact scope must be recorded in the ledger before protected thresholds are changed.
+
+Run `scripts/audit-codex-task-usage.ps1 -EnforceStageGate` at task entry, before any reviewer wave, before a broad source investigation, and before a compiler or device-deployment phase. Both canonical compiler wrappers execute the same gate before the pushed-source and engineering gates. This prevents an already-expensive task from entering another costly phase.
+
 ## Required checkpoints
 
 Take and record a meter snapshot:
@@ -20,6 +36,8 @@ Take and record a meter snapshot:
 2. immediately before and after every reviewer or subagent wave;
 3. after every compiler/build attempt;
 4. every 30 minutes while a task remains active, if no other checkpoint occurred.
+
+Also run the audit after every 10 root model calls. Prefer one composed read-only command that answers all related questions; a sequence of tiny shell or reviewer turns is a usage defect even when every individual call is cache-hit.
 
 Report a change of five percentage points or more immediately. A stage that consumes ten percentage points pauses before another reviewer wave or build so the implementation owner can reconcile what remains.
 
@@ -34,6 +52,7 @@ When twenty percent or less remains, stop optional review loops, research, and p
 - Reuse one narrow reviewer for one re-review. Do not spawn a replacement swarm because a reviewer missed a defect.
 - The implementation owner writes code. Reviewers remain read-only and return a verdict plus exact evidence.
 - Stop after the required verdict; do not ask reviewers to restate other roles.
+- Never keep completed agents merely as an excuse to start iterative review traffic. Reconcile their result once, close the wave, and start no re-review until all source corrections for that surface are batched.
 
 ## Build budget
 
@@ -65,5 +84,6 @@ Use this sequence outside Xtraordinary as well:
 5. Reconcile once. Batch corrections. Build or render once from the settled candidate.
 6. Store successful commands, decisions, rubrics, and recurring checks in the project; future tasks read those artifacts.
 7. Take meter snapshots at the checkpoints above and stop optional iteration when the budget threshold is reached.
+8. If the audit reports `handoff-required`, treat a fresh task as mandatory rather than trying to compact and continue. Cache hits reduce recomputation cost but do not make a 100k-plus repeated prompt an efficient workflow.
 
 For teaching material, default to one source-research pass, one audience/learning-objective outline, primary-agent drafting, and one final pedagogy/factual review. Do not run multiple vague rewrite agents. Ask the reviewer to check named outcomes such as prerequisite fit, misconception risk, worked-example correctness, cognitive load, and assessment alignment.

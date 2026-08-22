@@ -1,5 +1,21 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-22 usage-bound continuation checkpoint
+
+The current Codex task is mechanically over budget and must not perform another broad investigation, reviewer wave, compiler, install, flash, or device acceptance. `scripts/audit-codex-task-usage.ps1` reported 288 calls, 48.4M tokens, 176k median input per call, four compactions, and a weekly-meter increase from 8% to 42%. Continue the same objective in a fresh task from this file; this is a context reset, not a product-work stop.
+
+Preventive enforcement is now source state: run `scripts/audit-codex-task-usage.ps1 -EnforceStageGate` at fresh-task entry and before each costly stage. Protected ceilings are 20 calls, 75k median input after three calls, 120k latest-call input, zero compactions, five weekly percentage points per task, and 80% total weekly use.
+
+Current product boundary to resume:
+
+- pushed implementation through `fa61f83` contains the book-transfer lifecycle fixes and the latest Read color/Stop-glyph correction;
+- X3 dev37 firmware built successfully but is not flashed;
+- Android dev49 is not installed and no final canonical Android build exists;
+- latest Community/Play Read evidence was regenerated after `fa61f83`, but the worktree also contains unrelated changed screenshot references; inspect and stage only deliberate references;
+- hierarchy, layout, typography, and UX review results exist; color and shape blocked the prior candidate and need one narrow re-review of `fa61f83`; motion and accessibility remain outstanding; no final source-bound receipts exist;
+- physical acceptance still must cover foreground/background link truth, background upload continuity, Stop/abort cleanup, rejection without a zero-chapter library entry, exact EPUB picker filtering, row-local progress, direct-send offer, multi-book upload, library/delete reconciliation, cover parity, and X3 library filtering;
+- preserve Bluetooth bond/NVS/SD/app data. Re-discover wireless ADB through the repository mDNS workflow. Pixel timeout was restored from `7200000` to `1800000` ms through `Android_LPVTV8X5.local.:34473` at this checkpoint.
+
 ## 2026-08-22 book-transfer/background incident candidate
 
 The installed Pixel build is still `0.2.0-dev43`; Android `0.2.0-dev49` / firmware `dev37` are source candidates not yet built, installed, flashed, or physically accepted. The current device evidence isolated the reported failures rather than treating them as UI noise: terminal X3 NACKs were left in the durable queue and replayed on reconnect/foreground; cancellation did not join the old worker before clearing UI; delete released GATT after the command ACK rather than the final `LibraryPage`; USB used 240-byte chunks despite the safe 488-byte envelope; retrying an existing destination was rejected; and X3-only Open Library lookup used polluted filenames with a seven-day retry delay.

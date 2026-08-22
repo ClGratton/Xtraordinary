@@ -20,6 +20,7 @@ $toolchainScript = Join-Path $PSScriptRoot 'use-toolchains.ps1'
 $policyCheck = Join-Path $PSScriptRoot 'check-engineering-policies.ps1'
 $sourceCheck = Join-Path $PSScriptRoot 'assert-pushed-source.ps1'
 $apkNoticeCheck = Join-Path $PSScriptRoot 'check-android-apk-notices.ps1'
+$usageAudit = Join-Path $PSScriptRoot 'audit-codex-task-usage.ps1'
 
 if (-not (Test-Path -LiteralPath $gradle)) {
     throw "Bundled Gradle was not found at $gradle"
@@ -35,6 +36,9 @@ if (-not (Test-Path -LiteralPath $sourceCheck)) {
 }
 if (-not (Test-Path -LiteralPath $apkNoticeCheck)) {
     throw "APK release-notices verifier was not found at $apkNoticeCheck"
+}
+if (-not (Test-Path -LiteralPath $usageAudit)) {
+    throw "Codex task-usage audit was not found at $usageAudit"
 }
 
 if ($UiEvidenceCandidate) {
@@ -57,6 +61,10 @@ if ($UiEvidenceCandidate) {
     $Tasks = $requiredEvidenceTasks
 }
 
+& $usageAudit -EnforceStageGate
+if ($LASTEXITCODE -ne 0) {
+    throw "Codex task budget requires a durable handoff and fresh task before another compiler run. An explicit user override must be recorded in docs/codex-usage-ledger.md before changing the protected thresholds."
+}
 & $sourceCheck
 if ($UiEvidenceCandidate) {
     & $policyCheck -Mode UiEvidenceCandidate
