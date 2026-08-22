@@ -489,6 +489,13 @@
       "message": "The usage audit must bind the invoking task and must not borrow a specialist or unrelated rollout."
     },
     {
+      "id": "codex-task-audit-returns-explicit-success",
+      "type": "required_pattern",
+      "path": "scripts/audit-codex-task-usage.ps1",
+      "pattern": "ConvertTo-Json -Depth 8[\\s\\S]*?throw 'Codex task usage requires compaction or a fresh history-free bounded agent before the next protected stage\\.'[\\s\\S]*?exit 0",
+      "message": "A passing usage audit must explicitly reset the process exit code so canonical wrappers cannot mistake stale native-command failure for a stage-gate failure."
+    },
+    {
       "id": "codex-usage-ledger-records-the-reviewed-incident",
       "type": "required_pattern",
       "path": "docs/codex-usage-ledger.md",

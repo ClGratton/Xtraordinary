@@ -268,3 +268,4 @@ $result | ConvertTo-Json -Depth 8
 if (($EnforceStageGate -or $LegacyBuildGate) -and ($budgetViolations.Count -or $replaySignals.Count)) {
     throw 'Codex task usage requires compaction or a fresh history-free bounded agent before the next protected stage.'
 }
+exit 0
