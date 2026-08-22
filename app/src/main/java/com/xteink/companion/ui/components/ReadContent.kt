@@ -112,7 +112,9 @@ fun ReadContent(
     val deviceLabel = connectedDeviceModel ?: stringResource(R.string.xteink_device_short)
     var selectedBookIds by remember(initialSelectedBookIds) { mutableStateOf(initialSelectedBookIds) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
-    var showTransferChoices by remember { mutableStateOf(false) }
+    var showTransferChoices by remember {
+        mutableStateOf(state.directUploadOfferBookIds.isNotEmpty())
+    }
     var showServiceReminder by rememberSaveable { mutableStateOf(true) }
     var wasUploading by remember { mutableStateOf(state.uploadingToX3) }
     val visibleBooks = remember(state.books, state.query, state.sort, state.service, state.location) {
