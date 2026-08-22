@@ -257,6 +257,8 @@
         "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/communityAdFreeScreenshot_Community ad-free_de4f5724_0.png",
         "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/playAdFreeLargeTextScreenshot_Play ad-free large text_a6f4b93b_0.png",
         "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/quietPlayAdFreeScreenshot_Quiet Play ad-free_45c1976f_0.png",
+        "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/readDirectUploadOfferScreenshot_Read direct upload offer_599396a0_0.png",
+        "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/readUploadActiveScreenshot_Read upload active_29cffee7_0.png",
         "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/settingsThemesScreenshot_Settings themes_a8a8a3e5_0.png",
         "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/setupLibraryScreenshot_Setup library_b04839c0_0.png",
         "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/setupDeviceScreenshot_Setup device_bca57e3c_0.png",
@@ -265,7 +267,9 @@
         "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/firstRunSetupCompactScreenshot_First-run setup compact height_77370774_0.png",
         "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/communityAdFreeScreenshot_Community ad-free_de4f5724_0.png",
         "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/playAdFreeLargeTextScreenshot_Play ad-free large text_a6f4b93b_0.png",
-        "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/quietPlayAdFreeScreenshot_Quiet Play ad-free_45c1976f_0.png"
+        "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/quietPlayAdFreeScreenshot_Quiet Play ad-free_45c1976f_0.png",
+        "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/readDirectUploadOfferScreenshot_Read direct upload offer_599396a0_0.png",
+        "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/readUploadActiveScreenshot_Read upload active_29cffee7_0.png"
       ],
       "record": "docs/ui-review-records/android-ui-current.json"
     },
