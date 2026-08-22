@@ -1,11 +1,39 @@
 param(
-    [switch]$Update
+    [switch]$Update,
+    [string]$NoticeRoot
 )
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$noticeRoot = Join-Path $repoRoot 'release-notices\firmware'
+$noticeRoot = if ([string]::IsNullOrWhiteSpace($NoticeRoot)) {
+    Join-Path $repoRoot 'release-notices\firmware'
+} else {
+    $NoticeRoot
+}
 $manifestPath = Join-Path $noticeRoot 'MANIFEST.sha256'
+
+function Get-CanonicalTextSha256 {
+    param([Parameter(Mandatory)][string]$Path)
+
+    # The fixed firmware notice inventory is text. Git may materialize its LF
+    # repository content as CRLF on Windows, so hash a line-ending-normalized
+    # byte stream. Do not use this for arbitrary release payloads or binaries.
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    $canonical = [System.Collections.Generic.List[byte]]::new($bytes.Length)
+    for ($index = 0; $index -lt $bytes.Length; $index++) {
+        if ($bytes[$index] -eq 0x0d -and $index + 1 -lt $bytes.Length -and $bytes[$index + 1] -eq 0x0a) {
+            continue
+        }
+        $canonical.Add($bytes[$index])
+    }
+
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return ([System.BitConverter]::ToString($sha256.ComputeHash($canonical.ToArray())) -replace '-', '').ToLowerInvariant()
+    } finally {
+        $sha256.Dispose()
+    }
+}
 
 $requiredFiles = @(
     'Apache-NimBLE-Apache-2.0.txt',
@@ -53,7 +81,7 @@ if ($missing.Count -gt 0 -or $unexpected.Count -gt 0) {
 
 $expectedLines = @(
     $requiredFiles | Sort-Object | ForEach-Object {
-        $hash = (Get-FileHash -LiteralPath (Join-Path $noticeRoot $_) -Algorithm SHA256).Hash.ToLowerInvariant()
+        $hash = Get-CanonicalTextSha256 -Path (Join-Path $noticeRoot $_)
         "$hash  $_"
     }
 )

@@ -4,6 +4,10 @@ Status: mandatory for long-running implementation and specialist-review work in 
 
 Usage discipline is repository state, not chat memory. Any change to this procedure, its thresholds, or its delegation rules must update this document and append the dated ledger in `docs/codex-usage-ledger.md` in the same commit.
 
+## Canonical release-content portability
+
+The fixed firmware licence/NOTICE inventory is text-only, but Git may materialize its repository LF content as CRLF on Windows. `scripts/check-firmware-release-notices.ps1` therefore hashes canonical LF-normalized bytes for this inventory only. It still rejects missing/extra files and every non-line-ending content change. Do not reuse this primitive for binaries or arbitrary release assets. When changing the verifier, run `scripts/test-firmware-release-notices.ps1`; it proves CRLF equivalence and that a real content mutation fails. Regenerate `release-notices/firmware/MANIFEST.sha256` only through the verifier's reviewed `-Update` path.
+
 ## Authoritative meter
 
 Run `scripts/read-codex-usage.ps1` outside the filesystem sandbox in the normal signed-in user context. The script performs the initialized local Codex app-server handshake and reads `account/rateLimits/read`; do not recreate that handshake ad hoc. Record `usedPercent`, `windowDurationMins`, and `resetsAt`. Public OpenAI API billing, token prices, and API rate-limit pages are different systems and must not be presented as the signed-in Codex weekly meter. A sandbox-context result is invalid because it resolves a different Codex home and may have no signed-in account.
