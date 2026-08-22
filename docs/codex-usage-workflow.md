@@ -56,6 +56,14 @@ When twenty percent or less remains, stop optional review loops, research, and p
 - Stop after the required verdict; do not ask reviewers to restate other roles.
 - Never keep completed agents merely as an excuse to start iterative review traffic. Reconcile their result once, close the wave, and start no re-review until all source corrections for that surface are batched.
 
+## User-visible task continuity and status
+
+An automatic continuation or move may create or select another user-visible Codex task. When it does, the visible coordinator must immediately navigate to and open that task in the Codex app with the available task-navigation tool. Never leave the user on the Subagents page, and never treat merely providing a task name or ID as a handoff. The user must land in the task where visible coordination continues.
+
+At each milestone, the visible coordinator publishes a plain-language product status containing all four facts: completed product work, the current phase, whether the phone or X3 changed, and the next verifiable outcome. Keep subagent and worker implementation details out of user-facing status unless the user asks for them.
+
+Fresh bounded workers created with `fork_turns: "none"` remain internal execution contexts. They do not create user-visible tasks and do not change which task the user sees.
+
 ## Build budget
 
 - Batch source corrections before compiling.

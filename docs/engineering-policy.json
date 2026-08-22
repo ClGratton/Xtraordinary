@@ -447,6 +447,27 @@
       "message": "Long-running work must retain signed-in usage checkpoints, bounded delegation/build rules, and a durable ledger."
     },
     {
+      "id": "visible-codex-task-transitions-open-immediately",
+      "type": "required_pattern",
+      "path": "docs/codex-usage-workflow.md",
+      "pattern": "automatic continuation or move[\\s\\S]*?another user-visible Codex task[\\s\\S]*?immediately navigate to and open that task in the Codex app[\\s\\S]*?available task-navigation tool[\\s\\S]*?Never leave the user on the Subagents page[\\s\\S]*?never treat merely providing a task name or ID as a handoff",
+      "message": "A coordinator that changes the user-visible task must immediately open it in Codex instead of leaving the user on Subagents or returning only an identifier."
+    },
+    {
+      "id": "visible-coordinator-milestones-are-product-centered",
+      "type": "required_pattern",
+      "path": "docs/codex-usage-workflow.md",
+      "pattern": "visible coordinator publishes a plain-language product status[\\s\\S]*?completed product work[\\s\\S]*?current phase[\\s\\S]*?whether the phone or X3 changed[\\s\\S]*?next verifiable outcome[\\s\\S]*?Keep subagent and worker implementation details out of user-facing status unless the user asks",
+      "message": "Visible milestone updates must report product progress, phase, device impact, and the next proof without exposing internal worker mechanics by default."
+    },
+    {
+      "id": "history-free-bounded-workers-remain-internal",
+      "type": "required_pattern",
+      "path": "docs/codex-usage-workflow.md",
+      "pattern": "Fresh bounded workers created with `fork_turns: \"none\"` remain internal execution contexts[\\s\\S]*?do not create user-visible tasks[\\s\\S]*?do not change which task the user sees",
+      "message": "History-free bounded workers must remain internal and must not create or select a user-visible Codex task."
+    },
+    {
       "id": "codex-usage-reader-keeps-initialized-app-server-handshake",
       "type": "required_pattern",
       "path": "scripts/read-codex-usage.ps1",
