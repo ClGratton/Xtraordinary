@@ -1163,7 +1163,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                     val resolver = getApplication<Application>().contentResolver
                     val digest = MessageDigest.getInstance("SHA-256")
                     var size = 0L
-                    resolver.openInputStream(uri)?.use { input ->
+                    val finalSnapshot = resolver.openInputStream(uri)?.use { input ->
                         val buffer = ByteArray(16 * 1024)
                         while (true) {
                             val count = input.read(buffer)
@@ -1200,23 +1200,22 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                                 digest.digest(),
                                 input,
                                 progress,
-                            )
+                            ).let { null }
                         }
                     } ?: error("${book.title} is no longer available on this phone")
-                    val uploadedBooks = _uiState.value.read.books.map { existing ->
-                        if (existing.id == book.id) {
-                            existing.copy(isOnX3 = true, x3Path = "/Books/${book.fileName}")
-                        } else {
-                            existing
-                        }
+                    // Commit proves the transfer transaction, not the library's
+                    // published state. BLE returns a revisioned snapshot here;
+                    // USB is reconciled only after a later BLE snapshot.
+                    finalSnapshot?.let { snapshot ->
+                        reconcileDeviceLibrary(snapshot.revision, snapshot.entries.map { it.path to it.sizeBytes })
                     }
-                    bookLibrary.save(uploadedBooks)
-                    _uiState.update { state -> state.copy(read = state.read.copy(books = uploadedBooks)) }
                     pendingBookUploadIds.remove(book.id)
                     persistPendingBookUpload()
                 }
                 if (method == BookTransferMethod.Usb && companionClient.isReady()) {
-                    runCatching { companionClient.refreshLibrary() }
+                    companionClient.refreshLibraryAndAwaitSnapshot().also { snapshot ->
+                        reconcileDeviceLibrary(snapshot.revision, snapshot.entries.map { it.path to it.sizeBytes })
+                    }
                 }
             }
             val error = result.exceptionOrNull()

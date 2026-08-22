@@ -468,6 +468,13 @@
       "message": "History-free bounded workers must remain internal and must not create or select a user-visible Codex task."
     },
     {
+      "id": "substantial-milestones-have-one-fresh-terra-owner",
+      "type": "required_pattern",
+      "path": "docs/codex-usage-workflow.md",
+      "pattern": "Each substantial milestone has one fresh `fork_turns: \\\"none\\\"` `gpt-5\\.6-terra` execution owner[\\s\\S]*?owns the milestone's implementation, debugging, focused tests, and acceptance evidence[\\s\\S]*?Do not replace that execution owner mid-milestone[\\s\\S]*?do not create a reviewer swarm[\\s\\S]*?coordinator does not duplicate the owner's source inspection[\\s\\S]*?checks the remaining weekly budget before considering another milestone[\\s\\S]*?owner checkpoints code, evidence, handoff, tracker, and usage ledger, then terminates[\\s\\S]*?not persistent whole-project ownership or unbounded work assignment",
+      "message": "Each substantial milestone must retain one fresh Terra execution owner with bounded end-to-end responsibility and no mid-milestone replacement."
+    },
+    {
       "id": "codex-usage-reader-keeps-initialized-app-server-handshake",
       "type": "required_pattern",
       "path": "scripts/read-codex-usage.ps1",

@@ -614,7 +614,7 @@ class BluetoothCompanionClient(private val context: Context) {
         sha256: ByteArray,
         input: InputStream,
         onProgress: (Float) -> Unit = {},
-    ) = withContext(Dispatchers.IO) {
+    ): DeviceLibrarySnapshot = withContext(Dispatchers.IO) {
         var begun = false
         requestTransferConnectionPriority(high = true)
         try {
