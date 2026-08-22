@@ -1,5 +1,18 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-22 fresh-task audit exit-status checkpoint
+
+The thread-bound audit now passes against the invoking fresh task, but the first and only `-UiEvidenceCandidate` invocation in that task stopped before source provenance, policy checks, or Gradle. Its internal audit printed `status: within-budget` for thread `01a02a40-78b5-7781-b90b-edea8f3f9f50`, then the Android wrapper misread a stale nonzero PowerShell `$LASTEXITCODE` and threw at line 66. No screenshot reference, APK, install, flash, bond, app data, NVS, or SD state changed.
+
+The reusable process-status correction is pushed at `9694b50`: `scripts/audit-codex-task-usage.ps1` now returns explicit exit code zero after a passing report, and `docs/engineering-policy.json` prevents that contract from regressing. A contaminated-exit test seeded `$LASTEXITCODE=17`, received `within-budget`, and observed exit zero. The evidence-mode engineering gate passed all 139 rules.
+
+Fresh-task continuation order:
+
+1. From clean pushed `9694b50`, run the task-local usage audit and exactly one canonical `scripts/build-xtraordinary-app.ps1 -UiEvidenceCandidate`.
+2. Inspect the generated Community/Play diff and retain only the deliberate Quiet Read active-upload references. Add the exact generated Quiet PNG paths and hashes to `docs/ui-review-policy.json`; do not accept unrelated reference churn.
+3. Run only the narrow `shape-affordance`, `motion-interaction`, and `accessibility-adaptive` Terra reviews described below, then rebind earlier passing roles only as required by final source/evidence identity.
+4. Commit/push reviewed evidence and receipts, then run the canonical Android build before any deployment.
+
 ## 2026-08-22 Quiet transfer evidence checkpoint and mandatory task reset
 
 This fresh continuation reached the repository's hard task ceiling before a protected build stage. The explicit root audit reported `handoff-required`: 23 top-level calls, 1,895,226 input tokens (1,791,616 cached), 90,371 median input tokens, 114,997 maximum input tokens, three percentage points of task-local weekly growth (44% to 47%), and no compaction. Do not continue review, compilation, install, flash, or device acceptance in this task context.
