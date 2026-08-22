@@ -1,5 +1,13 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-22 final release-artifact checkpoint
+
+Pushed source is clean through `586cbac59fde4ac22b69217f5eb6b8858dd3cdc6` on `codex/x3-build-deploy-acceptance`. The fixed Android notice inventory now hashes only its declared text payload canonically: `scripts/test-android-release-notices.ps1` passed both CRLF/LF equivalence and genuine-content-mismatch rejection, and the resolved Community/Play graphs remained semantically unchanged at 147/180 modules. Legal status remains **not release-cleared**.
+
+The one authorized canonical Android wrapper invocation with `-AllowDeferredUiReviewDebt -AllowDocumentedWeeklyReserveOverride` stopped before provenance, policy, Gradle, artifact creation, ADB, or device mutation. Its task-bound gate rejected the non-waivable conditions: 99% signed-in weekly use, 12-point task growth, post-compaction median input 106,239 tokens, latest input 125,009 tokens, and recent growth 182% to 124,470 tokens. There is no new APK to install, no artifact-upload destination to evaluate, no firmware build/flash, and no Pixel/X3 state change; installed X3 dev36, NVS, SD, bond, app data, and the Pixel timeout remain untouched.
+
+Stop this release-artifact path here. A future fresh history-free task may repeat the canonical build only after its own protected-stage audit passes, then use `adb install -r`, conditionally application-flash a source-matching already-built firmware artifact if one exists, and record local artifact paths/SHA-256 unless an established repository destination is found. Do not infer a build, upload, install, or handshake from this checkpoint.
+
 ## 2026-08-22 build/deploy milestone checkpoint and next-task handoff
 
 The Windows canonical-build portability correction is pushed at `fde20a9d1680081ee5616fba89f381e08a4f0f7a`. `scripts/check-firmware-release-notices.ps1` now hashes canonical LF bytes only for its fixed text notice inventory, retains true content/inventory mismatch failures, and has an executable CRLF-equivalence plus changed-content rejection fixture. No licence payload changed; only its previously mixed-line-ending manifest was regenerated. AGENTS, the usage workflow/ledger, and the engineering policy now make this scoped portability invariant durable.

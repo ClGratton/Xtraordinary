@@ -20,6 +20,7 @@ This is the actionable backlog. Older unchecked items in `docs/x3-takeover-track
 
 - [x] Finish and push the current milestone's dirty documentation/policy changes; require a clean named branch with matching upstream before compilation.
 - [ ] Start the compiler/device phase in a fresh task with a bounded regression-impact audit against `docs/x3-power-sync-flow.md`, `docs/interactive-transport-lifecycle.md`, `docs/usb-firmware-maintenance.md`, `docs/legal-release-audit.md`, and the physical evidence in `HANDOFF.md`.
+- [~] Final release-artifact attempt: Android and firmware notice portability checks are pushed through `586cbac`, but the one canonical Android wrapper invocation stopped before compiler entry because the task-bound replay/task-growth gate rejected the weekly waiver. No APK, install, flash, upload, handshake, or device mutation occurred; resume only from a fresh passing audit.
 - [ ] Run the canonical Android build from the pushed source. Use only the explicit, visible, non-default waiver for the user-deferred UI-receipt class; do not suppress any other engineering-policy failure.
 - [ ] Rediscover the wireless-debug Pixel through the repository ADB/mDNS workflow and install with `adb install -r`, retaining app data.
 - [ ] Compare the pushed firmware source with the installed X3 dev36 artifact. Build and application-only flash only if firmware actually changed; preserve NVS, bond, and SD.

@@ -1,5 +1,12 @@
 # Codex usage ledger
 
+## 2026-08-22 - Final release-artifact gate checkpoint
+
+- Task: `01a02a88-cd91-7361-a6e3-1941183387f4`.
+- Source/evidence: pushed Android notice portability correction `586cbac59fde4ac22b69217f5eb6b8858dd3cdc6`; its focused verifier passed CRLF/LF equivalence and true-content mismatch rejection, with unchanged 147-module Community and 180-module Play graphs.
+- Protected-stage result: one canonical Android wrapper attempt used the documented UI-debt and weekly-reserve flags, but its independent task audit rejected continuation before provenance, policy, Gradle, ADB, or hardware work: weekly meter 99%, task growth 12 points, median input 106,239, latest input 125,009, and recent input growth 182% to 124,470. The weekly override did not and must not waive those limits.
+- Preservation result: no APK/artifact exists from this checkpoint; no artifact destination was contacted; no Android install, firmware build/flash, Pixel app-data or timeout change, Bluetooth-bond change, X3 NVS/SD write, or handshake occurred. Stop the path and require a fresh passing task audit before another protected stage.
+
 ## 2026-08-16 - Long-history reviewer incident
 
 - Task: `019faeb2-432c-7801-bfcd-2383a59d6ecb`
