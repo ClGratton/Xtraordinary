@@ -15,7 +15,7 @@
 
 - [x] Push the settled Read color/Stop correction and one centralized Quiet active-upload screenshot fixture at `5ef87c0`; preserve only the eight deliberate Community/Play Read references and remove unrelated generated screenshot noise.
 - [x] Pass the narrow `color-contrast` review with measured AA role-pair evidence; confirm default Stop geometry at actual size and 2x.
-- [!] `shape-affordance` is blocked only on the missing generated Quiet active-upload PNG. The first evidence attempt was cancelled at the hard root-task ceiling before screenshot generation; no APK/install/flash/device mutation occurred.
+- [~] Generate and inspect the missing Quiet active-upload evidence: the one canonical candidate build passed, Community/Play produced byte-identical 1082x1995 PNGs at SHA-256 `396604331CE6845759C0A7E2485581E9C386BCE516123CDCD8E9318C66051D90`, and default-size/2x inspection found the Stop glyph optically separated. The narrow `shape-affordance` review is now unblocked but not yet signed.
 - [x] Repair the usage stage gate before another protected stage: `f328924` binds the invoking task and terminates on measured replay/weekly failures; `9694b50` explicitly returns exit zero after a passing audit so canonical wrappers cannot misread stale native-command status.
 - [x] Isolate terminal-rejection replay, cancel/worker races, premature post-delete link release, undersized USB chunks, existing-destination rejection, broad picker MIME types, and polluted X3-only metadata lookup in source.
 - [~] Implement one reusable transfer lifecycle: transport interruption retries; command/source/validation failure stops and forgets; explicit Stop/task removal cancels and joins; active work owns the foreground service and persistent fast transport.
@@ -24,7 +24,7 @@
 - [~] Restrict the system picker to EPUB, reject OPFs without readable XHTML spine entries, normalize X3-only Open Library titles, and retry missing metadata after 24 hours rather than seven days.
 - [~] Await the final revisioned library snapshot after upload/delete before reconciling phone state or releasing GATT.
 - [~] Use the shared 488-byte payload limit on USB and atomically replace an existing `/Books/<name>` through a verified temporary file plus hidden rollback path.
-- [~] The candidate and Quiet fixture are pushed through `5ef87c0`; pass the one remaining UI-evidence build, required source-bound specialist receipts, canonical Android build, and firmware deployment gate.
+- [~] The candidate and Quiet fixture are pushed through `5ef87c0`; the remaining UI-evidence build passed from pushed `d98a9ff1`, with only the two deliberate Quiet Read references retained. Complete the required source-bound specialist receipts, canonical Android build, and firmware deployment gate.
 - [ ] Install with app data/bond retained and application-only flash with NVS/SD/bond retained.
 - [ ] Physically accept USB and BLE success, background continuation, swipe-away cancellation/no replay, rejection/no replay, same-name replacement rollback, delete reconciliation, Project Hail Mary cover recovery, and real `test_tables.epub` pagination.
 

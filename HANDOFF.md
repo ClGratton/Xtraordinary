@@ -1,5 +1,18 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-22 Quiet Read generated-evidence checkpoint
+
+Fresh task `01a02a44-1f16-7fa1-892c-69f96672a966` passed its task-local usage gate and ran exactly one canonical `scripts/build-xtraordinary-app.ps1 -UiEvidenceCandidate` from clean pushed `d98a9ff1f5d9d03a094cad6eef4f0128dff8b9a3`. Source provenance, all 139 engineering rules, Community/Play unit tests, and both deterministic screenshot-update tasks passed; Gradle completed 64 tasks in 1m16s. No APK install, firmware build/flash, bond, app data, NVS, or SD state changed.
+
+The build generated two required Quiet active-upload leaf references. Both are 1082x1995 and byte-identical at SHA-256 `396604331CE6845759C0A7E2485581E9C386BCE516123CDCD8E9318C66051D90`:
+
+- `app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/quietReadUploadActiveScreenshot_Quiet Read upload active_38ba0625_0.png`
+- `app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/quietReadUploadActiveScreenshot_Quiet Read upload active_38ba0625_0.png`
+
+Default-size and nearest-neighbor 2x inspection passed the evidence-generation check: the upload row stays legible in Quiet grayscale, its progress hierarchy is clear, and the Stop glyph remains one centered square with clean negative space and no competing ring. The generated update also touched 20 unrelated Community/Play references; those build-only changes were restored from the clean baseline, leaving only the two deliberate Quiet Read PNGs. `docs/ui-review-policy.json` now requires both exact leaf paths; receipt hashes remain the responsibility of the source-bound reviewers.
+
+Continue with exactly the narrow `shape-affordance`, `motion-interaction`, and `accessibility-adaptive` Terra reviews. Rebind earlier passing roles only if the final source/evidence identity requires it, then commit/push receipts and run the canonical Android build before any deployment.
+
 ## 2026-08-22 fresh-task audit exit-status checkpoint
 
 The thread-bound audit now passes against the invoking fresh task, but the first and only `-UiEvidenceCandidate` invocation in that task stopped before source provenance, policy checks, or Gradle. Its internal audit printed `status: within-budget` for thread `01a02a40-78b5-7781-b90b-edea8f3f9f50`, then the Android wrapper misread a stale nonzero PowerShell `$LASTEXITCODE` and threw at line 66. No screenshot reference, APK, install, flash, bond, app data, NVS, or SD state changed.

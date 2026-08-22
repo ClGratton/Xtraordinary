@@ -261,6 +261,7 @@
         "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/readDirectUploadOfferHugeTextScreenshot_Read direct upload offer huge text_f06d5d66_0.png",
         "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/readUploadActiveScreenshot_Read upload active_29cffee7_0.png",
         "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/readUploadActiveLargeTextScreenshot_Read upload active large text_adce9a5b_0.png",
+        "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/quietReadUploadActiveScreenshot_Quiet Read upload active_38ba0625_0.png",
         "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/settingsThemesScreenshot_Settings themes_a8a8a3e5_0.png",
         "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/setupLibraryScreenshot_Setup library_b04839c0_0.png",
         "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/setupDeviceScreenshot_Setup device_bca57e3c_0.png",
@@ -273,7 +274,8 @@
         "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/readDirectUploadOfferScreenshot_Read direct upload offer_599396a0_0.png",
         "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/readDirectUploadOfferHugeTextScreenshot_Read direct upload offer huge text_f06d5d66_0.png",
         "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/readUploadActiveScreenshot_Read upload active_29cffee7_0.png",
-        "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/readUploadActiveLargeTextScreenshot_Read upload active large text_adce9a5b_0.png"
+        "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/readUploadActiveLargeTextScreenshot_Read upload active large text_adce9a5b_0.png",
+        "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/quietReadUploadActiveScreenshot_Quiet Read upload active_38ba0625_0.png"
       ],
       "record": "docs/ui-review-records/android-ui-current.json"
     },
