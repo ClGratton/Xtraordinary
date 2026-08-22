@@ -372,44 +372,62 @@ fun ReadContent(
                 if (state.directUploadOfferBookIds.isNotEmpty()) onDismissDirectBookUploadOffer()
             },
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Text(
-                    pluralStringResource(
-                        R.plurals.choose_transfer_method,
-                        transferBookIds.size,
-                        transferBookIds.size,
-                    ),
-                    style = MaterialTheme.typography.headlineSmall,
-                )
-                TransferMethodRow(
-                    badge = "USB",
-                    title = stringResource(R.string.transfer_usb_title),
-                    description = if (usbConnected) stringResource(R.string.transfer_usb_ready)
-                    else stringResource(R.string.transfer_usb_unavailable),
-                    enabled = usbConnected,
-                    onClick = {
-                        showTransferChoices = false
-                        onDismissDirectBookUploadOffer()
-                        onUploadBooksToX3(transferBookIds, BookTransferMethod.Usb)
-                    },
-                )
-                TransferMethodRow(
-                    badge = "BT",
-                    title = stringResource(R.string.transfer_bluetooth_title),
-                    description = if (isX3Connected) stringResource(R.string.transfer_bluetooth_ready)
-                    else stringResource(R.string.transfer_bluetooth_unavailable),
-                    enabled = isX3Connected,
-                    onClick = {
-                        showTransferChoices = false
-                        onDismissDirectBookUploadOffer()
-                        onUploadBooksToX3(transferBookIds, BookTransferMethod.Bluetooth)
-                    },
-                )
-            }
+            TransferMethodSheetContent(
+                transferBookCount = transferBookIds.size,
+                usbConnected = usbConnected,
+                isX3Connected = isX3Connected,
+                onUsb = {
+                    showTransferChoices = false
+                    onDismissDirectBookUploadOffer()
+                    onUploadBooksToX3(transferBookIds, BookTransferMethod.Usb)
+                },
+                onBluetooth = {
+                    showTransferChoices = false
+                    onDismissDirectBookUploadOffer()
+                    onUploadBooksToX3(transferBookIds, BookTransferMethod.Bluetooth)
+                },
+            )
         }
+    }
+}
+
+@Composable
+internal fun TransferMethodSheetContent(
+    transferBookCount: Int,
+    usbConnected: Boolean,
+    isX3Connected: Boolean,
+    onUsb: () -> Unit,
+    onBluetooth: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            pluralStringResource(
+                R.plurals.choose_transfer_method,
+                transferBookCount,
+                transferBookCount,
+            ),
+            style = MaterialTheme.typography.headlineSmall,
+        )
+        TransferMethodRow(
+            badge = "USB",
+            title = stringResource(R.string.transfer_usb_title),
+            description = if (usbConnected) stringResource(R.string.transfer_usb_ready)
+            else stringResource(R.string.transfer_usb_unavailable),
+            enabled = usbConnected,
+            onClick = onUsb,
+        )
+        TransferMethodRow(
+            badge = "BT",
+            title = stringResource(R.string.transfer_bluetooth_title),
+            description = if (isX3Connected) stringResource(R.string.transfer_bluetooth_ready)
+            else stringResource(R.string.transfer_bluetooth_unavailable),
+            enabled = isX3Connected,
+            onClick = onBluetooth,
+        )
     }
 }
 

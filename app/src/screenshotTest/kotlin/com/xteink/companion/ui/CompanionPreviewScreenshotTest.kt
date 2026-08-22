@@ -25,6 +25,7 @@ import com.xteink.companion.ui.components.MonetizationSettingsCard
 import com.xteink.companion.ui.components.DeviceConnectionSheetContent
 import com.xteink.companion.ui.components.DeviceSetupStep
 import com.xteink.companion.ui.components.ReadContent
+import com.xteink.companion.ui.components.TransferMethodSheetContent
 import com.xteink.companion.ui.components.SetupScreen
 import com.xteink.companion.ui.theme.X3CompanionTheme
 
@@ -221,22 +222,13 @@ fun readUploadActiveScreenshot() {
 fun readDirectUploadOfferScreenshot() {
     X3CompanionTheme(visualTheme = CompanionVisualTheme.Expressive, useDynamicColor = false) {
         Surface(color = MaterialTheme.colorScheme.background) {
-            ReadContent(
-                state = screenshotReadState().copy(directUploadOfferBookIds = setOf("phone-book")),
-                isX3Connected = true,
+            TransferMethodSheetContent(
+                transferBookCount = 1,
                 usbConnected = true,
-                connectedDeviceModel = "X3",
-                onSetQuery = {},
-                onSetSort = {},
-                onSetService = {},
-                onSetReadLocation = {},
-                onChooseBookFolder = {},
-                onOpenEpub = {},
-                onOpenSettings = {},
-                onUploadBooksToX3 = { _, _ -> },
-                onCancelBookUpload = {},
-                onDismissDirectBookUploadOffer = {},
-                onDeleteBooksFromX3 = {},
+                isX3Connected = true,
+                onUsb = {},
+                onBluetooth = {},
+                modifier = Modifier.padding(top = 24.dp),
             )
         }
     }
