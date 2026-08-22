@@ -1,5 +1,27 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-22 Quiet transfer evidence checkpoint and mandatory task reset
+
+This fresh continuation reached the repository's hard task ceiling before a protected build stage. The explicit root audit reported `handoff-required`: 23 top-level calls, 1,895,226 input tokens (1,791,616 cached), 90,371 median input tokens, 114,997 maximum input tokens, three percentage points of task-local weekly growth (44% to 47%), and no compaction. Do not continue review, compilation, install, flash, or device acceptance in this task context.
+
+The pushed source is safe and the worktree is clean at `5ef87c0`. That commit preserves only the eight deliberate Community/Play Read references, removes the unrelated generated screenshot noise, and adds one centralized `Quiet Read upload active` fixture through the shared transfer screenshot content. The Impeccable mechanical detector returned an empty finding set for the changed screenshot source.
+
+Read-only Terra review status bound to `ReadContent.kt` SHA-256 `645632C38B934C025E5BA0424C98FFD66AB3C932CF03B250579421981A3A18EE`:
+
+- `color-contrast` passed with no findings. Measured Expressive ratios were 5.85:1 for the upload label against the row, 5.32:1 for indicator against track, 7.43:1 for passive location text, and 12.43:1 for Stop. Quiet grayscale was source-derived because the missing Quiet active-upload render had not yet been generated.
+- `shape-affordance` passed containment, target, and resting-action checks but correctly blocked `glyph-geometry-is-optically-separated` only because the contract requires a hashed current Quiet active-upload PNG. Default actual-size and 2x inspection found the Stop glyph optically clean after `fa61f83` removed the competing ring.
+
+The attempted `-UiEvidenceCandidate` run exposed a usage-gate defect and was cancelled immediately after initial Gradle preprocessing and `:protocol:compileKotlin`; it generated no new screenshot reference, APK, install, or device mutation. The explicit root audit had already returned `handoff-required`, but the composed shell continued because that status did not fail the process. The wrapper's own audit then selected the most-recent specialist rollout (`...17-57-32-01a02a31-0c12-7c82-a3e4-d8a791ac954b.jsonl`) rather than the root rollout and reported it within budget. Before another protected stage, make `-EnforceStageGate` exit nonzero on `handoff-required` and bind canonical wrappers to the invoking root rollout rather than the newest rollout file.
+
+Fresh-task continuation order:
+
+1. Fix and test the audit/wrapper rollout-binding failure without starting a compiler.
+2. From clean pushed `5ef87c0`, run exactly one canonical `scripts/build-xtraordinary-app.ps1 -UiEvidenceCandidate` to generate the new Quiet Read transfer PNG for Community and Play.
+3. Inspect and stage only deliberate Read references, add the exact generated Quiet paths to `docs/ui-review-policy.json`, and run only the narrow `shape-affordance` re-review plus the still-outstanding `motion-interaction` and `accessibility-adaptive` reviews. Rebind the other passing roles only as required by the final source/evidence hashes; do not launch an optional critique wave.
+4. Record final source-bound receipts, commit/push, then pass the canonical Android build before any `adb install -r` or application-only firmware flash.
+
+No temporary phone setting remains. No Bluetooth bond, app data, X3 NVS, SD data, firmware, or installed APK changed in this continuation.
+
 ## 2026-08-22 usage-bound continuation checkpoint
 
 The current Codex task is mechanically over budget and must not perform another broad investigation, reviewer wave, compiler, install, flash, or device acceptance. `scripts/audit-codex-task-usage.ps1` reported 288 calls, 48.4M tokens, 176k median input per call, four compactions, and a weekly-meter increase from 8% to 42%. Continue the same objective in a fresh task from this file; this is a context reset, not a product-work stop.
