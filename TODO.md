@@ -18,7 +18,7 @@ This is the actionable backlog. Older unchecked items in `docs/x3-takeover-track
 
 ### P0 — Build, deploy, and accept the current source
 
-- [ ] Finish and push the current milestone's dirty documentation/policy changes; require a clean named branch with matching upstream before compilation.
+- [x] Finish and push the current milestone's dirty documentation/policy changes; require a clean named branch with matching upstream before compilation.
 - [ ] Start the compiler/device phase in a fresh task with a bounded regression-impact audit against `docs/x3-power-sync-flow.md`, `docs/interactive-transport-lifecycle.md`, `docs/usb-firmware-maintenance.md`, `docs/legal-release-audit.md`, and the physical evidence in `HANDOFF.md`.
 - [ ] Run the canonical Android build from the pushed source. Use only the explicit, visible, non-default waiver for the user-deferred UI-receipt class; do not suppress any other engineering-policy failure.
 - [ ] Rediscover the wireless-debug Pixel through the repository ADB/mDNS workflow and install with `adb install -r`, retaining app data.

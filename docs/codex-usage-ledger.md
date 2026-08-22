@@ -235,3 +235,9 @@
 - Context: the fresh canonical Android build/deploy task reached a clean pushed candidate but the pre-compiler firmware-notice gate compared Windows CRLF working-tree bytes with a mixed LF/CRLF manifest, blocking the required build without a real licence-content change.
 - Durable correction: `scripts/check-firmware-release-notices.ps1` now hashes canonical LF bytes only for its fixed text notice inventory while retaining inventory and content-mismatch failures. The reviewed manifest was regenerated from those canonical bytes; no tracked licence/NOTICE payload was edited.
 - Focused evidence: `scripts/test-firmware-release-notices.ps1` passed both CRLF equivalence and real-content mismatch rejection, and the repository pack passed the corrected verifier. The engineering policy and AGENTS/workflow guidance now require this scoped portability invariant; no compiler, phone, or X3 mutation occurred in this correction stage.
+
+## 2026-08-22 - Canonical build/deploy stage blocked after portability checkpoint
+
+- Start snapshot: 89% used. Current snapshot: 94% used in the signed-in seven-day `10080`-minute allowance, resetting at Unix `1787999373`; a five-point task-local increase.
+- Task-local evidence: 30 calls; 1,830,548 total tokens (1,738,240 cached input); median input 62,539; maximum 84,975; zero compactions. The recent three-sample input median grew 154% from 33,358 to 84,742 tokens.
+- Stop decision: after pushing `fde20a9d1680081ee5616fba89f381e08a4f0f7a`, `audit-codex-task-usage.ps1 -EnforceStageGate -AllowDocumentedWeeklyReserveOverride` rejected the protected stage. The weekly exception cannot waive the independent replay/task-growth condition. No compiler, ADB/device discovery, installation, flash, bond/data/NVS/SD mutation, or physical acceptance began; resume only with a fresh history-free bounded task.
