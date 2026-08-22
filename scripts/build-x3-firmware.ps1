@@ -32,7 +32,7 @@ if (-not (Test-Path -LiteralPath $usageAudit)) {
 
 & $usageAudit -EnforceStageGate
 if ($LASTEXITCODE -ne 0) {
-    throw "Codex task budget requires a durable handoff and fresh task before another compiler run. An explicit user override must be recorded in docs/codex-usage-ledger.md before changing the protected thresholds."
+    throw "Codex usage requires compaction or a fresh history-free bounded agent before another compiler run. An explicit user override must be recorded in docs/codex-usage-ledger.md before changing the protected thresholds."
 }
 & $sourceCheck
 & $policyCheck -Mode FirmwareRelease

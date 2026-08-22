@@ -14,19 +14,21 @@ For a forensic task audit, read only top-level `token_count` events from the cur
 
 Run `scripts/audit-codex-task-usage.ps1` instead of broad text searches over rollout JSONL. It streams the file, counts only typed records, and reports cache effectiveness, per-call input distribution, compactions, tool-call concentration, task-local weekly growth, and lifetime totals without printing message bodies back into the model context.
 
-## Hard context and call ceilings
+## Replay, trend, and weekly ceilings
 
-The following are stop conditions, not advisory warnings:
+Model-call count is reported for forensics and checkpoint cadence only. It is never a hard stop. The stage gate makes decisions from these measured signals:
 
-- more than 20 top-level model calls in the current weekly slice of one task;
-- median input above 75,000 tokens after three calls, or any single call above 120,000 input tokens;
-- any context compaction in the current weekly slice;
+- post-compaction median input above 75,000 tokens after three samples;
+- the latest post-compaction input above 120,000 tokens;
+- a recent three-sample median above 75,000 tokens after growing more than 35% from the first three-sample median;
 - more than five percentage points of weekly allowance consumed by one task;
 - the signed-in weekly meter reaching 80% used.
 
-At any stop condition, do not dispatch another reviewer, compiler, renderer, install, flash, or exploratory search in the bloated task. Immediately update `HANDOFF.md`, the tracker, and the usage ledger, restore temporary device settings, then continue the same implementation from those durable artifacts in a fresh Codex task. The boundary is continuity work, not abandonment. A user may explicitly authorize additional budget, but the override and its exact scope must be recorded in the ledger before protected thresholds are changed.
+Replay and trend signals produce `compaction-required`. Compact the same task first, then calculate replay from token samples after the latest compaction; compaction count itself is not a violation. Weekly-growth or reserve signals produce `weekly-budget-exhausted`. In either case, the invoking task must not enter another protected stage until its signal is cleared or the minimum remaining stage is assigned to a fresh history-free agent whose own audit passes. Do not require the user to create a replacement task.
 
-Run `scripts/audit-codex-task-usage.ps1 -EnforceStageGate` at task entry, before any reviewer wave, before a broad source investigation, and before a compiler or device-deployment phase. Both canonical compiler wrappers execute the same gate before the pushed-source and engineering gates. This prevents an already-expensive task from entering another costly phase.
+Manual compaction has a precise ownership boundary. Codex app-server schema exposes `thread/compact/start` with only `threadId`, and the owning interactive client can run `/compact` between turns. An agent turn has no direct compaction tool. On Windows there is no supported app-server daemon lifecycle, so a new stdio app-server is a separate in-memory owner: sending `thread/compact/start` for the active desktop thread returns `thread not found`. Resuming that live rollout into the separate process and compacting it concurrently is unsafe and prohibited. When the owning client cannot compact between turns, use a fresh `fork_turns: "none"` agent with a compact source-bound packet for the next bounded stage.
+
+Run `scripts/audit-codex-task-usage.ps1 -EnforceStageGate` at task entry, before any reviewer wave, before a broad source investigation, and before a compiler or device-deployment phase. The audit binds to `CODEX_THREAD_ID`, falling back to `CODEX_SESSION_ID`, validates the rollout's `session_meta.payload.id`, and must never select the most recently modified rollout belonging to another root task or specialist. An explicit `-RolloutPath` is reserved for fixtures and forensics; pair it with `-ThreadId` when identity enforcement is required. Fewer than two samples return `warming-up`, not failure. Both canonical compiler wrappers execute the same gate before the pushed-source and engineering gates.
 
 ## Required checkpoints
 
@@ -37,7 +39,7 @@ Take and record a meter snapshot:
 3. after every compiler/build attempt;
 4. every 30 minutes while a task remains active, if no other checkpoint occurred.
 
-Also run the audit after every 10 root model calls. Prefer one composed read-only command that answers all related questions; a sequence of tiny shell or reviewer turns is a usage defect even when every individual call is cache-hit.
+Also run the audit after every 25 root model calls as a checkpoint, not a stop. Prefer one composed read-only command that answers all related questions; a sequence of tiny shell or reviewer turns is a usage defect even when every individual call is cache-hit.
 
 Report a change of five percentage points or more immediately. A stage that consumes ten percentage points pauses before another reviewer wave or build so the implementation owner can reconcile what remains.
 
@@ -84,6 +86,6 @@ Use this sequence outside Xtraordinary as well:
 5. Reconcile once. Batch corrections. Build or render once from the settled candidate.
 6. Store successful commands, decisions, rubrics, and recurring checks in the project; future tasks read those artifacts.
 7. Take meter snapshots at the checkpoints above and stop optional iteration when the budget threshold is reached.
-8. If the audit reports `handoff-required`, treat a fresh task as mandatory rather than trying to compact and continue. Cache hits reduce recomputation cost but do not make a 100k-plus repeated prompt an efficient workflow.
+8. If the audit reports `compaction-required`, compact through the owning client between turns. If that path is unavailable during an active agent turn, give the next bounded stage to a fresh `fork_turns: "none"` agent. If it reports `weekly-budget-exhausted`, stop optional work and preserve the weekly reserve.
 
 For teaching material, default to one source-research pass, one audience/learning-objective outline, primary-agent drafting, and one final pedagogy/factual review. Do not run multiple vague rewrite agents. Ask the reviewer to check named outcomes such as prerequisite fit, misconception risk, worked-example correctness, cognitive load, and assessment alignment.

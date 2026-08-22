@@ -454,32 +454,39 @@
       "message": "The canonical signed-in usage reader must preserve the initialized app-server handshake and required weekly-meter fields."
     },
     {
-      "id": "codex-task-audit-enforces-hard-stop-thresholds",
+      "id": "codex-task-audit-enforces-replay-and-weekly-thresholds",
       "type": "required_pattern",
       "path": "scripts/audit-codex-task-usage.ps1",
-      "pattern": "MaxTaskWeeklyIncreasePercent = 5[\\s\\S]*?MaxModelCalls = 20[\\s\\S]*?MaxMedianInputTokens = 75000[\\s\\S]*?MaxLastInputTokens = 120000[\\s\\S]*?MaxCompactions = 0[\\s\\S]*?MaxWeeklyUsedPercent = 80[\\s\\S]*?handoff-required[\\s\\S]*?EnforceStageGate",
-      "message": "The rollout audit must fail closed on excessive task growth, model calls, repeated context replay, compactions, or weekly depletion."
+      "pattern": "MaxTaskWeeklyIncreasePercent = 5[\\s\\S]*?MaxMedianInputTokens = 75000[\\s\\S]*?MaxLastInputTokens = 120000[\\s\\S]*?MaxRecentInputGrowthPercent = 35[\\s\\S]*?MaxWeeklyUsedPercent = 80[\\s\\S]*?weekly-budget-exhausted[\\s\\S]*?compaction-required[\\s\\S]*?EnforceStageGate",
+      "message": "The rollout audit must fail closed on excessive post-compaction replay, replay growth, task-local weekly growth, or weekly depletion without using model-call count as a stop."
     },
     {
       "id": "android-wrapper-enforces-codex-task-budget",
       "type": "required_pattern",
       "path": "scripts/build-xtraordinary-app.ps1",
-      "pattern": "audit-codex-task-usage\\.ps1[\\s\\S]*?-EnforceStageGate[\\s\\S]*?durable handoff and fresh task",
-      "message": "The Android compiler wrapper must stop an over-budget Codex task before compilation."
+      "pattern": "audit-codex-task-usage\\.ps1[\\s\\S]*?-EnforceStageGate[\\s\\S]*?compaction or a fresh history-free bounded agent",
+      "message": "The Android compiler wrapper must stop an oversized invoking context before compilation."
     },
     {
       "id": "firmware-wrapper-enforces-codex-task-budget",
       "type": "required_pattern",
       "path": "scripts/build-x3-firmware.ps1",
-      "pattern": "audit-codex-task-usage\\.ps1[\\s\\S]*?-EnforceStageGate[\\s\\S]*?durable handoff and fresh task",
-      "message": "The firmware compiler wrapper must stop an over-budget Codex task before compilation."
+      "pattern": "audit-codex-task-usage\\.ps1[\\s\\S]*?-EnforceStageGate[\\s\\S]*?compaction or a fresh history-free bounded agent",
+      "message": "The firmware compiler wrapper must stop an oversized invoking context before compilation."
     },
     {
       "id": "agents-obey-codex-task-audit-stop",
       "type": "required_pattern",
       "path": "AGENTS.md",
-      "pattern": "audit-codex-task-usage\\.ps1 -EnforceStageGate[\\s\\S]*?task entry[\\s\\S]*?after every 10 root model calls[\\s\\S]*?handoff-required[\\s\\S]*?fresh task",
-      "message": "Agents must treat the machine-audited context and weekly ceilings as a mandatory fresh-task boundary."
+      "pattern": "audit-codex-task-usage\\.ps1 -EnforceStageGate[\\s\\S]*?task entry[\\s\\S]*?never as a call-count stop[\\s\\S]*?CODEX_THREAD_ID[\\s\\S]*?compaction-required[\\s\\S]*?fork_turns",
+      "message": "Agents must act on measured replay and weekly signals, compact first, and use history-free bounded execution when compaction is not safely callable."
+    },
+    {
+      "id": "codex-task-audit-binds-invoking-thread",
+      "type": "required_pattern",
+      "path": "scripts/audit-codex-task-usage.ps1",
+      "pattern": "CODEX_THREAD_ID[\\s\\S]*?CODEX_SESSION_ID[\\s\\S]*?rollout-\\*-\\$effectiveThreadId\\.jsonl[\\s\\S]*?session_meta[\\s\\S]*?Resolved rollout belongs to thread[\\s\\S]*?warming-up",
+      "message": "The usage audit must bind the invoking task and must not borrow a specialist or unrelated rollout."
     },
     {
       "id": "codex-usage-ledger-records-the-reviewed-incident",

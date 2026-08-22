@@ -1,20 +1,20 @@
 param(
     [string]$RolloutPath,
+    [string]$ThreadId,
     [switch]$EnforceStageGate,
     [Alias('EnforceBuildGate')]
     [switch]$LegacyBuildGate,
     [int]$MaxTaskWeeklyIncreasePercent = 5,
-    [int]$MaxModelCalls = 20,
     [int]$MaxMedianInputTokens = 75000,
     [int]$MaxLastInputTokens = 120000,
-    [int]$MaxCompactions = 0,
+    [int]$MaxRecentInputGrowthPercent = 35,
     [int]$MaxWeeklyUsedPercent = 80
 )
 
 $ErrorActionPreference = 'Stop'
 
 function Resolve-RolloutPath {
-    param([string]$ExplicitPath)
+    param([string]$ExplicitPath, [string]$ExplicitThreadId)
 
     if ($ExplicitPath) {
         if (-not (Test-Path -LiteralPath $ExplicitPath -PathType Leaf)) {
@@ -23,12 +23,17 @@ function Resolve-RolloutPath {
         return (Resolve-Path -LiteralPath $ExplicitPath).Path
     }
 
+    $effectiveThreadId = if ($ExplicitThreadId) { $ExplicitThreadId } elseif ($env:CODEX_THREAD_ID) { $env:CODEX_THREAD_ID } elseif ($env:CODEX_SESSION_ID) { $env:CODEX_SESSION_ID } else { $null }
+    if (-not $effectiveThreadId) {
+        return $null
+    }
+
     $sessionsRoot = Join-Path $env:USERPROFILE '.codex\sessions'
     if (-not (Test-Path -LiteralPath $sessionsRoot -PathType Container)) {
         return $null
     }
 
-    $latest = Get-ChildItem -LiteralPath $sessionsRoot -Filter 'rollout-*.jsonl' -File -Recurse |
+    $latest = Get-ChildItem -LiteralPath $sessionsRoot -Filter "rollout-*-$effectiveThreadId.jsonl" -File -Recurse |
         Sort-Object LastWriteTimeUtc -Descending |
         Select-Object -First 1
     if ($latest) { return $latest.FullName }
@@ -75,25 +80,57 @@ function Get-UsageDelta {
     }
 }
 
-$resolvedRollout = Resolve-RolloutPath $RolloutPath
+function Get-ReplayTrend {
+    param([object[]]$Rows)
+
+    $callInputs = [long[]]@($Rows | Select-Object -Skip 1 | ForEach-Object { $_.lastInput })
+    $sampleSize = [math]::Min(3, [math]::Floor($callInputs.Count / 2))
+    if ($sampleSize -lt 1) {
+        return [pscustomobject]@{
+            sampleSize = 0
+            earlierMedianInputTokens = 0
+            recentMedianInputTokens = 0
+            inputGrowthPercent = 0
+        }
+    }
+
+    $earlier = [long[]]@($callInputs | Select-Object -First $sampleSize)
+    $recent = [long[]]@($callInputs | Select-Object -Last $sampleSize)
+    $earlierMedian = Get-PercentileValue $earlier 0.5
+    $recentMedian = Get-PercentileValue $recent 0.5
+    [pscustomobject]@{
+        sampleSize = $sampleSize
+        earlierMedianInputTokens = $earlierMedian
+        recentMedianInputTokens = $recentMedian
+        inputGrowthPercent = if ($earlierMedian -gt 0) {
+            [int][math]::Round(100 * ($recentMedian - $earlierMedian) / $earlierMedian)
+        } else { 0 }
+    }
+}
+
+$resolvedRollout = Resolve-RolloutPath $RolloutPath $ThreadId
 if (-not $resolvedRollout) {
     $unavailable = [pscustomobject]@{
-        status = 'unavailable'
-        reason = 'No Codex rollout was found under the normal-user sessions directory.'
+        status = 'not-applicable'
+        reason = 'No rollout matched the invoking CODEX_THREAD_ID. The audit will not substitute another task rollout.'
     }
     $unavailable | ConvertTo-Json -Depth 5
-    if ($EnforceStageGate -or $LegacyBuildGate) { exit 2 }
     exit 0
 }
 
 $tokenRows = [System.Collections.Generic.List[object]]::new()
 $compactionTimes = [System.Collections.Generic.List[datetime]]::new()
 $toolCounts = @{}
+$rolloutThreadId = $null
 
 Get-Content -LiteralPath $resolvedRollout -ReadCount 500 | ForEach-Object {
     foreach ($line in $_) {
         try { $item = $line | ConvertFrom-Json -Depth 50 } catch { continue }
         $timestamp = if ($item.timestamp) { [datetime]$item.timestamp } else { $null }
+
+        if (-not $rolloutThreadId -and $item.type -eq 'session_meta' -and $item.payload.id) {
+            $rolloutThreadId = [string]$item.payload.id
+        }
 
         if ($item.type -eq 'event_msg' -and $item.payload.type -eq 'context_compacted' -and $timestamp) {
             $compactionTimes.Add($timestamp)
@@ -114,7 +151,7 @@ Get-Content -LiteralPath $resolvedRollout -ReadCount 500 | ForEach-Object {
             timestamp = $timestamp
             input = [long]$total.input_tokens
             cached = [long]$total.cached_input_tokens
-            cacheWrite = [long]$total.cache_write_tokens
+            cacheWrite = if ($null -ne $total.cache_write_input_tokens) { [long]$total.cache_write_input_tokens } else { [long]$total.cache_write_tokens }
             output = [long]$total.output_tokens
             reasoning = [long]$total.reasoning_output_tokens
             total = [long]$total.total_tokens
@@ -126,8 +163,19 @@ Get-Content -LiteralPath $resolvedRollout -ReadCount 500 | ForEach-Object {
     }
 }
 
+$expectedThreadId = if ($ThreadId) { $ThreadId } elseif (-not $RolloutPath -and $env:CODEX_THREAD_ID) { $env:CODEX_THREAD_ID } elseif (-not $RolloutPath -and $env:CODEX_SESSION_ID) { $env:CODEX_SESSION_ID } else { $null }
+if ($expectedThreadId -and $rolloutThreadId -ne $expectedThreadId) {
+    throw "Resolved rollout belongs to thread '$rolloutThreadId', not invoking thread '$expectedThreadId'."
+}
+
 if ($tokenRows.Count -lt 2) {
-    throw "The rollout does not contain enough top-level token_count events: $resolvedRollout"
+    [pscustomobject]@{
+        status = 'warming-up'
+        rolloutPath = $resolvedRollout
+        tokenCountEvents = $tokenRows.Count
+        reason = 'Fewer than two token-count samples exist; rerun at the next checkpoint.'
+    } | ConvertTo-Json -Depth 5
+    exit 0
 }
 
 $meterRows = @($tokenRows | Where-Object { $_.windowMinutes -eq 10080 -and $null -ne $_.resetsAt })
@@ -139,29 +187,34 @@ $lifetimeUsage = Get-UsageDelta @($tokenRows) 'rollout-lifetime'
 $currentStart = $currentRows[0].timestamp
 $currentEnd = $currentRows[-1].timestamp
 $currentCompactions = @($compactionTimes | Where-Object { $_ -ge $currentStart -and $_ -le $currentEnd })
+$latestCompaction = $currentCompactions | Select-Object -Last 1
+$replayRows = if ($latestCompaction) { @($currentRows | Where-Object { $_.timestamp -gt $latestCompaction }) } else { @($currentRows) }
+if ($replayRows.Count -lt 2) { $replayRows = @($currentRows | Select-Object -Last 2) }
+$replayUsage = Get-UsageDelta $replayRows 'since-last-compaction'
+$replayTrend = Get-ReplayTrend $replayRows
 $weeklyIncrease = if ($currentUsage -and $null -ne $currentUsage.weeklyUsedPercentStart -and $null -ne $currentUsage.weeklyUsedPercentEnd) {
     [int]($currentUsage.weeklyUsedPercentEnd - $currentUsage.weeklyUsedPercentStart)
 } else { 0 }
 
-$violations = [System.Collections.Generic.List[string]]::new()
-if ($currentUsage.modelCalls -gt $MaxModelCalls) {
-    $violations.Add("model calls $($currentUsage.modelCalls) exceed $MaxModelCalls")
+$replaySignals = [System.Collections.Generic.List[string]]::new()
+$budgetViolations = [System.Collections.Generic.List[string]]::new()
+if ($replayUsage.modelCalls -ge 3 -and $replayUsage.medianInputTokensPerCall -gt $MaxMedianInputTokens) {
+    $replaySignals.Add("post-compaction median input $($replayUsage.medianInputTokensPerCall) exceeds $MaxMedianInputTokens tokens")
 }
-if ($currentUsage.modelCalls -ge 3 -and $currentUsage.medianInputTokensPerCall -gt $MaxMedianInputTokens) {
-    $violations.Add("median input $($currentUsage.medianInputTokensPerCall) exceeds $MaxMedianInputTokens tokens")
-}
-if ($currentCompactions.Count -gt $MaxCompactions) {
-    $violations.Add("compactions $($currentCompactions.Count) exceed $MaxCompactions")
-}
-$lastInputTokens = [long]$currentRows[-1].lastInput
+$lastInputTokens = [long]$replayRows[-1].lastInput
 if ($lastInputTokens -gt $MaxLastInputTokens) {
-    $violations.Add("last input $lastInputTokens exceeds $MaxLastInputTokens tokens")
+    $replaySignals.Add("latest post-compaction input $lastInputTokens exceeds $MaxLastInputTokens tokens")
+}
+if ($replayTrend.sampleSize -ge 2 -and
+    $replayTrend.recentMedianInputTokens -gt $MaxMedianInputTokens -and
+    $replayTrend.inputGrowthPercent -gt $MaxRecentInputGrowthPercent) {
+    $replaySignals.Add("recent input median grew $($replayTrend.inputGrowthPercent)% to $($replayTrend.recentMedianInputTokens) tokens")
 }
 if ($weeklyIncrease -gt $MaxTaskWeeklyIncreasePercent) {
-    $violations.Add("task weekly increase ${weeklyIncrease}% exceeds ${MaxTaskWeeklyIncreasePercent}%")
+    $budgetViolations.Add("task weekly increase ${weeklyIncrease}% exceeds ${MaxTaskWeeklyIncreasePercent}%")
 }
 if ($latestMeter -and $latestMeter.usedPercent -ge $MaxWeeklyUsedPercent) {
-    $violations.Add("weekly meter $($latestMeter.usedPercent)% reached the ${MaxWeeklyUsedPercent}% reserve cutoff")
+    $budgetViolations.Add("weekly meter $($latestMeter.usedPercent)% reached the ${MaxWeeklyUsedPercent}% reserve cutoff")
 }
 
 $history = @($meterRows | Group-Object { [long]([math]::Floor([double]$_.resetsAt / 10) * 10) } | ForEach-Object {
@@ -179,12 +232,15 @@ $history = @($meterRows | Group-Object { [long]([math]::Floor([double]$_.resetsA
 })
 
 $result = [pscustomobject]@{
-    status = if ($violations.Count) { 'handoff-required' } else { 'within-budget' }
+    status = if ($budgetViolations.Count) { 'weekly-budget-exhausted' } elseif ($replaySignals.Count) { 'compaction-required' } else { 'within-budget' }
+    threadId = $rolloutThreadId
     rolloutPath = $resolvedRollout
     currentResetAt = $currentReset
     currentWeeklyMeter = if ($latestMeter) { $latestMeter.usedPercent } else { $null }
     taskWeeklyIncreasePercent = $weeklyIncrease
     current = $currentUsage
+    replay = $replayUsage
+    replayTrend = $replayTrend
     lifetime = $lifetimeUsage
     currentCompactions = $currentCompactions.Count
     lifetimeCompactions = $compactionTimes.Count
@@ -194,14 +250,21 @@ $result = [pscustomobject]@{
     weeklyHistory = $history
     limits = [pscustomobject]@{
         maxTaskWeeklyIncreasePercent = $MaxTaskWeeklyIncreasePercent
-        maxModelCalls = $MaxModelCalls
         maxMedianInputTokens = $MaxMedianInputTokens
         maxLastInputTokens = $MaxLastInputTokens
-        maxCompactions = $MaxCompactions
+        maxRecentInputGrowthPercent = $MaxRecentInputGrowthPercent
         maxWeeklyUsedPercent = $MaxWeeklyUsedPercent
     }
-    violations = @($violations)
+    replaySignals = @($replaySignals)
+    budgetViolations = @($budgetViolations)
+    recommendedAction = if ($budgetViolations.Count) {
+        'Stop optional work and use a fresh fork_turns:none agent only for the minimum bounded completion path.'
+    } elseif ($replaySignals.Count) {
+        'Compact between turns with the owning Codex client; if that is unavailable from an active turn, delegate the next bounded stage to a fresh fork_turns:none agent.'
+    } else { 'Continue with bounded commands and re-audit before the next protected stage.' }
 }
 
 $result | ConvertTo-Json -Depth 8
-if (($EnforceStageGate -or $LegacyBuildGate) -and $violations.Count) { exit 3 }
+if (($EnforceStageGate -or $LegacyBuildGate) -and ($budgetViolations.Count -or $replaySignals.Count)) {
+    throw 'Codex task usage requires compaction or a fresh history-free bounded agent before the next protected stage.'
+}
