@@ -318,7 +318,6 @@ fun ReadContent(
             selectionMode = selectionMode,
             importing = state.importing,
             uploading = state.uploadingToX3,
-            uploadProgress = state.uploadProgress,
             canUpload = selectedPhoneOnlyIds.isNotEmpty() && (isX3Connected || usbConnected),
             canDelete = canDelete,
             importDescription = stringResource(R.string.import_epubs),
@@ -492,7 +491,6 @@ private fun LibraryBottomActions(
     selectionMode: Boolean,
     importing: Boolean,
     uploading: Boolean,
-    uploadProgress: Float?,
     canUpload: Boolean,
     canDelete: Boolean,
     importDescription: String,
@@ -581,11 +579,6 @@ private fun LibraryBottomActions(
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         if (uploading) {
-                            CircularProgressIndicator(
-                                progress = { uploadProgress ?: 0f },
-                                modifier = Modifier.size(34.dp),
-                                strokeWidth = 3.dp,
-                            )
                             StopUploadIcon()
                         } else {
                             UploadToDeviceIcon()
@@ -623,12 +616,6 @@ private fun LibraryBottomActions(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     if (uploading) {
-                        CircularProgressIndicator(
-                            progress = { uploadProgress ?: 0f },
-                            modifier = Modifier.size(34.dp),
-                            color = actionContent,
-                            strokeWidth = 3.dp,
-                        )
                         StopUploadIcon(color = actionContent)
                     } else if (importing) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), color = actionContent, strokeWidth = 2.dp)
@@ -976,12 +963,14 @@ private fun ImportedBookCard(
                     Text(
                         stringResource(R.string.uploading_book_progress, (uploadProgress * 100f).toInt()),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = MaterialTheme.colorScheme.tertiary,
                         maxLines = 2,
                     )
                     LinearProgressIndicator(
                         progress = { uploadProgress.coerceIn(0f, 1f) },
                         modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.tertiary,
+                        trackColor = MaterialTheme.colorScheme.tertiaryContainer,
                     )
                 } else if (book.isOnPhone && !book.isOnX3) {
                     Surface(
@@ -1001,7 +990,7 @@ private fun ImportedBookCard(
                     Text(
                         locationText,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
