@@ -817,6 +817,27 @@
       "message": "The Android build wrapper must expose, constrain, and visibly report the exceptional debt waiver instead of hiding a bypass."
     },
     {
+      "id": "weekly-reserve-override-is-ledger-bound-and-narrow",
+      "type": "required_pattern",
+      "path": "scripts/audit-codex-task-usage.ps1",
+      "pattern": "AllowDocumentedWeeklyReserveOverride[\\s\\S]*?Test-DocumentedWeeklyReserveOverride[\\s\\S]*?weeklyReserveOverrideAccepted[\\s\\S]*?nonOverridableBudgetViolations[\\s\\S]*?EXPLICIT WEEKLY-RESERVE OVERRIDE",
+      "message": "A weekly-reserve override must be explicit, ledger-bound, and unable to waive task-growth or replay limits."
+    },
+    {
+      "id": "canonical-builds-expose-weekly-reserve-override",
+      "type": "required_pattern",
+      "path": "scripts/build-xtraordinary-app.ps1",
+      "pattern": "AllowDocumentedWeeklyReserveOverride[\\s\\S]*?usageAudit -EnforceStageGate -AllowDocumentedWeeklyReserveOverride",
+      "message": "The Android canonical wrapper must pass the explicit documented weekly-reserve override to the stage gate."
+    },
+    {
+      "id": "firmware-canonical-build-exposes-weekly-reserve-override",
+      "type": "required_pattern",
+      "path": "scripts/build-x3-firmware.ps1",
+      "pattern": "AllowDocumentedWeeklyReserveOverride[\\s\\S]*?usageAudit -EnforceStageGate -AllowDocumentedWeeklyReserveOverride",
+      "message": "The firmware canonical wrapper must pass the explicit documented weekly-reserve override to the stage gate."
+    },
+    {
       "id": "ui-review-workflow-is-agent-independent",
       "type": "required_pattern",
       "path": "AGENTS.md",

@@ -4,6 +4,7 @@ param(
     [switch]$EnforceStageGate,
     [Alias('EnforceBuildGate')]
     [switch]$LegacyBuildGate,
+    [switch]$AllowDocumentedWeeklyReserveOverride,
     [int]$MaxTaskWeeklyIncreasePercent = 5,
     [int]$MaxMedianInputTokens = 75000,
     [int]$MaxLastInputTokens = 120000,
@@ -12,6 +13,15 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+function Test-DocumentedWeeklyReserveOverride {
+    param()
+
+    $ledgerPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'docs\codex-usage-ledger.md'
+    if (-not (Test-Path -LiteralPath $ledgerPath -PathType Leaf)) { return $false }
+    $ledger = Get-Content -LiteralPath $ledgerPath -Raw
+    return $ledger -match '(?s)## 2026-08-22 - Explicit release-debt waiver for build and physical acceptance.*?User authorization: continue.*?80% weekly-reserve advisory.*?Protected operations authorized'
+}
 
 function Resolve-RolloutPath {
     param([string]$ExplicitPath, [string]$ExplicitThreadId)
@@ -217,6 +227,21 @@ if ($latestMeter -and $latestMeter.usedPercent -ge $MaxWeeklyUsedPercent) {
     $budgetViolations.Add("weekly meter $($latestMeter.usedPercent)% reached the ${MaxWeeklyUsedPercent}% reserve cutoff")
 }
 
+$weeklyReserveViolation = "weekly meter $($latestMeter.usedPercent)% reached the ${MaxWeeklyUsedPercent}% reserve cutoff"
+$nonOverridableBudgetViolations = @($budgetViolations | Where-Object { $_ -ne $weeklyReserveViolation })
+$weeklyReserveOverrideAccepted = $false
+if ($AllowDocumentedWeeklyReserveOverride) {
+    if ($nonOverridableBudgetViolations.Count -gt 0 -or $replaySignals.Count -gt 0) {
+        Write-Host 'EXPLICIT WEEKLY-RESERVE OVERRIDE REJECTED: task-growth and replay limits remain fail-closed.' -ForegroundColor Red
+    } elseif ($budgetViolations -contains $weeklyReserveViolation) {
+        if (-not (Test-DocumentedWeeklyReserveOverride)) {
+            throw 'The explicit weekly-reserve override requires the documented 2026-08-22 user authorization in docs/codex-usage-ledger.md.'
+        }
+        $weeklyReserveOverrideAccepted = $true
+        Write-Host "EXPLICIT WEEKLY-RESERVE OVERRIDE: allowing this protected stage at $($latestMeter.usedPercent)% only; all non-reserve budget and replay limits remain fail-closed." -ForegroundColor Yellow
+    }
+}
+
 $history = @($meterRows | Group-Object { [long]([math]::Floor([double]$_.resetsAt / 10) * 10) } | ForEach-Object {
     $usage = Get-UsageDelta @($_.Group) "reset-$($_.Name)"
     if ($usage) {
@@ -232,7 +257,7 @@ $history = @($meterRows | Group-Object { [long]([math]::Floor([double]$_.resetsA
 })
 
 $result = [pscustomobject]@{
-    status = if ($budgetViolations.Count) { 'weekly-budget-exhausted' } elseif ($replaySignals.Count) { 'compaction-required' } else { 'within-budget' }
+    status = if ($weeklyReserveOverrideAccepted) { 'explicit-weekly-reserve-override' } elseif ($budgetViolations.Count) { 'weekly-budget-exhausted' } elseif ($replaySignals.Count) { 'compaction-required' } else { 'within-budget' }
     threadId = $rolloutThreadId
     rolloutPath = $resolvedRollout
     currentResetAt = $currentReset
@@ -257,6 +282,7 @@ $result = [pscustomobject]@{
     }
     replaySignals = @($replaySignals)
     budgetViolations = @($budgetViolations)
+    weeklyReserveOverrideAccepted = $weeklyReserveOverrideAccepted
     recommendedAction = if ($budgetViolations.Count) {
         'Stop optional work and use a fresh fork_turns:none agent only for the minimum bounded completion path.'
     } elseif ($replaySignals.Count) {
@@ -265,7 +291,7 @@ $result = [pscustomobject]@{
 }
 
 $result | ConvertTo-Json -Depth 8
-if (($EnforceStageGate -or $LegacyBuildGate) -and ($budgetViolations.Count -or $replaySignals.Count)) {
+if (($EnforceStageGate -or $LegacyBuildGate) -and (($nonOverridableBudgetViolations.Count -gt 0) -or $replaySignals.Count -or (($budgetViolations.Count -gt 0) -and -not $weeklyReserveOverrideAccepted))) {
     throw 'Codex task usage requires compaction or a fresh history-free bounded agent before the next protected stage.'
 }
 exit 0

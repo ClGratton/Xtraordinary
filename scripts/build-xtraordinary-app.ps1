@@ -11,7 +11,8 @@ param(
         ':app:assemblePlayDebug'
     ),
     [switch]$UiEvidenceCandidate,
-    [switch]$AllowDeferredUiReviewDebt
+    [switch]$AllowDeferredUiReviewDebt,
+    [switch]$AllowDocumentedWeeklyReserveOverride
 )
 
 $ErrorActionPreference = 'Stop'
@@ -66,7 +67,7 @@ if ($AllowDeferredUiReviewDebt -and $UiEvidenceCandidate) {
     throw 'AllowDeferredUiReviewDebt may be used only for the explicit canonical Android Release gate, never for UiEvidenceCandidate.'
 }
 
-& $usageAudit -EnforceStageGate
+& $usageAudit -EnforceStageGate -AllowDocumentedWeeklyReserveOverride:$AllowDocumentedWeeklyReserveOverride
 if ($LASTEXITCODE -ne 0) {
     throw "Codex usage requires compaction or a fresh history-free bounded agent before another compiler run. An explicit user override must be recorded in docs/codex-usage-ledger.md before changing the protected thresholds."
 }

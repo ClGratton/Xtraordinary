@@ -2,7 +2,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Version,
     [ValidateRange(1, 8)]
-    [int]$Jobs = 2
+    [int]$Jobs = 2,
+    [switch]$AllowDocumentedWeeklyReserveOverride
 )
 
 $ErrorActionPreference = 'Stop'
@@ -30,7 +31,7 @@ if (-not (Test-Path -LiteralPath $usageAudit)) {
     throw "Codex task-usage audit was not found at $usageAudit"
 }
 
-& $usageAudit -EnforceStageGate
+& $usageAudit -EnforceStageGate -AllowDocumentedWeeklyReserveOverride:$AllowDocumentedWeeklyReserveOverride
 if ($LASTEXITCODE -ne 0) {
     throw "Codex usage requires compaction or a fresh history-free bounded agent before another compiler run. An explicit user override must be recorded in docs/codex-usage-ledger.md before changing the protected thresholds."
 }

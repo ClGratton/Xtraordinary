@@ -30,6 +30,8 @@ Manual compaction has a precise ownership boundary. Codex app-server schema expo
 
 Run `scripts/audit-codex-task-usage.ps1 -EnforceStageGate` at task entry, before any reviewer wave, before a broad source investigation, and before a compiler or device-deployment phase. The audit binds to `CODEX_THREAD_ID`, falling back to `CODEX_SESSION_ID`, validates the rollout's `session_meta.payload.id`, and must never select the most recently modified rollout belonging to another root task or specialist. An explicit `-RolloutPath` is reserved for fixtures and forensics; pair it with `-ThreadId` when identity enforcement is required. Fewer than two samples return `warming-up`, not failure. Both canonical compiler wrappers execute the same gate before the pushed-source and engineering gates.
 
+An exceptional weekly-reserve continuation requires direct user authorization recorded in the dated ledger before the protected stage. Only then may a canonical wrapper pass the visible `-AllowDocumentedWeeklyReserveOverride` flag. The audit accepts that flag only for the current weekly-meter reserve violation; task-growth and replay signals remain fail-closed, and it prints the active exception. This is not a default, environment, or hidden bypass.
+
 ## Required checkpoints
 
 Take and record a meter snapshot:
