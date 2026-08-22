@@ -600,11 +600,11 @@
       "message": "Automatic durable USB drains must not race an active maintenance owner."
     },
     {
-      "id": "usb-book-chunk-retains-cdc-headroom",
+      "id": "usb-book-chunk-uses-sized-cdc-envelope",
       "type": "required_pattern",
       "path": "app/src/main/java/com/xteink/companion/data/UsbBookTransfer.kt",
-      "pattern": "ByteArray\\(UsbBookChunkBytes\\)[\\s\\S]*?UsbBookChunkBytes = 240",
-      "message": "Hex-over-CDC book chunks must retain sustained-frame headroom instead of reusing the BLE maximum."
+      "pattern": "ByteArray\\(UsbBookChunkBytes\\)[\\s\\S]*?UsbBookChunkBytes = BOOK_UPLOAD_CHUNK_BYTES",
+      "message": "Hex-over-CDC book chunks must use the shared maximum envelope already provisioned by the sized CDC receive queue."
     },
     {
       "id": "book-library-readiness-drains-pending-usb",
@@ -883,6 +883,48 @@
       "path": "app/src/main/java/com/xteink/companion/ui/components/SharedComponents.kt",
       "pattern": "settings_legal[\\s\\S]*?LegalDocument\\.Privacy[\\s\\S]*?LegalDocument\\.Terms[\\s\\S]*?LegalDocument\\.Notices",
       "message": "Settings must expose privacy, terms, and attribution directly rather than hiding them inside setup."
+    },
+    {
+      "id": "book-picker-is-epub-only",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/MainActivity.kt",
+      "pattern": "epubPicker\\.launch\\([\\s\\S]*?arrayOf\\(\"application/epub\\+zip\"\\)",
+      "message": "The system book picker must request EPUBs rather than broad ZIP or binary file types."
+    },
+    {
+      "id": "book-upload-failure-disposition-is-centralized",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/BookUploadLifecyclePolicy.kt",
+      "pattern": "CompanionTransportInterruptedException[\\s\\S]*?RetryWhenTransportReturns[\\s\\S]*?CompanionCommandRejectedException[\\s\\S]*?StopAndForget",
+      "message": "Only transport interruptions may retain a book queue; device rejections and source failures must stop without replay."
+    },
+    {
+      "id": "book-upload-background-owner-is-explicit",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/data/BookTransferForegroundService.kt",
+      "pattern": "startForeground[\\s\\S]*?onTaskRemoved[\\s\\S]*?BookUploadPersistence\\.clear[\\s\\S]*?BookTransferRuntimeControl\\.requestCancel",
+      "message": "Active background uploads need a foreground owner, while task removal must clear durable intent and cancel the live owner."
+    },
+    {
+      "id": "book-library-reconciliation-awaits-final-page",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/data/BluetoothCompanionClient.kt",
+      "pattern": "refreshLibraryAndAwaitSnapshot[\\s\\S]*?CoroutineStart\\.UNDISPATCHED[\\s\\S]*?refreshLibrary\\(\\)[\\s\\S]*?snapshot\\.await",
+      "message": "Upload and delete reconciliation must subscribe before GetLibrary and await its final revisioned page."
+    },
+    {
+      "id": "book-publish-is-verified-and-rollback-safe",
+      "type": "required_pattern",
+      "path": "firmware/src/companion/CompanionService.cpp",
+      "pattern": "bookUploadBackupPath_[\\s\\S]*?replacingExisting[\\s\\S]*?rename\\(bookUploadFinalPath_, bookUploadBackupPath_\\)[\\s\\S]*?rename\\(BOOK_UPLOAD_TEMP_PATH, bookUploadFinalPath_\\)[\\s\\S]*?rename\\(bookUploadBackupPath_, bookUploadFinalPath_\\)",
+      "message": "A verified book replacement must retain and restore the previous destination if atomic publish fails."
+    },
+    {
+      "id": "epub-import-requires-readable-spine",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/data/EpubMetadataReader.kt",
+      "pattern": "readableSpineItems > 0[\\s\\S]*?EPUB has no readable chapters",
+      "message": "An EPUB with no readable XHTML spine item must fail import rather than appear as a zero-chapter book."
     }
   ]
 }

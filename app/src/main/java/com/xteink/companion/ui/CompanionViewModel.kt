@@ -10,6 +10,9 @@ import com.xteink.companion.BuildConfig
 import com.xteink.companion.data.BluetoothCompanionClient
 import com.xteink.companion.data.BarcodeRasterizer
 import com.xteink.companion.data.BookLibraryRepository
+import com.xteink.companion.data.BookTransferForegroundService
+import com.xteink.companion.data.BookTransferRuntimeControl
+import com.xteink.companion.data.BookUploadPersistence
 import com.xteink.companion.data.FirmwareRelease
 import com.xteink.companion.data.FirmwareReleaseRepository
 import com.xteink.companion.data.FirmwareSource
@@ -130,7 +133,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     private val firmwareReleases = FirmwareReleaseRepository(application)
     private val bookLibrary = BookLibraryRepository(application)
     private val connectionPreferences =
-        application.getSharedPreferences("xtraordinary_connection", Application.MODE_PRIVATE)
+        application.getSharedPreferences(BookUploadPersistence.PreferencesName, Application.MODE_PRIVATE)
     private var latestRelease: FirmwareRelease? = null
     private var backgroundDisconnectJob: Job? = null
     private var reconnectJob: Job? = null
@@ -142,6 +145,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     private var radioPolicySyncJob: Job? = null
     private var readingQuietJob: Job? = null
     private var bookUploadJob: Job? = null
+    private var bookUploadGeneration = 0L
     private var usbMaintenanceActive = false
     private var interactiveTransportRenewalJob: Job? = null
     private var lastDeletedReadingSession: ReadingSessionStat? = null
@@ -164,12 +168,12 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         .orEmpty()
         .toCollection(linkedSetOf())
     private val pendingBookUploadIds = connectionPreferences
-        .getStringSet(PendingBookUploadIdsKey, emptySet())
+        .getStringSet(BookUploadPersistence.PendingIdsKey, emptySet())
         .orEmpty()
         .toCollection(linkedSetOf())
     private var pendingBookUploadMethod = runCatching {
         BookTransferMethod.valueOf(
-            connectionPreferences.getString(PendingBookUploadMethodKey, null)
+            connectionPreferences.getString(BookUploadPersistence.MethodKey, null)
                 ?: BookTransferMethod.Bluetooth.name,
         )
     }.getOrDefault(BookTransferMethod.Bluetooth)
@@ -177,6 +181,11 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     init {
         managedDeviceModel()?.let { model ->
             _uiState.update { it.copy(isX3Connected = true, connectedDeviceModel = model) }
+        }
+        viewModelScope.launch {
+            BookTransferRuntimeControl.cancelRequests.collect {
+                stopBookUpload(showNotice = false)
+            }
         }
         viewModelScope.launch {
             companionClient.state.collect { link ->
@@ -237,6 +246,10 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                         connectedDeviceModel = capabilities?.model ?: managedModel ?: state.connectedDeviceModel,
                         device = state.device.copy(
                             linkPhase = link.phase.name,
+                            quietLinkProbe = when {
+                                transportConnected || link.phase == LinkPhase.Error -> false
+                                else -> state.device.quietLinkProbe
+                            },
                             reconnecting = if (connectionBlocked) false else shouldShowReconnecting(
                                 previous = state.device.reconnecting,
                                 phase = link.phase,
@@ -810,6 +823,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             block()
         } finally {
             usbMaintenanceActive = false
+            drainPendingUsbWork()
         }
     }
 
@@ -817,6 +831,16 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         appForeground = true
         foregroundProbePending = true
         intentionalTransportIdle = false
+        val quietProbe = managedDeviceModel() != null && !requiresPersistentTransport()
+        _uiState.update { state ->
+            state.copy(
+                device = state.device.copy(
+                    quietLinkProbe = quietProbe,
+                    reconnecting = if (quietProbe) false else state.device.reconnecting,
+                    message = if (quietProbe) null else state.device.message,
+                ),
+            )
+        }
         backgroundDisconnectJob?.cancel()
         backgroundDisconnectJob = null
         ensureTransportConnected()
@@ -955,6 +979,12 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     override fun onCleared() {
+        if (pendingBookUploadIds.isNotEmpty() || bookUploadJob?.isActive == true) {
+            bookUploadGeneration += 1L
+            pendingBookUploadIds.clear()
+            persistPendingBookUpload()
+            BookTransferForegroundService.stop(getApplication())
+        }
         usbBookTransfer.close()
         usbFlasher.close()
         companionClient.close()
@@ -1009,7 +1039,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
 
 
     fun requestUploadBooksToX3(bookIds: Set<String>, method: BookTransferMethod) {
-        if (bookIds.isEmpty() || _uiState.value.read.uploadingToX3) return
+        if (bookIds.isEmpty() || _uiState.value.read.uploadingToX3 || bookUploadJob?.isActive == true) return
         val books = _uiState.value.read.books.filter { it.id in bookIds && it.isOnPhone && !it.isOnX3 }
         if (books.isEmpty()) return
         when (method) {
@@ -1022,22 +1052,64 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 return
             }
         }
+        bookUploadGeneration += 1L
         pendingBookUploadIds.clear()
         pendingBookUploadIds.addAll(books.map { it.id })
         pendingBookUploadMethod = method
         persistPendingBookUpload()
+        BookTransferForegroundService.start(getApplication())
+        _uiState.update { state ->
+            state.copy(
+                notice = null,
+                read = state.read.copy(directUploadOfferBookIds = emptySet()),
+            )
+        }
         drainPendingUsbWork()
     }
 
-    fun cancelBookUpload() {
+    fun cancelBookUpload() = stopBookUpload(showNotice = true)
+
+    private fun stopBookUpload(showNotice: Boolean) {
+        if (pendingBookUploadIds.isEmpty() && bookUploadJob?.isActive != true) return
+        bookUploadGeneration += 1L
         pendingBookUploadIds.clear()
         persistPendingBookUpload()
-        bookUploadJob?.cancel(CancellationException("Upload stopped"))
+        val stoppingJob = bookUploadJob
         _uiState.update {
             it.copy(
-                read = it.read.copy(uploadingToX3 = false, uploadProgress = null, uploadMethod = null),
-                notice = UiNotice.DeviceMessage("Upload stopped"),
+                read = it.read.copy(
+                    uploadingToX3 = stoppingJob?.isActive == true,
+                    uploadProgress = null,
+                    uploadingBookId = null,
+                    uploadingBookProgress = null,
+                ),
+                notice = null,
             )
+        }
+        viewModelScope.launch {
+            stoppingJob?.cancelAndJoin()
+            if (bookUploadJob === stoppingJob) bookUploadJob = null
+            BookTransferForegroundService.stop(getApplication())
+            _uiState.update {
+                it.copy(
+                    read = it.read.copy(uploadingToX3 = false, uploadMethod = null),
+                    notice = if (showNotice) UiNotice.DeviceMessage("Upload stopped") else null,
+                )
+            }
+            releaseTransportIfIdle()
+        }
+    }
+
+    fun offerImportedBooksForDirectUpload(bookIds: Set<String>) {
+        if (bookIds.isEmpty()) return
+        _uiState.update { state ->
+            state.copy(read = state.read.copy(directUploadOfferBookIds = bookIds))
+        }
+    }
+
+    fun dismissDirectBookUploadOffer() {
+        _uiState.update { state ->
+            state.copy(read = state.read.copy(directUploadOfferBookIds = emptySet()))
         }
     }
 
@@ -1053,6 +1125,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             persistPendingBookUpload()
         }
         if (books.isEmpty()) return
+        BookTransferForegroundService.start(getApplication())
         when (pendingBookUploadMethod) {
             BookTransferMethod.Bluetooth -> {
                 if (managedDeviceModel() == null) return
@@ -1062,12 +1135,15 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             BookTransferMethod.Usb -> if (!usbBookTransfer.isDeviceDetected()) return
         }
         bookUploadJob = viewModelScope.launch(Dispatchers.IO) {
+            val generation = bookUploadGeneration
             val method = pendingBookUploadMethod
             _uiState.update {
                 it.copy(
                     read = it.read.copy(
                         uploadingToX3 = true,
                         uploadProgress = 0f,
+                        uploadingBookId = books.firstOrNull()?.id,
+                        uploadingBookProgress = 0f,
                         uploadMethod = method,
                     ),
                 )
@@ -1075,6 +1151,14 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             val result = runCatching {
                 if (method == BookTransferMethod.Bluetooth) companionClient.awaitConnected()
                 books.forEachIndexed { index, book ->
+                    _uiState.update { state ->
+                        state.copy(
+                            read = state.read.copy(
+                                uploadingBookId = book.id,
+                                uploadingBookProgress = 0f,
+                            ),
+                        )
+                    }
                     val uri = Uri.parse(book.sourceUri)
                     val resolver = getApplication<Application>().contentResolver
                     val digest = MessageDigest.getInstance("SHA-256")
@@ -1094,7 +1178,12 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                         val progress: (Float) -> Unit = { bookProgress ->
                             val overall = (index + bookProgress) / books.size.toFloat()
                             _uiState.update { state ->
-                                state.copy(read = state.read.copy(uploadProgress = overall.coerceIn(0f, 1f)))
+                                state.copy(
+                                    read = state.read.copy(
+                                        uploadProgress = overall.coerceIn(0f, 1f),
+                                        uploadingBookProgress = bookProgress.coerceIn(0f, 1f),
+                                    ),
+                                )
                             }
                         }
                         when (method) {
@@ -1131,21 +1220,42 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             }
             val error = result.exceptionOrNull()
+            if (generation != bookUploadGeneration) return@launch
+            val disposition = error?.let(BookUploadLifecyclePolicy::failureDisposition)
+            if (disposition == BookUploadFailureDisposition.StopAndForget) {
+                pendingBookUploadIds.clear()
+                persistPendingBookUpload()
+                BookTransferForegroundService.stop(getApplication())
+            } else if (result.isSuccess) {
+                BookTransferForegroundService.stop(getApplication())
+            }
             _uiState.update { state ->
                 state.copy(
-                    read = state.read.copy(uploadingToX3 = false, uploadProgress = null, uploadMethod = null),
+                    read = state.read.copy(
+                        uploadingToX3 = false,
+                        uploadProgress = null,
+                        uploadingBookId = null,
+                        uploadingBookProgress = null,
+                        uploadMethod = if (disposition == BookUploadFailureDisposition.RetryWhenTransportReturns) {
+                            method
+                        } else {
+                            null
+                        },
+                    ),
                     notice = when {
                         result.isSuccess -> UiNotice.DeviceMessage(
                             "${books.size} book${if (books.size == 1) "" else "s"} uploaded to X3",
                         )
-                        error is CancellationException -> state.notice ?: UiNotice.DeviceMessage("Upload stopped")
+                        disposition == BookUploadFailureDisposition.RetryWhenTransportReturns ->
+                            UiNotice.DeviceMessage("Upload paused; it will resume when X3 is available")
+                        error is CancellationException -> state.notice
                         else -> UiNotice.DeviceMessage(
-                            "${error?.message ?: "Book upload failed"}. Reopen the app to resume.",
+                            error?.message ?: "Book upload failed",
                         )
                     },
                 )
             }
-            bookUploadJob = null
+            if (generation == bookUploadGeneration) bookUploadJob = null
             releaseTransportIfIdle()
         }
     }
@@ -1159,10 +1269,10 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     private fun persistPendingBookUpload() {
         val editor = connectionPreferences.edit()
         if (pendingBookUploadIds.isEmpty()) {
-            editor.remove(PendingBookUploadIdsKey).remove(PendingBookUploadMethodKey)
+            editor.remove(BookUploadPersistence.PendingIdsKey).remove(BookUploadPersistence.MethodKey)
         } else {
-            editor.putStringSet(PendingBookUploadIdsKey, pendingBookUploadIds.toSet())
-                .putString(PendingBookUploadMethodKey, pendingBookUploadMethod.name)
+            editor.putStringSet(BookUploadPersistence.PendingIdsKey, pendingBookUploadIds.toSet())
+                .putString(BookUploadPersistence.MethodKey, pendingBookUploadMethod.name)
         }
         check(editor.commit()) { "Could not persist the pending book upload" }
     }
@@ -1674,6 +1784,11 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun scheduleReconnect() {
         val model = managedDeviceModel() ?: return
+        if (requiresPersistentTransport()) {
+            _uiState.update { state ->
+                state.copy(device = state.device.copy(quietLinkProbe = false))
+            }
+        }
         if (!canMaintainTransport() || intentionalTransportIdle || reconnectJob?.isActive == true ||
             _uiState.value.device.requiresBluetoothReset
         ) return
@@ -1827,7 +1942,5 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         const val BackgroundDisconnectGraceMs = 1_500L
         const val LastConnectedModelKey = "last_connected_model"
         const val PendingDeletePathsKey = "pending_delete_paths"
-        const val PendingBookUploadIdsKey = "pending_book_upload_ids"
-        const val PendingBookUploadMethodKey = "pending_book_upload_method"
     }
 }

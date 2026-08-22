@@ -1426,12 +1426,23 @@ bool CompanionService::beginBookUpload(const EnvelopeView& envelope, BookUploadO
   bookUploadExpectedSize_ = readU64(envelope.payload + 2 + nameLength);
   if (bookUploadExpectedSize_ == 0 || bookUploadExpectedSize_ > 128u * 1024u * 1024u) return false;
   std::memcpy(bookUploadExpectedSha_, envelope.payload + 2 + nameLength + 8, sizeof(bookUploadExpectedSha_));
-  if (std::snprintf(bookUploadFinalPath_, sizeof(bookUploadFinalPath_), "/Books/%s", fileName) <= 0 ||
-      Storage.exists(bookUploadFinalPath_)) {
+  const int finalPathLength =
+      std::snprintf(bookUploadFinalPath_, sizeof(bookUploadFinalPath_), "/Books/%s", fileName);
+  const int backupPathLength = std::snprintf(bookUploadBackupPath_, sizeof(bookUploadBackupPath_),
+                                             "/Books/.%s.companion-backup", fileName);
+  if (finalPathLength <= 0 || finalPathLength >= static_cast<int>(sizeof(bookUploadFinalPath_)) ||
+      backupPathLength <= 0 || backupPathLength >= static_cast<int>(sizeof(bookUploadBackupPath_))) {
     return false;
   }
   if (!Storage.ensureDirectoryExists("/.crosspoint/companion") || !Storage.ensureDirectoryExists("/Books")) {
     return false;
+  }
+  if (Storage.exists(bookUploadBackupPath_)) {
+    if (Storage.exists(bookUploadFinalPath_)) {
+      Storage.remove(bookUploadBackupPath_);
+    } else if (!Storage.rename(bookUploadBackupPath_, bookUploadFinalPath_)) {
+      return false;
+    }
   }
   Storage.remove(BOOK_UPLOAD_TEMP_PATH);
   bookUploadFile_ = Storage.open(BOOK_UPLOAD_TEMP_PATH, O_WRITE | O_CREAT | O_TRUNC);
@@ -1484,16 +1495,34 @@ bool CompanionService::commitBookUpload(BookUploadOwner owner) {
            std::memcmp(actual, bookUploadExpectedSha_, sizeof(actual)) == 0;
   mbedtls_sha256_free(&context);
   input.close();
-  if (!hashOk || !Storage.rename(BOOK_UPLOAD_TEMP_PATH, bookUploadFinalPath_)) {
+  if (!hashOk) {
     abortBookUpload();
     return false;
   }
+
+  // Publish only a verified file. Existing books are replaceable, but remain
+  // recoverable until the new temp file owns the final path.
+  const bool replacingExisting = Storage.exists(bookUploadFinalPath_);
+  if (replacingExisting) {
+    Storage.remove(bookUploadBackupPath_);
+    if (!Storage.rename(bookUploadFinalPath_, bookUploadBackupPath_)) {
+      abortBookUpload();
+      return false;
+    }
+  }
+  if (!Storage.rename(BOOK_UPLOAD_TEMP_PATH, bookUploadFinalPath_)) {
+    if (replacingExisting) Storage.rename(bookUploadBackupPath_, bookUploadFinalPath_);
+    abortBookUpload();
+    return false;
+  }
+  if (replacingExisting) Storage.remove(bookUploadBackupPath_);
 
   LOG_INF("CMP", "Book upload committed path=%s", bookUploadFinalPath_);
   const bool restoreSlowConnection = bookUploadOwner_ == BookUploadOwner::Ble;
   bookUploadActive_ = false;
   bookUploadOwner_ = BookUploadOwner::None;
   bookUploadFinalPath_[0] = '\0';
+  bookUploadBackupPath_[0] = '\0';
   if (restoreSlowConnection) scheduleSlowConnection();
   return scanLibrary();
 }
@@ -1508,6 +1537,7 @@ void CompanionService::abortBookUpload(bool restoreSlowConnection) {
   bookUploadExpectedSize_ = 0;
   bookUploadLastActivityMs_ = 0;
   bookUploadFinalPath_[0] = '\0';
+  bookUploadBackupPath_[0] = '\0';
   if (restoreSlowConnection && restoreOwnedBleConnection) {
     scheduleSlowConnection();
   }

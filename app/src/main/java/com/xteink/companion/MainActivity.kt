@@ -284,15 +284,12 @@ class MainActivity : ComponentActivity() {
                         onSetReadLocation = viewModel::setReadLocation,
                         onUploadBooksToX3 = viewModel::requestUploadBooksToX3,
                         onCancelBookUpload = viewModel::cancelBookUpload,
+                        onDismissDirectBookUploadOffer = viewModel::dismissDirectBookUploadOffer,
                         onDeleteBooksFromX3 = viewModel::requestDeleteBooksFromX3,
                         onChooseBookFolder = { folderPicker.launch(null) },
                         onOpenEpub = {
                             epubPicker.launch(
-                                arrayOf(
-                                    "application/epub+zip",
-                                    "application/zip",
-                                    "application/octet-stream",
-                                ),
+                                arrayOf("application/epub+zip"),
                             )
                         },
                         onOpenPasses = viewModel::openPasses,
@@ -529,7 +526,7 @@ class MainActivity : ComponentActivity() {
                         val enriched = if (enrichmentBudget > 0 && OpenLibraryMetadataClient.shouldEnrich(parsed)) {
                             enrichmentBudget -= 1
                             runCatching { OpenLibraryMetadataClient.enrich(this@MainActivity, parsed) }
-                                .getOrElse { parsed.copy(lastMetadataLookupEpochMs = System.currentTimeMillis()) }
+                                .getOrElse { parsed }
                                 .also { delay(1_100) }
                         } else {
                             parsed
@@ -567,40 +564,47 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             viewModel.setImporting(true)
             val outcome = withContext(Dispatchers.IO) {
-                val existingIds = bookLibrary.load().mapTo(mutableSetOf()) { it.id }
-                val newBooks = mutableListOf<com.xteink.companion.ui.ImportedBookUiState>()
-                var duplicates = 0
-                var failed = 0
+                runCatching {
+                    val existingIds = bookLibrary.load().mapTo(mutableSetOf()) { it.id }
+                    val newBooks = mutableListOf<com.xteink.companion.ui.ImportedBookUiState>()
+                    var duplicates = 0
+                    var failed = 0
 
-                uris.distinct().forEach { uri ->
-                    val id = EpubMetadataReader.idForUri(uri)
-                    if (id in existingIds) {
-                        duplicates += 1
-                        return@forEach
+                    uris.distinct().forEach { uri ->
+                        val id = EpubMetadataReader.idForUri(uri)
+                        if (id in existingIds) {
+                            duplicates += 1
+                            return@forEach
+                        }
+                        runCatching {
+                            contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        val parsed = runCatching { EpubMetadataReader.read(this@MainActivity, uri) }.getOrElse {
+                            failed += 1
+                            return@forEach
+                        }
+                        val enriched = if (OpenLibraryMetadataClient.shouldEnrich(parsed)) {
+                            runCatching { OpenLibraryMetadataClient.enrich(this@MainActivity, parsed) }
+                                .getOrElse { parsed }
+                        } else {
+                            parsed
+                        }
+                        newBooks += enriched
+                        existingIds += id
+                        if (OpenLibraryMetadataClient.shouldEnrich(parsed)) delay(1_100)
                     }
-                    runCatching {
-                        contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-                    val parsed = runCatching { EpubMetadataReader.read(this@MainActivity, uri) }.getOrElse {
-                        failed += 1
-                        return@forEach
-                    }
-                    val enriched = if (OpenLibraryMetadataClient.shouldEnrich(parsed)) {
-                        runCatching { OpenLibraryMetadataClient.enrich(this@MainActivity, parsed) }
-                            .getOrElse { parsed.copy(lastMetadataLookupEpochMs = System.currentTimeMillis()) }
-                    } else {
-                        parsed
-                    }
-                    newBooks += enriched
-                    existingIds += id
-                    if (OpenLibraryMetadataClient.shouldEnrich(parsed)) delay(1_100)
+                    val library = if (newBooks.isEmpty()) bookLibrary.load() else bookLibrary.upsertAll(newBooks)
+                    ImportOutcome(library, newBooks.mapTo(linkedSetOf()) { it.id }, duplicates, failed)
                 }
-                val library = if (newBooks.isEmpty()) bookLibrary.load() else bookLibrary.upsertAll(newBooks)
-                ImportOutcome(library, newBooks.size, duplicates, failed)
             }
-            viewModel.restoreBooks(outcome.library)
             viewModel.setImporting(false)
-            viewModel.reportImportResult(outcome.added, outcome.duplicates, outcome.failed)
+            outcome.onSuccess { imported ->
+                viewModel.restoreBooks(imported.library)
+                viewModel.reportImportResult(imported.added, imported.duplicates, imported.failed)
+                viewModel.offerImportedBooksForDirectUpload(imported.importedBookIds)
+            }.onFailure {
+                viewModel.reportEpubImportFailure()
+            }
         }
     }
 
@@ -612,7 +616,7 @@ class MainActivity : ComponentActivity() {
                 books.forEach { book ->
                     if (!OpenLibraryMetadataClient.shouldEnrich(book)) return@forEach
                     val enriched = runCatching { OpenLibraryMetadataClient.enrich(this@MainActivity, book) }
-                        .getOrElse { book.copy(lastMetadataLookupEpochMs = System.currentTimeMillis()) }
+                        .getOrElse { book }
                     bookLibrary.upsertAll(listOf(enriched))
                     changed = true
                     delay(1_100)
@@ -625,10 +629,12 @@ class MainActivity : ComponentActivity() {
 
     private data class ImportOutcome(
         val library: List<com.xteink.companion.ui.ImportedBookUiState>,
-        val added: Int,
+        val importedBookIds: Set<String>,
         val duplicates: Int,
         val failed: Int,
-    )
+    ) {
+        val added: Int get() = importedBookIds.size
+    }
 
     private data class FolderSyncOutcome(
         val library: List<com.xteink.companion.ui.ImportedBookUiState>,

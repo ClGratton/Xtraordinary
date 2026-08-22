@@ -42,6 +42,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -102,6 +103,7 @@ fun ReadContent(
     onOpenSettings: () -> Unit,
     onUploadBooksToX3: (Set<String>, BookTransferMethod) -> Unit,
     onCancelBookUpload: () -> Unit,
+    onDismissDirectBookUploadOffer: () -> Unit,
     onDeleteBooksFromX3: (Set<String>) -> Unit,
     modifier: Modifier = Modifier,
     initialSelectedBookIds: Set<String> = emptySet(),
@@ -112,6 +114,7 @@ fun ReadContent(
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var showTransferChoices by remember { mutableStateOf(false) }
     var showServiceReminder by rememberSaveable { mutableStateOf(true) }
+    var wasUploading by remember { mutableStateOf(state.uploadingToX3) }
     val visibleBooks = remember(state.books, state.query, state.sort, state.service, state.location) {
         val terms = state.query.trim().lowercase().split(Regex("\\s+")).filter { it.isNotBlank() }
         val matching = state.books.filter { book ->
@@ -149,9 +152,26 @@ fun ReadContent(
     val selectedPhoneOnlyIds = selectedBookIds.filterTo(linkedSetOf()) { id ->
         state.books.any { it.id == id && it.isOnPhone && !it.isOnX3 }
     }
+    val transferBookIds = state.directUploadOfferBookIds.ifEmpty { selectedPhoneOnlyIds }
 
     LaunchedEffect(state.books) {
         selectedBookIds = selectedBookIds.intersect(state.books.mapTo(hashSetOf()) { it.id })
+    }
+    LaunchedEffect(state.directUploadOfferBookIds) {
+        if (state.directUploadOfferBookIds.isNotEmpty()) showTransferChoices = true
+    }
+    LaunchedEffect(state.uploadingToX3, state.books) {
+        if (!wasUploading && state.uploadingToX3) {
+            // The picker/selection has finished its job. Transfer state now
+            // belongs to the matching book row and the persistent stop action.
+            selectedBookIds = emptySet()
+        }
+        if (wasUploading && !state.uploadingToX3) {
+            selectedBookIds = selectedBookIds.filterTo(linkedSetOf()) { id ->
+                state.books.any { it.id == id && !it.isOnX3 }
+            }
+        }
+        wasUploading = state.uploadingToX3
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -249,6 +269,11 @@ fun ReadContent(
                         deviceLabel = deviceLabel,
                         selectionMode = selectedBookIds.isNotEmpty(),
                         selected = book.id in selectedBookIds,
+                        uploadProgress = if (state.uploadingBookId == book.id) {
+                            state.uploadingBookProgress
+                        } else {
+                            null
+                        },
                         onClick = {
                             if (selectedBookIds.isNotEmpty()) {
                                 selectedBookIds = selectedBookIds.toggle(book.id)
@@ -339,7 +364,12 @@ fun ReadContent(
     }
 
     if (showTransferChoices) {
-        ModalBottomSheet(onDismissRequest = { showTransferChoices = false }) {
+        ModalBottomSheet(
+            onDismissRequest = {
+                showTransferChoices = false
+                if (state.directUploadOfferBookIds.isNotEmpty()) onDismissDirectBookUploadOffer()
+            },
+        ) {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -347,8 +377,8 @@ fun ReadContent(
                 Text(
                     pluralStringResource(
                         R.plurals.choose_transfer_method,
-                        selectedPhoneOnlyIds.size,
-                        selectedPhoneOnlyIds.size,
+                        transferBookIds.size,
+                        transferBookIds.size,
                     ),
                     style = MaterialTheme.typography.headlineSmall,
                 )
@@ -360,7 +390,8 @@ fun ReadContent(
                     enabled = usbConnected,
                     onClick = {
                         showTransferChoices = false
-                        onUploadBooksToX3(selectedPhoneOnlyIds, BookTransferMethod.Usb)
+                        onDismissDirectBookUploadOffer()
+                        onUploadBooksToX3(transferBookIds, BookTransferMethod.Usb)
                     },
                 )
                 TransferMethodRow(
@@ -371,7 +402,8 @@ fun ReadContent(
                     enabled = isX3Connected,
                     onClick = {
                         showTransferChoices = false
-                        onUploadBooksToX3(selectedPhoneOnlyIds, BookTransferMethod.Bluetooth)
+                        onDismissDirectBookUploadOffer()
+                        onUploadBooksToX3(transferBookIds, BookTransferMethod.Bluetooth)
                     },
                 )
             }
@@ -453,13 +485,13 @@ private fun LibraryBottomActions(
         label = "library action corner",
     )
     val actionContainer by animateColorAsState(
-        targetValue = if (selectionMode) MaterialTheme.colorScheme.errorContainer
+        targetValue = if (selectionMode || uploading) MaterialTheme.colorScheme.errorContainer
         else MaterialTheme.colorScheme.primary,
         animationSpec = tween(220),
         label = "library action container",
     )
     val actionContent by animateColorAsState(
-        targetValue = if (selectionMode) MaterialTheme.colorScheme.onErrorContainer
+        targetValue = if (selectionMode || uploading) MaterialTheme.colorScheme.onErrorContainer
         else MaterialTheme.colorScheme.onPrimary,
         animationSpec = tween(220),
         label = "library action content",
@@ -542,11 +574,11 @@ private fun LibraryBottomActions(
             }
         } else {
             Surface(
-                onClick = onImport,
-                enabled = actionEnabled,
+                onClick = if (uploading) onCancelUpload else onImport,
+                enabled = uploading || actionEnabled,
                 modifier = Modifier.align(Alignment.CenterEnd).size(68.dp).semantics {
-                    contentDescription = importDescription
-                    if (!actionEnabled) disabled()
+                    contentDescription = if (uploading) stopUploadDescription else importDescription
+                    if (!uploading && !actionEnabled) disabled()
                 },
                 shape = RoundedCornerShape(actionCorner),
                 color = actionContainer,
@@ -555,7 +587,15 @@ private fun LibraryBottomActions(
                 tonalElevation = 3.dp,
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    if (importing) {
+                    if (uploading) {
+                        CircularProgressIndicator(
+                            progress = { uploadProgress ?: 0f },
+                            modifier = Modifier.size(34.dp),
+                            color = actionContent,
+                            strokeWidth = 3.dp,
+                        )
+                        StopUploadIcon(color = actionContent)
+                    } else if (importing) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), color = actionContent, strokeWidth = 2.dp)
                     } else {
                         ImportBookIcon(color = actionContent)
@@ -786,6 +826,7 @@ private fun ImportedBookCard(
     deviceLabel: String,
     selectionMode: Boolean,
     selected: Boolean,
+    uploadProgress: Float?,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
@@ -889,7 +930,18 @@ private fun ImportedBookCard(
                 } else {
                     stringResource(R.string.book_unavailable)
                 }
-                if (book.isOnPhone && !book.isOnX3) {
+                if (uploadProgress != null) {
+                    Text(
+                        stringResource(R.string.uploading_book_progress, (uploadProgress * 100f).toInt()),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                    )
+                    LinearProgressIndicator(
+                        progress = { uploadProgress.coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else if (book.isOnPhone && !book.isOnX3) {
                     Surface(
                         color = MaterialTheme.colorScheme.secondaryContainer,
                         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,

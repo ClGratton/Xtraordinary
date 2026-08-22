@@ -83,6 +83,7 @@ class CompanionService {
   uint64_t bookUploadReceived_ = 0;
   uint8_t bookUploadExpectedSha_[32] = {};
   char bookUploadFinalPath_[181] = {};
+  char bookUploadBackupPath_[181] = {};
   bool bookUploadActive_ = false;
   enum class BookUploadOwner : uint8_t { None, Ble, Usb };
   BookUploadOwner bookUploadOwner_ = BookUploadOwner::None;

@@ -69,6 +69,7 @@ fun X3CompanionApp(
     onOpenEpub: () -> Unit,
     onUploadBooksToX3: (Set<String>, BookTransferMethod) -> Unit,
     onCancelBookUpload: () -> Unit,
+    onDismissDirectBookUploadOffer: () -> Unit,
     onDeleteBooksFromX3: (Set<String>) -> Unit,
     onOpenPasses: () -> Unit,
     onOpenStats: () -> Unit,
@@ -207,7 +208,10 @@ fun X3CompanionApp(
                 hasManagedX3 = state.isX3Connected,
                 isX3TransportConnected = state.isX3TransportConnected,
                 isX3Reconnecting = state.device.reconnecting,
-                isX3Connecting = state.device.linkPhase == "Scanning" || state.device.linkPhase == "Connecting",
+                isX3Connecting = shouldPresentConnecting(
+                    state.device.linkPhase,
+                    state.device.quietLinkProbe,
+                ),
                 requiresBluetoothReset = state.device.requiresBluetoothReset,
                 transportBlocker = state.device.transportBlocker,
                 connectedDeviceModel = state.connectedDeviceModel,
@@ -253,6 +257,7 @@ fun X3CompanionApp(
                             onOpenSettings = { onShowSettings(true) },
                             onUploadBooksToX3 = onUploadBooksToX3,
                             onCancelBookUpload = onCancelBookUpload,
+                            onDismissDirectBookUploadOffer = onDismissDirectBookUploadOffer,
                             onDeleteBooksFromX3 = onDeleteBooksFromX3,
                         )
                         CompanionSurface.Tools -> when (toolDestination) {

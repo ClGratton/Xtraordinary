@@ -61,4 +61,11 @@ class ConnectionPolicyTest {
         assertFalse(shouldShowReconnecting(true, LinkPhase.Connected, intentionalTransportIdle = false))
         assertFalse(shouldShowReconnecting(true, LinkPhase.Disconnected, intentionalTransportIdle = true))
     }
+
+    @Test
+    fun `quiet foreground probe keeps the remembered device presented as paired`() {
+        assertFalse(shouldPresentConnecting(LinkPhase.Scanning.name, quietLinkProbe = true))
+        assertFalse(shouldPresentConnecting(LinkPhase.Connecting.name, quietLinkProbe = true))
+        assertTrue(shouldPresentConnecting(LinkPhase.Connecting.name, quietLinkProbe = false))
+    }
 }

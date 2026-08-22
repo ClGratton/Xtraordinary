@@ -320,6 +320,9 @@
     <string name="delete_selected_from_device">Delete selected books from %1$s</string>
     <string name="upload_selected_to_device">Upload selected books to %1$s</string>
     <string name="stop_book_upload">Stop book upload</string>
+    <string name="uploading_book_progress">Sending to X3 · %1$d%%</string>
+    <string name="book_transfer_notification_title">Sending books to X3</string>
+    <string name="book_transfer_notification_text">Transfer continues in the background</string>
     <string name="transfer_usb_title">USB cable</string>
     <string name="transfer_usb_ready">Fastest · cable connected</string>
     <string name="transfer_usb_unavailable">Connect X3 with a USB-C data cable</string>

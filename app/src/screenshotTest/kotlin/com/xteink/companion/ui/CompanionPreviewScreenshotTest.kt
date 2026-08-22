@@ -174,8 +174,69 @@ fun readContentSelectedScreenshot() {
                 onOpenSettings = {},
                 onUploadBooksToX3 = { _, _ -> },
                 onCancelBookUpload = {},
+                onDismissDirectBookUploadOffer = {},
                 onDeleteBooksFromX3 = {},
                 initialSelectedBookIds = setOf("sample-book"),
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Read upload active", widthDp = 412, heightDp = 760, showBackground = true)
+@Composable
+fun readUploadActiveScreenshot() {
+    X3CompanionTheme(visualTheme = CompanionVisualTheme.Expressive, useDynamicColor = false) {
+        Surface(color = MaterialTheme.colorScheme.background) {
+            ReadContent(
+                state = screenshotReadState().copy(
+                    uploadingToX3 = true,
+                    uploadProgress = 0.42f,
+                    uploadingBookId = "phone-book",
+                    uploadingBookProgress = 0.42f,
+                    uploadMethod = BookTransferMethod.Usb,
+                ),
+                isX3Connected = true,
+                usbConnected = true,
+                connectedDeviceModel = "X3",
+                onSetQuery = {},
+                onSetSort = {},
+                onSetService = {},
+                onSetReadLocation = {},
+                onChooseBookFolder = {},
+                onOpenEpub = {},
+                onOpenSettings = {},
+                onUploadBooksToX3 = { _, _ -> },
+                onCancelBookUpload = {},
+                onDismissDirectBookUploadOffer = {},
+                onDeleteBooksFromX3 = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Read direct upload offer", widthDp = 412, heightDp = 760, showBackground = true)
+@Composable
+fun readDirectUploadOfferScreenshot() {
+    X3CompanionTheme(visualTheme = CompanionVisualTheme.Expressive, useDynamicColor = false) {
+        Surface(color = MaterialTheme.colorScheme.background) {
+            ReadContent(
+                state = screenshotReadState().copy(directUploadOfferBookIds = setOf("phone-book")),
+                isX3Connected = true,
+                usbConnected = true,
+                connectedDeviceModel = "X3",
+                onSetQuery = {},
+                onSetSort = {},
+                onSetService = {},
+                onSetReadLocation = {},
+                onChooseBookFolder = {},
+                onOpenEpub = {},
+                onOpenSettings = {},
+                onUploadBooksToX3 = { _, _ -> },
+                onCancelBookUpload = {},
+                onDismissDirectBookUploadOffer = {},
+                onDeleteBooksFromX3 = {},
             )
         }
     }
@@ -571,6 +632,7 @@ private fun ScreenshotApp(state: CompanionUiState) {
             onOpenEpub = {},
             onUploadBooksToX3 = { _, _ -> },
             onCancelBookUpload = {},
+            onDismissDirectBookUploadOffer = {},
             onDeleteBooksFromX3 = {},
             onOpenPasses = {},
             onOpenStats = {},

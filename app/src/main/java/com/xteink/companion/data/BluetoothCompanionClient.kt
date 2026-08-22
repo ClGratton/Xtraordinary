@@ -49,6 +49,9 @@ import com.xteink.companion.protocol.XTEINK_DATA_UUID
 import com.xteink.companion.protocol.XTEINK_EVENTS_UUID
 import com.xteink.companion.protocol.XTEINK_SERVICE_UUID
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitAll
@@ -504,6 +507,15 @@ class BluetoothCompanionClient(private val context: Context) {
     suspend fun resumeSession() = sendAwaitingAck(MessageType.ResumeSession)
     suspend fun stopSession() = sendAwaitingAck(MessageType.StopSession)
     suspend fun refreshLibrary() = sendAwaitingAck(MessageType.GetLibrary)
+
+    suspend fun refreshLibraryAndAwaitSnapshot(timeoutMillis: Long = 20_000): DeviceLibrarySnapshot =
+        coroutineScope {
+            // Subscribe before the request ACK: the final page may arrive in the
+            // same BLE burst and must not be cut off by an immediate idle release.
+            val snapshot = async(start = CoroutineStart.UNDISPATCHED) { libraries.first() }
+            refreshLibrary()
+            withTimeout(timeoutMillis) { snapshot.await() }
+        }
     suspend fun acknowledgeReadingStats(sessionId: UInt) =
         sendAwaitingAck(MessageType.AckReadingStats, PayloadCodec.encodeReadingStatsAck(sessionId))
     suspend fun showTicket(ticket: BoardingPassPayload, barcodeBmp: ByteArray) = withContext(Dispatchers.IO) {
@@ -589,11 +601,11 @@ class BluetoothCompanionClient(private val context: Context) {
 
     fun isReady(): Boolean = state.value.phase == LinkPhase.Connected && state.value.capabilities != null
 
-    suspend fun deleteLibraryEntries(revision: UInt, paths: List<String>) {
+    suspend fun deleteLibraryEntries(revision: UInt, paths: List<String>): DeviceLibrarySnapshot {
         paths.forEach { path ->
             sendAwaitingAck(MessageType.DeleteLibraryEntries, PayloadCodec.encodeDeleteLibraryEntries(0u, listOf(path)))
         }
-        refreshLibrary()
+        return refreshLibraryAndAwaitSnapshot()
     }
 
     suspend fun uploadBook(
@@ -639,7 +651,7 @@ class BluetoothCompanionClient(private val context: Context) {
             check(offset == sizeBytes) { "Book source changed before upload completed" }
             sendAwaitingAck(MessageType.CommitBookUpload, timeoutMillis = 60_000)
             onProgress(1f)
-            refreshLibrary()
+            refreshLibraryAndAwaitSnapshot()
         } catch (error: Throwable) {
             if (begun && isReady()) {
                 withContext(NonCancellable) {
@@ -876,7 +888,7 @@ class BluetoothCompanionClient(private val context: Context) {
                 MessageType.Nack, MessageType.Error -> {
                     val id = if (envelope.payload.size >= 4) PayloadCodec.decodeAck(envelope.payload) else 0u
                     val message = envelope.payload.drop(4).toByteArray().toString(Charsets.UTF_8).ifBlank { "Device rejected command" }
-                    pendingAcks.remove(id)?.completeExceptionally(IllegalStateException(message))
+                    pendingAcks.remove(id)?.completeExceptionally(CompanionCommandRejectedException(message))
                     _state.value = _state.value.copy(message = message)
                 }
                 MessageType.Capabilities -> {
@@ -923,7 +935,7 @@ class BluetoothCompanionClient(private val context: Context) {
         val bluetoothOff = bluetoothManager.adapter?.isEnabled != true
         val effectiveMessage = if (bluetoothOff) BluetoothOffMessage else message
         Log.w(LogTag, "link failed: $effectiveMessage")
-        val failure = IllegalStateException(effectiveMessage)
+        val failure = CompanionTransportInterruptedException(effectiveMessage)
         pendingAcks.values.forEach { it.completeExceptionally(failure) }
         pendingAcks.clear()
         writes.clear()

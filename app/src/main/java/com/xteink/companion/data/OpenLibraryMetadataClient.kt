@@ -8,7 +8,7 @@ import java.net.URL
 import java.net.URLEncoder
 
 object OpenLibraryMetadataClient {
-    private const val LookupCooldownMs = 7L * 24L * 60L * 60L * 1_000L
+    private const val LookupCooldownMs = 24L * 60L * 60L * 1_000L
     private const val MaxResponseBytes = 1_000_000
     private const val MaxCoverBytes = 8_000_000
     private const val UserAgent = "Xtraordinary/0.1 (https://github.com/ClGratton/Xtraordinary)"
@@ -25,26 +25,38 @@ object OpenLibraryMetadataClient {
         val titleQuery = book.title.ifBlank { book.fileName.substringBeforeLast('.') }
         if (titleQuery.isBlank()) return book.copy(lastMetadataLookupEpochMs = attemptedAt)
 
-        val endpoint = buildString {
-            append("https://openlibrary.org/search.json?limit=1")
-            append("&fields=title,author_name,publisher,first_publish_year,language,cover_i,subject,isbn")
-            append("&title=")
-            append(encode(titleQuery))
-            if (book.author != UnknownAuthor && book.author.isNotBlank()) {
-                append("&author=")
-                append(encode(book.author))
+        var completedRequest = false
+        var lastFailure: Throwable? = null
+        var document: JSONObject? = null
+        for (candidateTitle in metadataTitleCandidates(titleQuery)) {
+            val endpoint = buildString {
+                append("https://openlibrary.org/search.json?limit=1")
+                append("&fields=title,author_name,publisher,first_publish_year,language,cover_i,subject,isbn")
+                append("&title=")
+                append(encode(candidateTitle))
+                if (book.author != UnknownAuthor && book.author.isNotBlank() && book.author != "On X3") {
+                    append("&author=")
+                    append(encode(book.author))
+                }
             }
+            val result = runCatching {
+                JSONObject(readText(endpoint, MaxResponseBytes)).optJSONArray("docs")?.optJSONObject(0)
+            }
+            result.onSuccess { candidate ->
+                completedRequest = true
+                if (candidate != null) document = candidate
+            }.onFailure { lastFailure = it }
+            if (document != null) break
         }
-        val root = JSONObject(readText(endpoint, MaxResponseBytes))
-        val document = root.optJSONArray("docs")?.optJSONObject(0)
-            ?: return book.copy(lastMetadataLookupEpochMs = attemptedAt)
+        if (document == null && !completedRequest) throw lastFailure ?: error("Metadata lookup failed")
+        val metadata = document ?: return book.copy(lastMetadataLookupEpochMs = attemptedAt)
 
-        val author = document.firstString("author_name")
-        val publisher = document.firstString("publisher")
-        val language = document.firstString("language")
-        val isbn = document.firstString("isbn")
-        val publishedYear = document.optInt("first_publish_year").takeIf { it > 0 }
-        val subjects = document.optJSONArray("subject")?.let { array ->
+        val author = metadata.firstString("author_name")
+        val publisher = metadata.firstString("publisher")
+        val language = metadata.firstString("language")
+        val isbn = metadata.firstString("isbn")
+        val publishedYear = metadata.optInt("first_publish_year").takeIf { it > 0 }
+        val subjects = metadata.optJSONArray("subject")?.let { array ->
             buildList {
                 for (index in 0 until minOf(array.length(), 3)) add(array.getString(index))
             }
@@ -52,7 +64,7 @@ object OpenLibraryMetadataClient {
         val coverPath = if (book.coverPath != null) {
             book.coverPath
         } else {
-            document.optLong("cover_i").takeIf { it > 0 }?.let { coverId ->
+            metadata.optLong("cover_i").takeIf { it > 0 }?.let { coverId ->
                 runCatching {
                     BookCoverCache.save(
                         context,
@@ -78,7 +90,11 @@ object OpenLibraryMetadataClient {
             isbn = book.isbn ?: isbn,
             subjects = if (book.subjects.isEmpty()) subjects else book.subjects,
             coverPath = coverPath,
-            metadataSource = if (changed) "EPUB + Open Library" else book.metadataSource,
+            metadataSource = if (changed) {
+                "${book.metadataSource.substringBefore(" + ")} + Open Library"
+            } else {
+                book.metadataSource
+            },
             lastMetadataLookupEpochMs = attemptedAt,
         )
     }
@@ -115,6 +131,18 @@ object OpenLibraryMetadataClient {
         optJSONArray(key)?.optString(0)?.takeIf { it.isNotBlank() }
 
     private fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8.name())
+
+    internal fun metadataTitleCandidates(rawTitle: String): List<String> {
+        val withoutSourceTag = rawTitle.replace(
+            Regex(
+                "\\s*\\([^)]*(?:z-library|z-lib|1lib|libgen|\\.(?:sk|org|com))[^)]*\\)\\s*$",
+                RegexOption.IGNORE_CASE,
+            ),
+            "",
+        ).trim()
+        val plainTitle = withoutSourceTag.replace(Regex("\\s*\\([^)]{2,80}\\)\\s*$"), "").trim()
+        return listOf(plainTitle, withoutSourceTag, rawTitle.trim()).filter { it.isNotBlank() }.distinct()
+    }
 
     const val UnknownAuthor = "Unknown author"
 }

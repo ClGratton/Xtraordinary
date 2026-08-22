@@ -11,6 +11,19 @@
 - [~] In progress
 - [!] Blocked by a named prerequisite
 
+## 2026-08-22 book transfer and background-state incident
+
+- [x] Isolate terminal-rejection replay, cancel/worker races, premature post-delete link release, undersized USB chunks, existing-destination rejection, broad picker MIME types, and polluted X3-only metadata lookup in source.
+- [~] Implement one reusable transfer lifecycle: transport interruption retries; command/source/validation failure stops and forgets; explicit Stop/task removal cancels and joins; active work owns the foreground service and persistent fast transport.
+- [~] Keep a remembered idle X3 presented as **Paired** through brief Activity background/foreground transitions; do not expose a best-effort idle probe as **Connecting/Reconnecting**.
+- [~] Put upload progress on the active book row, end selection when upload begins, keep one stable Stop action, and offer direct X3 transfer after importing one or more EPUBs.
+- [~] Restrict the system picker to EPUB, reject OPFs without readable XHTML spine entries, normalize X3-only Open Library titles, and retry missing metadata after 24 hours rather than seven days.
+- [~] Await the final revisioned library snapshot after upload/delete before reconciling phone state or releasing GATT.
+- [~] Use the shared 488-byte payload limit on USB and atomically replace an existing `/Books/<name>` through a verified temporary file plus hidden rollback path.
+- [ ] Commit and push the completed candidate; pass policy/static/unit/UI evidence and all required source-bound UI specialist receipts; then run canonical Android and firmware builds.
+- [ ] Install with app data/bond retained and application-only flash with NVS/SD/bond retained.
+- [ ] Physically accept USB and BLE success, background continuation, swipe-away cancellation/no replay, rejection/no replay, same-name replacement rollback, delete reconciliation, Project Hail Mary cover recovery, and real `test_tables.epub` pagination.
+
 ## Non-negotiable gates
 
 - [ ] Fresh-pair the restored APK and restored firmware before compiling or flashing another firmware.

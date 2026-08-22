@@ -15,6 +15,7 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.xteink.companion.protocol.BookUploadBegin
+import com.xteink.companion.protocol.BOOK_UPLOAD_CHUNK_BYTES
 import com.xteink.companion.protocol.Envelope
 import com.xteink.companion.protocol.EnvelopeCodec
 import com.xteink.companion.protocol.MessageType
@@ -229,10 +230,12 @@ class UsbBookTransfer(context: Context) : Closeable {
                 val line = readLine(remaining) ?: continue
                 when (line) {
                     "USB_BOOK_ACK:$messageId" -> return
-                    "USB_BOOK_NACK:$messageId" -> error("X3 rejected the USB book transfer")
+                    "USB_BOOK_NACK:$messageId" -> throw CompanionCommandRejectedException(
+                        "X3 rejected the USB book transfer",
+                    )
                 }
             }
-            error("Timed out waiting for the X3 USB transfer")
+            throw CompanionTransportInterruptedException("Timed out waiting for the X3 USB transfer")
         }
 
         private fun readLine(timeoutMs: Int): String? {
@@ -262,7 +265,7 @@ class UsbBookTransfer(context: Context) : Closeable {
                     bytes.size - offset,
                     UsbIoTimeoutMs,
                 )
-                require(written > 0) { "USB write to X3 failed" }
+                if (written <= 0) throw CompanionTransportInterruptedException("USB write to X3 failed")
                 offset += written
             }
         }
@@ -327,9 +330,9 @@ class UsbBookTransfer(context: Context) : Closeable {
         private const val CdcSetLineCoding = 0x20
         private const val CommandPrefix = "CMD:USB_BOOK:"
         private const val MaxLineBytes = 4 * 1024
-        // BLE can carry the protocol maximum directly. CDC hex expansion doubles
-        // each byte, so retain ample RX-queue headroom across sustained frames.
-        private const val UsbBookChunkBytes = 240
+        // The firmware allocates a full MAX_PACKET_BYTES*2 CDC command line.
+        // Use the protocol maximum instead of doubling round trips needlessly.
+        private const val UsbBookChunkBytes = BOOK_UPLOAD_CHUNK_BYTES
         private const val ProgressLogBytes = 64L * 1024L
         private const val LogTag = "XteinkUsbBook"
     }

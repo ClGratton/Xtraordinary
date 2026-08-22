@@ -22,6 +22,7 @@ object EpubMetadataReader {
         val packagePath = parsePackagePath(containerXml)
         val packageXml = readZipText(context, uri, packagePath)
         val packageData = parsePackage(packageXml)
+        require(packageData.readableSpineItems > 0) { "EPUB has no readable chapters" }
         val bookId = idForUri(uri)
         val coverPath = packageData.coverHref?.let { href ->
             val coverEntry = resolveRelativeEntry(packagePath, href)
@@ -136,6 +137,7 @@ object EpubMetadataReader {
         var isbn: String? = null
         var coverId: String? = null
         val manifestItems = mutableListOf<ManifestItem>()
+        val spineIds = mutableListOf<String>()
 
         while (parser.eventType != XmlPullParser.END_DOCUMENT) {
             if (parser.eventType == XmlPullParser.START_TAG) {
@@ -161,6 +163,7 @@ object EpubMetadataReader {
                         mediaType = parser.getAttributeValue(null, "media-type").orEmpty(),
                         properties = parser.getAttributeValue(null, "properties").orEmpty(),
                     )
+                    "itemref" -> parser.getAttributeValue(null, "idref")?.let(spineIds::add)
                 }
             }
             parser.next()
@@ -170,7 +173,10 @@ object EpubMetadataReader {
             ?: manifestItems.firstOrNull {
                 it.mediaType.startsWith("image/") && it.href.contains("cover", ignoreCase = true)
             }?.href
-        return PackageData(title, author, language, publisher, publishedYear, isbn, coverHref)
+        val readableSpineItems = spineIds.count { id ->
+            manifestItems.any { it.id == id && it.mediaType == "application/xhtml+xml" }
+        }
+        return PackageData(title, author, language, publisher, publishedYear, isbn, coverHref, readableSpineItems)
     }
 
     private fun resolveRelativeEntry(packagePath: String, href: String): String {
@@ -204,6 +210,7 @@ object EpubMetadataReader {
         val publishedYear: Int?,
         val isbn: String?,
         val coverHref: String?,
+        val readableSpineItems: Int,
     )
 
     private data class ManifestItem(

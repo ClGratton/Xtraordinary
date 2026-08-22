@@ -52,5 +52,8 @@ internal fun reconnectDelayMs(attempt: Int, appForeground: Boolean): Long {
     ]
 }
 
+internal fun shouldPresentConnecting(linkPhase: String, quietLinkProbe: Boolean): Boolean =
+    !quietLinkProbe && linkPhase in setOf(LinkPhase.Scanning.name, LinkPhase.Connecting.name)
+
 private const val ForegroundReconnectGapMs = 500L
 private val BackgroundReconnectBackoffMs = longArrayOf(1_000L, 3_000L, 8_000L, 15_000L)

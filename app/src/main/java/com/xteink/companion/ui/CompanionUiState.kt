@@ -215,7 +215,10 @@ data class ReadUiState(
     val importing: Boolean = false,
     val uploadingToX3: Boolean = false,
     val uploadProgress: Float? = null,
+    val uploadingBookId: String? = null,
+    val uploadingBookProgress: Float? = null,
     val uploadMethod: BookTransferMethod? = null,
+    val directUploadOfferBookIds: Set<String> = emptySet(),
     val syncing: Boolean = false,
     val folderLinked: Boolean = false,
 )
@@ -224,6 +227,8 @@ enum class FirmwareCheckPhase { Idle, Checking, Available, UpToDate, Downloading
 
 data class DeviceUiState(
     val linkPhase: String = "Disconnected",
+    /** A best-effort foreground status probe must not replace Paired with Connecting. */
+    val quietLinkProbe: Boolean = false,
     val reconnecting: Boolean = false,
     val requiresBluetoothReset: Boolean = false,
     val transportBlocker: com.xteink.companion.data.LinkBlocker? = null,
