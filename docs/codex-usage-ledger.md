@@ -241,3 +241,9 @@
 - Start snapshot: 89% used. Current snapshot: 94% used in the signed-in seven-day `10080`-minute allowance, resetting at Unix `1787999373`; a five-point task-local increase.
 - Task-local evidence: 30 calls; 1,830,548 total tokens (1,738,240 cached input); median input 62,539; maximum 84,975; zero compactions. The recent three-sample input median grew 154% from 33,358 to 84,742 tokens.
 - Stop decision: after pushing `fde20a9d1680081ee5616fba89f381e08a4f0f7a`, `audit-codex-task-usage.ps1 -EnforceStageGate -AllowDocumentedWeeklyReserveOverride` rejected the protected stage. The weekly exception cannot waive the independent replay/task-growth condition. No compiler, ADB/device discovery, installation, flash, bond/data/NVS/SD mutation, or physical acceptance began; resume only with a fresh history-free bounded task.
+
+## 2026-08-22 - Android notice verifier portability correction
+
+- Context: the authorized canonical Android build reached its pre-compiler legal-notice check, where the resolved Community/Play graphs remained semantically unchanged (147/180 rows) but the generator compared CRLF checkout bytes with an LF-oriented tracked manifest.
+- Durable correction: the fixed text-only Android notice inventory now hashes canonical LF bytes for both resolved reports and its manifest. The generator retains graph and override validation; no APK, firmware image, or other binary payload is normalized. The reviewed manifest was regenerated without a dependency-coordinate or licence-metadata change.
+- Focused evidence: `scripts/test-android-release-notices.ps1` passed CRLF equivalence and true-content mismatch rejection. The existing 27 deferred UI-review receipt findings remain release debt, and legal status remains **not release-cleared**. No Android compiler, installation, flash, bond/app-data change, NVS write, or SD mutation occurred in this correction stage.

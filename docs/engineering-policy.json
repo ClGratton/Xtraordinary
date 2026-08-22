@@ -1071,6 +1071,19 @@
       "type": "required_file",
       "path": "scripts/test-firmware-release-notices.ps1",
       "message": "The firmware notice verifier needs an executable CRLF-equivalence and content-mismatch regression fixture."
+    },
+    {
+      "id": "android-notice-verifier-is-checkout-portable",
+      "type": "required_pattern",
+      "path": "scripts/generate-android-release-notices.ps1",
+      "pattern": "function Get-CanonicalTextSha256[\\s\\S]*?0x0d[\\s\\S]*?0x0a[\\s\\S]*?Get-CanonicalTextSha256 -Path",
+      "message": "The fixed text-only Android notice pack must hash canonical LF content so a Windows CRLF checkout cannot bypass or block its integrity gate."
+    },
+    {
+      "id": "android-notice-verifier-has-portability-regression-test",
+      "type": "required_file",
+      "path": "scripts/test-android-release-notices.ps1",
+      "message": "The Android notice verifier needs an executable CRLF-equivalence and content-mismatch regression fixture."
     }
   ]
 }

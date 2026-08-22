@@ -6,7 +6,7 @@ Usage discipline is repository state, not chat memory. Any change to this proced
 
 ## Canonical release-content portability
 
-The fixed firmware licence/NOTICE inventory is text-only, but Git may materialize its repository LF content as CRLF on Windows. `scripts/check-firmware-release-notices.ps1` therefore hashes canonical LF-normalized bytes for this inventory only. It still rejects missing/extra files and every non-line-ending content change. Do not reuse this primitive for binaries or arbitrary release assets. When changing the verifier, run `scripts/test-firmware-release-notices.ps1`; it proves CRLF equivalence and that a real content mutation fails. Regenerate `release-notices/firmware/MANIFEST.sha256` only through the verifier's reviewed `-Update` path.
+The fixed Android and firmware licence/NOTICE inventories are text-only, but Git may materialize their repository LF content as CRLF on Windows. `scripts/generate-android-release-notices.ps1` and `scripts/check-firmware-release-notices.ps1` therefore hash canonical LF-normalized bytes for these inventories only. They still reject missing/extra files and every non-line-ending content change. Do not reuse this primitive for binaries, APKs, firmware images, or arbitrary release assets. When changing either verifier, run its matching `scripts/test-*-release-notices.ps1`; each proves CRLF equivalence and that a real content mutation fails. Regenerate `release-notices/android/MANIFEST.sha256` only through the reviewed Android generator and `release-notices/firmware/MANIFEST.sha256` only through the firmware verifier's reviewed `-Update` path.
 
 ## Authoritative meter
 

@@ -1,5 +1,6 @@
 param(
-    [switch]$Check
+    [switch]$Check,
+    [string]$NoticeRoot
 )
 
 $ErrorActionPreference = 'Stop'
@@ -7,7 +8,11 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $gradle = Join-Path $repoRoot '.tools\gradle-9.5.0\bin\gradle.bat'
 $toolchainScript = Join-Path $PSScriptRoot 'use-toolchains.ps1'
 $generatedRoot = Join-Path $repoRoot 'app\build\legal\runtime-dependencies'
-$noticeRoot = Join-Path $repoRoot 'release-notices\android'
+$noticeRoot = if ([string]::IsNullOrWhiteSpace($NoticeRoot)) {
+    Join-Path $repoRoot 'release-notices\android'
+} else {
+    $NoticeRoot
+}
 $expectedFiles = @(
     'communityReleaseRuntimeClasspath.tsv',
     'communityReleaseRuntimeLicenses.tsv',
@@ -108,9 +113,33 @@ function Get-PackManifestLines {
         Where-Object { $_.Name -ne $manifestName } |
         Sort-Object Name |
         ForEach-Object {
-            $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            $hash = Get-CanonicalTextSha256 -Path $_.FullName
             "$hash *$($_.Name)"
         }
+}
+
+function Get-CanonicalTextSha256 {
+    param([Parameter(Mandatory)][string]$Path)
+
+    # This fixed Android notice inventory contains text reports and notice
+    # documents. Git may materialize repository LF bytes as CRLF on Windows,
+    # so only this text pack hashes canonical LF bytes. Do not apply this to
+    # APKs, firmware images, or other binary release payloads.
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    $canonical = [System.Collections.Generic.List[byte]]::new($bytes.Length)
+    for ($index = 0; $index -lt $bytes.Length; $index++) {
+        if ($bytes[$index] -eq 0x0d -and $index + 1 -lt $bytes.Length -and $bytes[$index + 1] -eq 0x0a) {
+            continue
+        }
+        $canonical.Add($bytes[$index])
+    }
+
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return ([System.BitConverter]::ToString($sha256.ComputeHash($canonical.ToArray())) -replace '-', '').ToLowerInvariant()
+    } finally {
+        $sha256.Dispose()
+    }
 }
 
 function Assert-PackManifest {
@@ -164,8 +193,8 @@ if ($Check) {
         if (-not (Test-Path -LiteralPath $tracked)) {
             throw "Tracked Android dependency inventory is missing: $tracked"
         }
-        if ((Get-FileHash -LiteralPath $generated -Algorithm SHA256).Hash -ne
-            (Get-FileHash -LiteralPath $tracked -Algorithm SHA256).Hash) {
+        if ((Get-CanonicalTextSha256 -Path $generated) -ne
+            (Get-CanonicalTextSha256 -Path $tracked)) {
             throw "Android dependency inventory is stale for $name. Regenerate and review release-notices/android."
         }
     }
