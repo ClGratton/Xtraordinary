@@ -10,7 +10,8 @@ param(
         ':app:lintPlayDebug',
         ':app:assemblePlayDebug'
     ),
-    [switch]$UiEvidenceCandidate
+    [switch]$UiEvidenceCandidate,
+    [switch]$AllowDeferredUiReviewDebt
 )
 
 $ErrorActionPreference = 'Stop'
@@ -61,6 +62,10 @@ if ($UiEvidenceCandidate) {
     $Tasks = $requiredEvidenceTasks
 }
 
+if ($AllowDeferredUiReviewDebt -and $UiEvidenceCandidate) {
+    throw 'AllowDeferredUiReviewDebt may be used only for the explicit canonical Android Release gate, never for UiEvidenceCandidate.'
+}
+
 & $usageAudit -EnforceStageGate
 if ($LASTEXITCODE -ne 0) {
     throw "Codex usage requires compaction or a fresh history-free bounded agent before another compiler run. An explicit user override must be recorded in docs/codex-usage-ledger.md before changing the protected thresholds."
@@ -69,7 +74,12 @@ if ($LASTEXITCODE -ne 0) {
 if ($UiEvidenceCandidate) {
     & $policyCheck -Mode UiEvidenceCandidate
 } else {
-    & $policyCheck -Mode Release
+    if ($AllowDeferredUiReviewDebt) {
+        Write-Host 'EXPLICIT NON-DEFAULT RELEASE-DEBT WAIVER requested; the policy gate will accept only the documented Terra-review debt class.' -ForegroundColor Yellow
+        & $policyCheck -Mode Release -AllowDeferredUiReviewDebt
+    } else {
+        & $policyCheck -Mode Release
+    }
 }
 if (-not $?) {
     throw "Engineering policy gate failed"

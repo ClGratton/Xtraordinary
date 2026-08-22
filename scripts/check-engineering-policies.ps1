@@ -1,7 +1,8 @@
 param(
     [string]$ManifestPath,
     [ValidateSet('Release', 'UiEvidenceCandidate', 'FirmwareRelease')]
-    [string]$Mode = 'Release'
+    [string]$Mode = 'Release',
+    [switch]$AllowDeferredUiReviewDebt
 )
 
 $ErrorActionPreference = 'Stop'
@@ -77,6 +78,16 @@ $agentsPath = Join-Path $repoRoot 'AGENTS.md'
 if (-not (Test-Path -LiteralPath $usageWorkflowPath -PathType Leaf) -or
     -not (Test-Path -LiteralPath $usageLedgerPath -PathType Leaf)) {
     throw 'Repository-owned Codex usage checkpoints, delegation limits, and ledger enforcement must remain active.'
+}
+
+if ($AllowDeferredUiReviewDebt) {
+    if ($Mode -ne 'Release') {
+        throw 'Deferred UI-review debt is permitted only for the explicit Android Release gate; FirmwareRelease and UiEvidenceCandidate remain fail-closed.'
+    }
+    $ledgerContent = Get-Content -LiteralPath $usageLedgerPath -Raw
+    if ($ledgerContent -notmatch '(?s)## 2026-08-22 - Explicit release-debt waiver for build and physical acceptance.*?User authorization:.*?AllowDeferredUiReviewDebt') {
+        throw 'Deferred UI-review debt requires the documented 2026-08-22 explicit user authorization in docs/codex-usage-ledger.md.'
+    }
 }
 $usageWorkflowContent = Get-Content -LiteralPath $usageWorkflowPath -Raw
 if ($usageWorkflowContent -notmatch 'account/rateLimits/read' -or
@@ -531,6 +542,18 @@ foreach ($rule in $manifest.rules) {
             $failures.Add("[$($rule.id)] Unsupported rule type: $($rule.type)")
         }
     }
+}
+
+if ($AllowDeferredUiReviewDebt -and $failures.Count -gt 0) {
+    $deferredUiReviewFailures = @($failures | Where-Object { $_ -match '^\[ui-changes-require-stable-terra-reviews\]' })
+    if ($deferredUiReviewFailures.Count -eq $failures.Count) {
+        Write-Host "EXPLICIT NON-DEFAULT RELEASE-DEBT WAIVER: deferring $($deferredUiReviewFailures.Count) ui-changes-require-stable-terra-reviews violation(s)." -ForegroundColor Yellow
+        Write-Host 'The complete deferred debt follows; default Release remains fail-closed.' -ForegroundColor Yellow
+        $deferredUiReviewFailures | ForEach-Object { Write-Host " - $_" -ForegroundColor Yellow }
+        Write-Host "Engineering policy gate passed with explicit deferred UI-review debt ($($manifest.rules.Count) rules; $($deferredUiReviewFailures.Count) deferred)." -ForegroundColor Yellow
+        exit 0
+    }
+    Write-Host "EXPLICIT NON-DEFAULT RELEASE-DEBT WAIVER REJECTED: $($failures.Count - $deferredUiReviewFailures.Count) non-UI-review violation(s) remain." -ForegroundColor Red
 }
 
 if ($failures.Count -gt 0) {

@@ -803,6 +803,20 @@
       "message": "Registered UI surfaces require distinct, passing, source-bound Terra specialist receipts."
     },
     {
+      "id": "deferred-ui-review-debt-is-explicit-and-ledger-bound",
+      "type": "required_pattern",
+      "path": "scripts/check-engineering-policies.ps1",
+      "pattern": "AllowDeferredUiReviewDebt[\\s\\S]*?Mode -ne 'Release'[\\s\\S]*?Explicit release-debt waiver for build and physical acceptance[\\s\\S]*?deferredUiReviewFailures.Count -eq \\$failures.Count[\\s\\S]*?EXPLICIT NON-DEFAULT RELEASE-DEBT WAIVER",
+      "message": "Any exceptional UI-review debt path must be explicit, Release-only, ledger-bound, and reject every other policy violation."
+    },
+    {
+      "id": "canonical-android-debt-waiver-is-visible-and-nondefault",
+      "type": "required_pattern",
+      "path": "scripts/build-xtraordinary-app.ps1",
+      "pattern": "AllowDeferredUiReviewDebt[\\s\\S]*?UiEvidenceCandidate[\\s\\S]*?EXPLICIT NON-DEFAULT RELEASE-DEBT WAIVER requested[\\s\\S]*?\\$policyCheck[\\s\\S]*?-AllowDeferredUiReviewDebt",
+      "message": "The Android build wrapper must expose, constrain, and visibly report the exceptional debt waiver instead of hiding a bypass."
+    },
+    {
       "id": "ui-review-workflow-is-agent-independent",
       "type": "required_pattern",
       "path": "AGENTS.md",
