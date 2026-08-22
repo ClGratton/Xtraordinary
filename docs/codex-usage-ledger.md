@@ -211,3 +211,9 @@
 - Work performed: corrected the USB transfer reconciliation boundary so a commit ACK no longer marks a phone book as present on X3. Only a final revisioned BLE `LibraryPage` snapshot updates X3 library state; a USB transfer uses an immediately available BLE snapshot when present and otherwise remains conservatively unreconciled until a later snapshot. The transfer queue still clears only after the successful transaction commit.
 - Governance correction: the usage workflow and machine-checkable policy now require one fresh `fork_turns: "none"` `gpt-5.6-terra` owner for each substantial milestone, including implementation, debugging, focused verification, acceptance evidence, a bounded end checkpoint, no mid-milestone replacement, no reviewer swarm, and coordinator weekly-budget review before another milestone.
 - Validation boundary: the release policy's 27 existing stale or missing `passes`/`android-ui` receipts remain deferred by this milestone's user override. No receipt was cleared, regenerated, or represented as current.
+
+## 2026-08-22 - Protected-stage reserve stop
+
+- Start snapshot: 79% used. Stop snapshot: 80% used in the signed-in seven-day `10080`-minute allowance, resetting at Unix `1787999373`; Plus plan, no credits.
+- Task-local audit: 12 model calls, 894,216 total tokens (798,720 cached input), 75,349 median input tokens, 102,152 maximum input tokens, zero compactions, and two percentage points of task-local weekly growth. It returned `weekly-budget-exhausted` because the signed-in weekly reserve cutoff is 80%, with replay median/trend signals also requiring a fresh bounded stage.
+- Stop decision: no canonical compiler, deployment, ADB/mDNS device discovery, install, flash, screenshot regeneration, or reviewer work began. The pushed source checkpoint remains `e743bc8`; all phone/X3 state is preserved. Resume only in a fresh bounded milestone after the reserve resets or under an explicit user budget exception.
