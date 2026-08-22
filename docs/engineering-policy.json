@@ -475,6 +475,20 @@
       "message": "Each substantial milestone must retain one fresh Terra execution owner with bounded end-to-end responsibility and no mid-milestone replacement."
     },
     {
+      "id": "milestone-todo-entrypoint-is-authoritative",
+      "type": "required_pattern",
+      "path": "docs/codex-usage-workflow.md",
+      "pattern": "Every milestone task must read `TODO\\.md` first[\\s\\S]*?authoritative actionable backlog[\\s\\S]*?only the directly relevant current `HANDOFF\\.md` section[\\s\\S]*?policy or evidence files linked from that section[\\s\\S]*?Older unchecked tracker entries are incident history unless represented in `TODO\\.md`[\\s\\S]*?remembered chat scope is not an entrypoint[\\s\\S]*?Update `TODO\\.md` status at the milestone checkpoint",
+      "message": "Every milestone must enter through TODO.md, limit follow-up reading to current linked evidence, and update TODO status at checkpoint."
+    },
+    {
+      "id": "agents-require-todo-first-milestone-entrypoint",
+      "type": "required_pattern",
+      "path": "AGENTS.md",
+      "pattern": "Every milestone task must read `TODO\\.md` first[\\s\\S]*?authoritative actionable backlog[\\s\\S]*?only the directly relevant current `HANDOFF\\.md` section[\\s\\S]*?linked policy or evidence files[\\s\\S]*?Older unchecked tracker entries are incident history unless represented in `TODO\\.md`[\\s\\S]*?Update `TODO\\.md` status at the milestone checkpoint",
+      "message": "Repository agents must use TODO.md as the durable milestone entrypoint and update it at checkpoint."
+    },
+    {
       "id": "milestones-audit-regression-impact-and-handoff-visibly",
       "type": "required_pattern",
       "path": "docs/codex-usage-workflow.md",

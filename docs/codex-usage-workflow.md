@@ -60,6 +60,8 @@ When twenty percent or less remains, stop optional review loops, research, and p
 
 ## Durable bounded-milestone ownership
 
+Every milestone task must read `TODO.md` first and treat it as the authoritative actionable backlog. It then reads only the directly relevant current `HANDOFF.md` section and the policy or evidence files linked from that section. Older unchecked tracker entries are incident history unless represented in `TODO.md`; remembered chat scope is not an entrypoint. Update `TODO.md` status at the milestone checkpoint.
+
 Each substantial milestone has one fresh `fork_turns: "none"` `gpt-5.6-terra` execution owner. That owner owns the milestone's implementation, debugging, focused tests, and acceptance evidence from its bounded start through its checkpointed end.
 
 Do not replace that execution owner mid-milestone and do not create a reviewer swarm for the milestone. The coordinator does not duplicate the owner's source inspection: it reconciles one concise result, publishes product/device/next-outcome status, and checks the remaining weekly budget before considering another milestone.
@@ -68,7 +70,7 @@ At the milestone end, the owner checkpoints code, evidence, handoff, tracker, an
 
 Before milestone implementation begins, the execution owner runs a bounded regression-impact audit against the existing power, synchronization, pairing, state-truth, and legal policies plus measured hardware evidence relevant to the change. Existing measured behavior is a constraint. If a proposed fix conflicts with it, evaluate compatibility explicitly and document the evidence-backed decision before editing; never silently regress a policy or replace measured behavior with an assumption.
 
-At the milestone checkpoint, normalize the completed result and remaining authoritative backlog in `HANDOFF.md` and the tracker. When another substantial milestone remains, automatically create a new user-visible Codex task for that milestone, immediately navigate to and open it in the app, and end the old coordinator. Do not keep one coordinator alive across milestones and do not require user intervention for the handoff.
+At the milestone checkpoint, update `TODO.md` status and normalize the completed result and remaining authoritative backlog in the directly relevant current `HANDOFF.md` section. When another substantial milestone remains, automatically create a new user-visible Codex task for that milestone, immediately navigate to and open it in the app, and end the old coordinator. Do not keep one coordinator alive across milestones and do not require user intervention for the handoff.
 
 ## User-visible task continuity and status
 
