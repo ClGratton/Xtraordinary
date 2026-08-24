@@ -1,5 +1,7 @@
 # Xtraordinary authoritative TODO
 
+- [~] 2026-08-24 managed BLE routing correction: `flashLatestFirmware()` previously rejected LocalFile over BLE and selected guarded USB whenever USB was present, despite the existing `BluetoothCompanionClient.flashFirmware()` BEGIN/chunk/commit/apply path. Pushed `20d639b` adds a reusable selector preferring BLE when fresh Capabilities advertise firmware updates, with focused tests; canonical focused Android build was attempted once but stopped before Gradle because the task-bound usage audit resolved another thread's rollout. No install or device mutation.
+
 **Updated:** 2026-08-24
 **Scope:** normalized remaining work from the 175 user-prompt blocks in the current Codex task, reconciled against `HANDOFF.md`, `docs/x3-takeover-tracker.md`, the current checkout, and recorded physical evidence.
 

@@ -1,5 +1,9 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-24 managed BLE routing correction
+
+Source tracing showed the prepared Install callback entered `CompanionViewModel.flashLatestFirmware()`, which rejected LocalFile unless USB was connected and otherwise routed Xtraordinary through USB whenever present. The existing `BluetoothCompanionClient.flashFirmware()` already sends managed BLE `BEGIN_FIRMWARE`, chunks, commit, and apply. Pushed `20d639b` adds a reusable transport selector and tests: fresh BLE Capabilities with `supportsFirmwareUpdate` takes managed BLE; guarded USB remains separate. The focused canonical wrapper stopped before Gradle because its task-bound usage audit resolved a rollout belonging to another thread. No APK install, OTA, or device mutation occurred.
+
 Coordination correction: the agent prepares and launches managed workflows and owns bounded physical-action timing/retry; it must not require a chat reply merely to synchronize the user's irreducible Confirm gesture.
 
 ## 2026-08-24 managed dev38 transport boundary
