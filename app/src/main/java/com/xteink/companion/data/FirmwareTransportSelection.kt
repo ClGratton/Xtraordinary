@@ -8,8 +8,8 @@ internal fun selectFirmwareTransport(
     bleConnected: Boolean,
     bleSupportsFirmwareUpdate: Boolean,
 ): FirmwareTransport = when {
-    bleConnected && bleSupportsFirmwareUpdate -> FirmwareTransport.ManagedBle
     usbConnected -> FirmwareTransport.GuardedUsb
+    bleConnected && bleSupportsFirmwareUpdate -> FirmwareTransport.ManagedBle
     bleConnected -> FirmwareTransport.Unavailable
     else -> FirmwareTransport.ManagedBle
 }

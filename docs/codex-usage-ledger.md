@@ -1,5 +1,10 @@
 # Codex usage ledger
 
+## 2026-08-24 - Firmware transport contract correction
+
+- Source correction: USB is restored as the primary LocalFile/stock/CrossPoint takeover and recovery route; managed BLE is restricted to fresh Xtraordinary-to-Xtraordinary Capabilities with explicit update support. The firmware BEGIN physical-Confirm guard was removed; SHA-256, ACK, commit, and apply checks remain.
+- Safety evidence: Android now has pure otadata CRC/sequence/state parsing fixtures, but its current ROM protocol has no flash-read/stub primitive. USB therefore remains fail-closed before writing when `RUNTIME_TRACE_OTA` is absent; it never assumes `0x10000` or rewrites otadata. Candidate version is dev50/versionCode 51. No device mutation.
+
 ## 2026-08-24 - Automatic Confirm-window retry boundary
 
 - Repository-resolved ADB relaunched the retained-data app; fresh dev37 Capabilities, StatusChanged, revisioned LibraryPage, policy ACKs, and lease ACK arrived. The pending dev38 transaction automatically emitted BEGIN at 19:39:24.794 and 19:39:30.242; X3 returned NACK at 19:39:25.023 and 19:39:30.485 before chunks, matching the physical Confirm guard. No transfer, reboot, flash, reset, pairing, or data mutation occurred.

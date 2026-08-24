@@ -33,7 +33,7 @@ object FirmwareInstallPendingPolicy {
     fun afterLeaseAck(pending: PendingFirmwareInstall): PendingFirmwareInstall = pending
 
     fun afterNack(pending: PendingFirmwareInstall): PendingFirmwareInstall? =
-        pending.copy(attempt = pending.attempt + 1).takeUnless { it.attempt >= MaxPhysicalConfirmAttempts }
+        pending.copy(attempt = pending.attempt + 1).takeUnless { it.attempt >= MaxManagedUpdateAttempts }
 
-    private const val MaxPhysicalConfirmAttempts = 2
+    private const val MaxManagedUpdateAttempts = 2
 }

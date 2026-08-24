@@ -51,4 +51,27 @@ class X3OtaSlotPolicyTest {
             selection.requireSelectedFlashOffset()
         }
     }
+
+    @Test
+    fun otadataSelectsHighestCrcValidSequenceWithoutChangingRecords() {
+        val bytes = ByteArray(0x2000)
+        writeU32(bytes, 0, 1u)
+        writeU32(bytes, 28, 0x4743989Au)
+        writeU32(bytes, 0x1000, 2u)
+        writeU32(bytes, 0x1000 + 28, 0x55F63774u)
+
+        assertEquals(EspRomProtocol.App1Offset, X3OtaSlotPolicy.parseOtadata(bytes).requireSelectedFlashOffset())
+    }
+
+    @Test
+    fun invalidOtadataFailsClosed() {
+        val bytes = ByteArray(0x2000)
+        writeU32(bytes, 0, 2u)
+        writeU32(bytes, 28, 0u)
+        assertThrows(IllegalArgumentException::class.java) { X3OtaSlotPolicy.parseOtadata(bytes) }
+    }
+
+    private fun writeU32(bytes: ByteArray, offset: Int, value: UInt) {
+        repeat(4) { index -> bytes[offset + index] = (value shr (index * 8)).toByte() }
+    }
 }

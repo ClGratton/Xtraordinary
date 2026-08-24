@@ -21,7 +21,7 @@ class FirmwareInstallPendingTest {
         assertFalse(FirmwareInstallPendingPolicy.shouldReplay(pending, false, true))
     }
 
-    @Test fun physicalConfirmNackAllowsOneReplayThenClears() {
+    @Test fun managedUpdateNackAllowsOneReplayThenClears() {
         val retry = FirmwareInstallPendingPolicy.afterNack(pending)
         assertNotNull(retry)
         assertEquals(1, retry!!.attempt)

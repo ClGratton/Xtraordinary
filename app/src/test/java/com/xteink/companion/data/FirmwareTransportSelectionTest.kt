@@ -4,8 +4,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class FirmwareTransportSelectionTest {
-    @Test fun freshBleCapabilitiesPreferManagedBleOverUsb() = assertEquals(
-        FirmwareTransport.ManagedBle,
+    @Test fun usbTakeoverRemainsPrimaryEvenWhenBleAdvertisesManagedUpdates() = assertEquals(
+        FirmwareTransport.GuardedUsb,
         selectFirmwareTransport(true, true, true),
     )
 

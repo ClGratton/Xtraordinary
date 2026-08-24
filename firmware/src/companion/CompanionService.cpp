@@ -1544,10 +1544,10 @@ void CompanionService::abortBookUpload(bool restoreSlowConnection) {
 }
 
 bool CompanionService::beginFirmware(const EnvelopeView& envelope) {
-  // A nearby bonded phone still needs a physical gesture before it can replace
-  // the running image. This keeps firmware writes impossible while the device
-  // is unattended.
-  if (!mappedInputManager.isPressed(MappedInputManager::Button::Confirm)) return false;
+  // Authorization is provided by the bonded/encrypted companion protocol and
+  // the artifact SHA-256 validation in commitFirmware(). Do not require a
+  // concurrent physical button state: USB and managed BLE are both valid,
+  // independently guarded transport paths.
   size_t cursor = 0;
   if (envelope.payloadLength < 2) return false;
   const uint16_t modelLength = readU16(envelope.payload);

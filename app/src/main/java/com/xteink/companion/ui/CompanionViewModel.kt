@@ -17,8 +17,6 @@ import com.xteink.companion.data.BookUploadPersistence
 import com.xteink.companion.data.FirmwareRelease
 import com.xteink.companion.data.FirmwareReleaseRepository
 import com.xteink.companion.data.FirmwareSource
-import com.xteink.companion.data.FirmwareTransport
-import com.xteink.companion.data.selectFirmwareTransport
 import com.xteink.companion.data.FlightBarcodeFormat
 import com.xteink.companion.data.FlightIdentity
 import com.xteink.companion.data.FlightStatusRefreshPolicy
@@ -944,26 +942,31 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             reportDeviceError(IllegalStateException("Firmware selection is no longer available"))
             return
         }
-        val pending = PendingFirmwareInstall(
-            model = release.model,
-            version = release.version,
-            sizeBytes = release.sizeBytes,
-            sha256 = release.sha256,
-            source = release.source,
-            assetName = release.assetName,
-            downloadUrl = release.downloadUrl,
-        )
-        if (pendingFirmwareInstall?.let { FirmwareInstallPendingPolicy.isSame(it, pending) } != true) {
-            pendingFirmwareInstall = pending
-            persistPendingFirmwareInstall()
-        }
+        // Preserve the established upload semantics: a physically connected X3
+        // always uses the guarded USB takeover path. Managed BLE is an explicit
+        // capability-bound path for Xtraordinary-to-Xtraordinary only, never a
+        // silent replacement for LocalFile/stock/CrossPoint upload.
+        val useUsb = _uiState.value.device.usbConnected
         val link = companionClient.state.value
-        val transport = selectFirmwareTransport(
-            usbConnected = _uiState.value.device.usbConnected,
-            bleConnected = _uiState.value.isX3TransportConnected && link.phase == LinkPhase.Connected,
-            bleSupportsFirmwareUpdate = link.capabilities?.supportsFirmwareUpdate == true,
-        )
-        if (transport == FirmwareTransport.GuardedUsb) {
+        val useManagedBle = !useUsb && release.source == FirmwareSource.Xtraordinary &&
+            _uiState.value.isX3TransportConnected && link.phase == LinkPhase.Connected &&
+            link.capabilities?.supportsFirmwareUpdate == true
+        if (!useUsb && !useManagedBle) {
+            _uiState.update {
+                it.copy(notice = UiNotice.DeviceMessage(
+                    if (release.source == FirmwareSource.Xtraordinary)
+                        "Connect X3 by USB or establish a fresh managed-update link"
+                    else
+                        "Connect the X3 to this phone by USB before flashing",
+                ))
+            }
+            return
+        }
+        if (useUsb) {
+            // A USB selection owns this transaction; do not let a stale managed
+            // BLE pending record replay concurrently with the upload.
+            pendingFirmwareInstall = null
+            persistPendingFirmwareInstall()
             viewModelScope.launch {
                 val result = runCatching {
                     val file = firmwareReleases.downloadVerified(release)
@@ -982,6 +985,19 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             }
             return
+        }
+        val pending = PendingFirmwareInstall(
+            model = release.model,
+            version = release.version,
+            sizeBytes = release.sizeBytes,
+            sha256 = release.sha256,
+            source = release.source,
+            assetName = release.assetName,
+            downloadUrl = release.downloadUrl,
+        )
+        if (pendingFirmwareInstall?.let { FirmwareInstallPendingPolicy.isSame(it, pending) } != true) {
+            pendingFirmwareInstall = pending
+            persistPendingFirmwareInstall()
         }
         intentionalTransportIdle = false
         _uiState.update {
@@ -1279,6 +1295,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     /** Drains durable work whenever the shared USB-availability lifecycle permits it. */
     private fun drainPendingFirmwareInstall() {
         val pending = pendingFirmwareInstall ?: return
+        if (pending.source != FirmwareSource.Xtraordinary) return
         val link = companionClient.state.value
         if (firmwareInstallJob?.isActive == true ||
             !FirmwareInstallPendingPolicy.shouldReplay(
@@ -1302,9 +1319,8 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 delay(12_000)
                 ensureTransportConnected()
             } else {
-                // A disconnect or missed physical Confirm is retryable. Keep the
-                // identity/hash durable and let the next protocol-ready session
-                // replay the transaction without another UI tap.
+                // A disconnect is retryable. Keep the identity/hash durable and
+                // let the next protocol-ready session replay the transaction.
                 if (result.exceptionOrNull() is CompanionCommandRejectedException) {
                     val retry = FirmwareInstallPendingPolicy.afterNack(pending)
                     pendingFirmwareInstall = retry
@@ -1314,9 +1330,9 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                             it.copy(
                                 device = it.device.copy(
                                     firmwareCheckPhase = FirmwareCheckPhase.Error,
-                                    message = "X3 did not receive the physical Confirm gesture",
+                                    message = "X3 rejected the managed firmware transaction",
                                 ),
-                                notice = UiNotice.DeviceMessage("Hold Confirm on X3 while firmware installation starts"),
+                                notice = UiNotice.DeviceMessage("Managed Xtraordinary firmware update was rejected"),
                             )
                         }
                         firmwareInstallJob = null

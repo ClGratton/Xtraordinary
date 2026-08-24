@@ -1,5 +1,9 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-24 firmware transport contract correction
+
+Restored the pre-`20d639b` user-facing USB-first upload semantics: USB owns LocalFile, stock, CrossPoint, takeover, and recovery; managed BLE is additional and only for fresh Xtraordinary-to-Xtraordinary Capabilities with companion update support. Removed the firmware Confirm-button guard while retaining bonded/encrypted protocol, artifact hash, commit, and apply safety. Added Android otadata parser tests for CRC-valid highest sequence and invalid fail-closed records. The current Android ROM implementation has no flash-read/stub primitive, so `UsbEspFlasher` still fails closed before write when runtime selected-slot evidence is absent; no address is assumed and otadata is never rewritten. App candidate is now dev50/versionCode 51.
+
 ## 2026-08-24 Focus appearance selector source checkpoint
 
 The Focus screen's existing 1.60 landscape artwork field is now the sole picture-based Light/Dark selector. It reuses `MagneticHorizontalPager` resistance, threshold haptics, snap, and settled behavior; its generic displayed-position callback feeds a transient `0..1` palette interpolation at the Activity/theme boundary. The durable `CompanionColorMode` callback fires only after a settled page, so an interrupted swipe, fling, return-to-origin, or recreated Focus pager preserves the last settled mode rather than a transient desired value. Settings now offers ordinary text-only Light/Dark radio targets at 48dp; Expressive/Minimal remains independent. Intermediate Material roles use a black-or-white content choice selected for at least normal-text contrast while their containers interpolate.
