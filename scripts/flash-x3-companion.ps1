@@ -10,8 +10,16 @@ param(
 $ErrorActionPreference = "Stop"
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 . (Join-Path $PSScriptRoot "use-toolchains.ps1")
+. (Join-Path $PSScriptRoot "resolve-xtraordinary-deployment-targets.ps1")
 
 $ResolvedFirmware = (Resolve-Path (Join-Path $ProjectRoot $FirmwarePath)).Path
+$X3UsbTarget = Get-XtraordinaryX3UsbTarget
+if ($null -eq $X3UsbTarget) {
+    throw 'No present X3 USB/JTAG composite or serial interface with VID_303A:1001 was found. Do not infer absence from serial ports alone.'
+}
+if ($Port -ne $X3UsbTarget.Port) {
+    throw "Requested X3 serial port $Port does not match the present VID_303A:1001 target $($X3UsbTarget.Port)."
+}
 $AvailablePorts = [System.IO.Ports.SerialPort]::GetPortNames()
 if ($Port -notin $AvailablePorts) {
     throw "X3 serial port $Port is not present. Available ports: $($AvailablePorts -join ', ')"
@@ -33,9 +41,9 @@ Write-Host "Size: $($Artifact.Length) bytes"
 Write-Host "SHA-256: $($Hash.Hash)"
 
 if (-not $SkipAndroidRelease) {
-    $ConnectedPhones = @(& $Adb devices | Select-String "`tdevice$")
+    $ConnectedPhones = @(Get-XtraordinaryAdbDevice -Adb $Adb)
     if ($ConnectedPhones.Count -ne 1) {
-        throw "Expected exactly one ADB phone before resetting X3; found $($ConnectedPhones.Count)."
+        throw "Expected exactly one ADB phone after current mDNS discovery before resetting X3; found $($ConnectedPhones.Count)."
     }
     Write-Host "Requesting a graceful Android GATT release..."
     & $Adb logcat -c

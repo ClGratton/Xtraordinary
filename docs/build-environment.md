@@ -88,6 +88,8 @@ The Espressif 14.2 assembler resolves its own executable path at startup. In a r
 
 ## Safe X3 application flash
 
+Before a guarded install/flash says either target is unavailable, use the shared discovery preflight. It retains an existing authenticated phone; otherwise it falls back from an empty OpenScreen mDNS result to a normal-user Windows Bonjour probe and connects only its current TLS endpoint. It also checks present `VID_303A:1001` composite/interface PnP records before it selects `COM7`; never infer X3 absence from a ports-only scan or open the port merely to probe it.
+
 Use the repository workflow rather than opening COM7 manually:
 
 ```powershell

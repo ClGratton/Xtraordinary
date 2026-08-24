@@ -117,8 +117,22 @@
       "id": "wireless-adb-discovery-before-phone-absent",
       "type": "required_pattern",
       "path": "AGENTS.md",
-      "pattern": "Do not report that a wireless-debug phone is absent[\\s\\S]*?restart the repository ADB daemon in the normal user context[\\s\\S]*?adb mdns services[\\s\\S]*?_adb-tls-connect\\._tcp[\\s\\S]*?adb devices -l",
+      "pattern": "Do not report that a wireless-debug phone is absent[\\s\\S]*?resolve-xtraordinary-deployment-targets\\.ps1[\\s\\S]*?OpenScreen[\\s\\S]*?_adb-tls-connect\\._tcp[\\s\\S]*?ADB_MDNS_OPENSCREEN[\\s\\S]*?0[\\s\\S]*?Bonjour",
       "message": "Agents must restart a restricted ADB daemon and perform current mDNS discovery before declaring a wireless-debug phone unavailable."
+    },
+    {
+      "id": "windows-adb-discovery-falls-back-to-bonjour",
+      "type": "required_pattern",
+      "path": "scripts/resolve-xtraordinary-deployment-targets.ps1",
+      "pattern": "Get-XtraordinaryAdbDevice[\\s\\S]*?mdns services[\\s\\S]*?ADB_MDNS_OPENSCREEN[\\s\\S]*?0[\\s\\S]*?kill-server[\\s\\S]*?start-server[\\s\\S]*?Get-AdbTlsConnectEndpoints[\\s\\S]*?connect \\$endpoint",
+      "message": "Windows deployment discovery must fall back from an empty OpenScreen mDNS result to Bonjour and connect only a current TLS endpoint."
+    },
+    {
+      "id": "windows-x3-discovery-uses-present-composite-before-port",
+      "type": "required_pattern",
+      "path": "scripts/flash-x3-companion.ps1",
+      "pattern": "Get-XtraordinaryX3UsbTarget[\\s\\S]*?VID_303A:1001[\\s\\S]*?\\$AvailablePorts",
+      "message": "Guarded X3 flashing must check the present VID_303A:1001 composite/interface target before relying on a serial-port list."
     },
     {
       "id": "android-wrapper-runs-policy-gate",

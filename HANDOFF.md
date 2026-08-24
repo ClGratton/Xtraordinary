@@ -1,5 +1,13 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-24 protected discovery workflow checkpoint
+
+The guarded deployment completed before this checkpoint: Community `com.xteink.companion` is installed as `0.2.0-dev49` / code `50` with retained app data; the source-matched dev37 application image was written only to `0x10000`, hash-verified, and the app relaunched. The prior evidence owner confirmed the `1800000` ms timeout plus a running app process after relaunch, the retained `XTEINK Companion` LE Secure Connections bond, and present Windows `USB\\VID_303A&PID_1001` composite/JTAG/serial interfaces with `COM7`. No reset, pairing/bond, app-data, NVS, SD, book, or settings mutation belongs to that evidence checkpoint.
+
+`scripts/resolve-xtraordinary-deployment-targets.ps1` is now the shared, read-only deployment preflight. It keeps an authenticated ADB device; only when none exists and OpenScreen has no current TLS service does it restart the normal-user repository daemon with `ADB_MDNS_OPENSCREEN=0`, query Bonjour, and connect only a current `_adb-tls-connect._tcp` endpoint. It also checks present `VID_303A:1001` composite/interface PnP records before selecting an associated serial port. Focused fixtures pass, and the 158-rule engineering gate passes only with the existing explicit deferred UI-review debt (46 stale/missing UI-review findings); release mode remains fail-closed.
+
+The last missing physical proof is a fresh BLE protocol-ready chain: encrypted GATT, notifications, `Capabilities` carrying dev37's firmware version, `StatusChanged`, revisioned `LibraryPage`, and matching policy acknowledgements. The X3 has now moved from the PC's COM7 connection to the Pixel USB host, so PC PnP absence is expected and must not trigger any reset, re-pair, reflash, timeout change, or COM-port probe. Use the authenticated Pixel only for a bounded normal-app/diagnostic interaction; a USB-host detection result is distinct from BLE firmware reconciliation.
+
 ## 2026-08-24 canonical build/deploy retry checkpoint
 
 Pushed source `23acfd87919f178c2d1cf055ce1b2f311439f187` on `codex/x3-build-deploy-acceptance` was clean and upstream-matched. The task-bound usage audit passed before Android, device, and firmware protected stages (weekly meter 6%, task-local weekly growth 0 points; the gate returned `within-budget`). The bounded regression-impact decision made no behavioral change: retain fast-lease-before-transaction, matching-ACK and final revisioned `LibraryPage` truth, Bluetooth bonds, Pixel app data/timeout, and X3 NVS/SD/books. Legal status remains **not release-cleared**.

@@ -7,6 +7,7 @@ param(
 $ErrorActionPreference = "Stop"
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 . (Join-Path $PSScriptRoot "use-toolchains.ps1")
+. (Join-Path $PSScriptRoot "resolve-xtraordinary-deployment-targets.ps1")
 
 $ResolvedApk = (Resolve-Path (Join-Path $ProjectRoot $ApkPath)).Path
 $Adb = Join-Path $env:ANDROID_HOME "platform-tools\adb.exe"
@@ -14,9 +15,9 @@ if (-not (Test-Path -LiteralPath $Adb)) {
     throw "Required project ADB is missing: $Adb"
 }
 
-$ConnectedPhones = @(& $Adb devices | Select-String "`tdevice$")
+$ConnectedPhones = @(Get-XtraordinaryAdbDevice -Adb $Adb)
 if ($ConnectedPhones.Count -ne 1) {
-    throw "Expected exactly one ADB phone before installing; found $($ConnectedPhones.Count)."
+    throw "Expected exactly one ADB phone after current mDNS discovery; found $($ConnectedPhones.Count)."
 }
 
 $Artifact = Get-Item -LiteralPath $ResolvedApk

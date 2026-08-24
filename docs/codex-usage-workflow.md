@@ -14,6 +14,12 @@ Run `scripts/read-codex-usage.ps1` outside the filesystem sandbox in the normal 
 
 `windowDurationMins = 10080` is a seven-day allowance. Treat its percentage as weekly budget consumption, never as a short rolling window that can be casually spent within one task. State the window length whenever reporting the percentage.
 
+## Windows deployment-target discovery
+
+Use `scripts/resolve-xtraordinary-deployment-targets.ps1` as the reusable preflight for an Android install or guarded X3 flash. It first retains an already authenticated ADB device. Only when no device is connected and OpenScreen reports no current `_adb-tls-connect._tcp` service does it restart the normal-user repository daemon with `ADB_MDNS_OPENSCREEN=0`, query Windows Bonjour, and connect only the freshly discovered TLS endpoint. This changes neither pairing nor app data; never print or record a pairing code.
+
+The same helper identifies X3 from present `VID_303A:1001` composite/interface PnP records before selecting its associated `COM` interface. A ports-only scan is insufficient: a present composite without a serial interface is a reconnect/Device Manager condition, not evidence that X3 is absent. Discovery is read-only and must not open the serial port, reset the device, alter NVS, Bluetooth bonds, app data, or SD/books.
+
 For a forensic task audit, read only top-level `token_count` events from the current task rollout. Report deltas for input, cached input, uncached input, output, reasoning output, total tokens, and model-call count. Do not sum forked-agent rollout totals: forked rollouts inherit counters/history and can duplicate usage.
 
 Run `scripts/audit-codex-task-usage.ps1` instead of broad text searches over rollout JSONL. It streams the file, counts only typed records, and reports cache effectiveness, per-call input distribution, compactions, tool-call concentration, task-local weekly growth, and lifetime totals without printing message bodies back into the model context.

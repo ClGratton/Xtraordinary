@@ -37,6 +37,8 @@ The phone recognizes the ESP32-C3 USB/JTAG serial interface as USB VID/PID `303A
 
 Do not replace step 7 with a generic disconnected state. OEM firmware may stop exposing USB/JTAG after boot even while the cable remains physically attached. The instruction tells the user which physical action is required and prevents a successful flash from looking like an unexplained failure.
 
+On Windows, preflight the same identity through `scripts/resolve-xtraordinary-deployment-targets.ps1`: inspect present `VID_303A:1001` composite/interface PnP records before selecting the associated serial interface. A ports-only scan is not evidence that X3 is absent, and discovery must not open the serial port.
+
 ### Application firmware region
 
 - Offset: `0x10000`

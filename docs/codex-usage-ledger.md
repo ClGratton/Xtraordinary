@@ -1,5 +1,11 @@
 # Codex usage ledger
 
+## 2026-08-24 - Protected discovery workflow checkpoint
+
+- Task: `01a033f6-ba01-7e91-8ab7-f20f325c48ab`. Entry `-EnforceStageGate` returned `within-budget`: 14% used in the 10,080-minute signed-in window, 0-point task-local weekly growth, one 31,211-token call (77.92% cached), no compactions, and no replay/budget signal.
+- Source checkpoint: the new shared preflight retains an authenticated ADB target, uses Bonjour only after an empty OpenScreen current-service result, and maps present X3 `VID_303A:1001` composite/interface records before COM selection. Its focused fixture passed. The full 158-rule policy gate passed with the existing explicit 46-item UI-review debt only; release mode still fails closed. The Android notice generator refreshed only UTF-8 BOM/manifest hashes after the checker detected stale inventories.
+- Protected physical evidence remains pending after this clean commit/push. The X3 is now attached to the Pixel host, so the bounded next interaction must preserve the app data, `1800000` timeout, bond, NVS, SD/books, and settings while proving USB-host detection and, if advertising permits, a fresh BLE capabilities/status/library/policy-ACK chain.
+
 ## 2026-08-24 - Bounded device-deployment checkpoint
 
 - Task: `01a033d7-8315-7c83-a1fd-646fa27f147c`. The entry/pre-deployment `-EnforceStageGate` audit returned `within-budget`: 9% used in the 10,080-minute signed-in window, 0-point task-local weekly growth, one model call with 26,813 input tokens (86.88% cached), no compactions, and no replay or weekly-reserve violation.

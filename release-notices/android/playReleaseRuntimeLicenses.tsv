@@ -1,4 +1,4 @@
-group	module	version	licenseNames	licenseUrls	pomSha256
+﻿group	module	version	licenseNames	licenseUrls	pomSha256
 androidx.activity	activity	1.13.0	The Apache Software License, Version 2.0	http://www.apache.org/licenses/LICENSE-2.0.txt	a5c53e074754835d30621618616e783b5b71875c2e7988ab06082348152e314e
 androidx.activity	activity-compose	1.13.0	The Apache Software License, Version 2.0	http://www.apache.org/licenses/LICENSE-2.0.txt	cb6a8ff89ffb7f107f214050e9fb32b0d0b0f665d8de7c9e4e2a4d5fea9951e9
 androidx.activity	activity-ktx	1.13.0	The Apache Software License, Version 2.0	http://www.apache.org/licenses/LICENSE-2.0.txt	79d63d7b13c43f92faf63ade9fc6a4ab45e8e42493dbaa138c7a736184a4c775
