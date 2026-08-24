@@ -27,4 +27,13 @@ class FirmwareInstallPendingTest {
         assertEquals(1, retry!!.attempt)
         assertNull(FirmwareInstallPendingPolicy.afterNack(retry))
     }
+
+    @Test fun pendingArtifactCannotBeReplacedUntilTransactionStops() {
+        assertFalse(FirmwareInstallPendingPolicy.canChangeSource(FirmwareCheckPhase.Downloading))
+        assertFalse(FirmwareInstallPendingPolicy.canChangeSource(FirmwareCheckPhase.Transferring))
+        assertFalse(FirmwareInstallPendingPolicy.canChangeSource(FirmwareCheckPhase.Verifying))
+        assertTrue(FirmwareInstallPendingPolicy.canChangeSource(FirmwareCheckPhase.Available))
+        assertTrue(FirmwareInstallPendingPolicy.canChangeSource(FirmwareCheckPhase.Error))
+        assertTrue(FirmwareInstallPendingPolicy.canChangeSource(FirmwareCheckPhase.Complete))
+    }
 }

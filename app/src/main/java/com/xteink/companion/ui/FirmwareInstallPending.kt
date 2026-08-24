@@ -28,6 +28,13 @@ object FirmwareInstallPendingPolicy {
         supportsFirmwareUpdate: Boolean,
     ): Boolean = pending != null && protocolReady && supportsFirmwareUpdate
 
+    /** A durable install owns its selected artifact until it completes or fails closed. */
+    fun canChangeSource(phase: FirmwareCheckPhase): Boolean = phase !in setOf(
+        FirmwareCheckPhase.Downloading,
+        FirmwareCheckPhase.Transferring,
+        FirmwareCheckPhase.Verifying,
+    )
+
     fun afterDisconnect(pending: PendingFirmwareInstall): PendingFirmwareInstall = pending
 
     fun afterLeaseAck(pending: PendingFirmwareInstall): PendingFirmwareInstall = pending

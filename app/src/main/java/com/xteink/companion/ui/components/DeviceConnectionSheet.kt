@@ -73,6 +73,7 @@ import com.xteink.companion.ui.DevicePresence
 import com.xteink.companion.ui.FirmwareCheckPhase
 import com.xteink.companion.ui.firmwareInstallRoutes
 import com.xteink.companion.ui.FirmwareInstallRoute
+import com.xteink.companion.ui.FirmwareInstallPendingPolicy
 import com.xteink.companion.ui.devicePresence
 
 enum class DeviceSetupStep {
@@ -666,13 +667,21 @@ private fun DefaultFirmwarePage(
             onFlashFirmware = onFlashFirmware,
             onFlashFirmwareManagedBle = onFlashFirmwareManagedBle,
         )
-        Spacer(Modifier.height(8.dp))
-        TextButton(
-            onClick = onChooseAlternative,
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+        AnimatedVisibility(
+            visible = FirmwareInstallPendingPolicy.canChangeSource(device.firmwareCheckPhase),
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically(),
         ) {
-            Text(stringResource(R.string.choose_another_firmware))
+            OutlinedButton(
+                onClick = onChooseAlternative,
+                modifier = Modifier
+                    .padding(top = 12.dp)
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+            ) {
+                Text(stringResource(R.string.choose_another_firmware))
+            }
         }
     }
 }

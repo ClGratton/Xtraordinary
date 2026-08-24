@@ -1366,7 +1366,9 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 supportsFirmwareUpdate = link.capabilities?.supportsFirmwareUpdate == true,
             )
         ) return
-        val release = latestRelease ?: pending.toRelease().also { latestRelease = it }
+        // Durable identity is authoritative during replay. A later catalog or
+        // picker result must never replace the artifact the user requested.
+        val release = pending.toRelease().also { latestRelease = it }
         firmwareInstallJob = viewModelScope.launch {
             val result = runCatching {
                 val file = firmwareReleases.downloadVerified(release)
