@@ -67,6 +67,32 @@ class PayloadCodecTest {
     }
 
     @Test
+    fun legacyFixedWidthCapabilitiesDecodeWithoutUsingCachedState() {
+        val bytes = ByteBuffer.allocate(24 + 48 + 9).order(ByteOrder.LITTLE_ENDIAN).apply {
+            put("X3".toByteArray())
+            put(ByteArray(22))
+            put("xtraordinary-v0.2.6-dev32".toByteArray())
+            put(ByteArray(48 - "xtraordinary-v0.2.6-dev32".length))
+            putInt(17)
+            put(byteArrayOf(1, 0, 1, 1, 1))
+        }.array()
+
+        val decoded = PayloadCodec.decodeCapabilities(bytes)
+        assertEquals("X3", decoded.model)
+        assertEquals("xtraordinary-v0.2.6-dev32", decoded.firmwareVersion)
+        assertEquals(17u, decoded.libraryRevision)
+        assertEquals(1, decoded.readerPolicyVersion)
+    }
+
+    @Test
+    fun capabilitiesRejectTruncatedLengthPrefixedField() {
+        val malformed = byteArrayOf(2, 0, 'X'.code.toByte(), '3'.code.toByte(), 48, 0)
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            PayloadCodec.decodeCapabilities(malformed)
+        }
+    }
+
+    @Test
     fun interactiveLeaseIsReusableAndBounded() {
         assertTrue(PayloadCodec.encodeInteractiveLease(30).contentEquals(byteArrayOf(0x1e, 0x00)))
         assertTrue(PayloadCodec.encodeInteractiveLease(500).contentEquals(byteArrayOf(0x78, 0x00)))

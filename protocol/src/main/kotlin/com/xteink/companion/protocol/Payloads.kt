@@ -2,6 +2,7 @@ package com.xteink.companion.protocol
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.charset.CodingErrorAction
 
 const val XTEINK_SERVICE_UUID = "7e400001-b5a3-f393-e0a9-e50e24dcca9e"
 const val XTEINK_CONTROL_UUID = "7e400002-b5a3-f393-e0a9-e50e24dcca9e"
@@ -282,26 +283,53 @@ object PayloadCodec {
         put(value.ticketPayloadVersion.coerceIn(0, 255).toByte())
     }
 
-    fun decodeCapabilities(bytes: ByteArray): DeviceCapabilities = reader(bytes) {
-        val model = utf8(24)
-        val firmwareVersion = utf8(48)
+    fun decodeCapabilities(bytes: ByteArray): DeviceCapabilities {
+        // Current X3 firmware uses length-prefixed UTF-8 fields. Older companion
+        // firmware used the original fixed 24/48-byte fields; identify that
+        // layout from its impossible first length and decode it explicitly.
+        val currentLength = if (bytes.size >= 2) {
+            ByteBuffer.wrap(bytes).little().short.toInt() and 0xffff
+        } else {
+            Int.MAX_VALUE
+        }
+        return if (currentLength <= 24 && bytes.size >= 2 + currentLength + 2) {
+            reader(bytes) {
+                decodeCapabilitiesFields(utf8(24), utf8(48))
+            }
+        } else {
+            decodeLegacyCapabilities(bytes)
+        }
+    }
+
+    private fun ByteBuffer.decodeCapabilitiesFields(model: String, firmwareVersion: String): DeviceCapabilities {
         val libraryRevision = int.toUInt()
         val supportsFirmwareUpdate = get().toInt() != 0
         val ticketPresent = remaining() > 0 && get().toInt() != 0
         val readerPolicyVersion = if (remaining() > 0) get().toInt() and 0xff else 0
         val radioPolicyVersion = if (remaining() > 0) get().toInt() and 0xff else 0
         val ticketPayloadVersion = if (remaining() > 0) get().toInt() and 0xff else 0
-        DeviceCapabilities(
-            model = model,
-            firmwareVersion = firmwareVersion,
-            libraryRevision = libraryRevision,
-            supportsFirmwareUpdate = supportsFirmwareUpdate,
-            ticketPresent = ticketPresent,
-            supportsReaderPolicy = readerPolicyVersion > 0,
-            readerPolicyVersion = readerPolicyVersion,
-            radioPolicyVersion = radioPolicyVersion,
-            ticketPayloadVersion = ticketPayloadVersion,
+        return DeviceCapabilities(
+            model, firmwareVersion, libraryRevision, supportsFirmwareUpdate, ticketPresent,
+            readerPolicyVersion > 0, readerPolicyVersion, radioPolicyVersion, ticketPayloadVersion,
         )
+    }
+
+    private fun decodeLegacyCapabilities(bytes: ByteArray): DeviceCapabilities {
+        require(bytes.size >= 24 + 48 + 5) { "Legacy capabilities payload is truncated" }
+        return ByteBuffer.wrap(bytes).little().run {
+            val model = fixedUtf8(24)
+            val firmwareVersion = fixedUtf8(48)
+            decodeCapabilitiesFields(model, firmwareVersion)
+        }
+    }
+
+    private fun ByteBuffer.fixedUtf8(width: Int): String {
+        val field = ByteArray(width).also(::get)
+        val end = field.indexOf(0).takeIf { it >= 0 } ?: field.size
+        return Charsets.UTF_8.newDecoder()
+            .onMalformedInput(CodingErrorAction.REPORT)
+            .onUnmappableCharacter(CodingErrorAction.REPORT)
+            .decode(ByteBuffer.wrap(field, 0, end)).toString()
     }
 
     fun encodeLibraryPage(value: LibraryPagePayload): ByteArray = writer(64 + value.entries.sumOf { it.path.length }) {
