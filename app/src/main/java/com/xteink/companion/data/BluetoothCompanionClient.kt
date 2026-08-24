@@ -578,7 +578,11 @@ class BluetoothCompanionClient(private val context: Context) {
         )
     suspend fun acquireInteractiveLease(seconds: Int = InteractiveTransportContract.LeaseSeconds) {
         requestTransferConnectionPriority(high = true)
-        send(MessageType.AcquireInteractiveLease, PayloadCodec.encodeInteractiveLease(seconds), awaitAck = false)
+        sendAwaitingAck(
+            MessageType.AcquireInteractiveLease,
+            PayloadCodec.encodeInteractiveLease(seconds),
+            timeoutMillis = 10_000,
+        )
     }
     suspend fun releaseInteractiveLease() {
         requestTransferConnectionPriority(high = false)

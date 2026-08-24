@@ -16,8 +16,6 @@ import com.xteink.companion.data.BookUploadPersistence
 import com.xteink.companion.data.FirmwareRelease
 import com.xteink.companion.data.FirmwareReleaseRepository
 import com.xteink.companion.data.FirmwareSource
-import com.xteink.companion.data.FirmwareTransport
-import com.xteink.companion.data.selectFirmwareTransport
 import com.xteink.companion.data.FlightBarcodeFormat
 import com.xteink.companion.data.FlightIdentity
 import com.xteink.companion.data.FlightStatusRefreshPolicy
@@ -36,6 +34,7 @@ import com.xteink.companion.data.UsbFlashPhase
 import com.xteink.companion.protocol.SessionStart
 import com.xteink.companion.protocol.BoardingPassPayload
 import com.xteink.companion.protocol.DeviceActivity
+import com.xteink.companion.protocol.DeviceCapabilities
 import com.xteink.companion.protocol.PayloadCodec
 import com.xteink.companion.protocol.RadioPolicy
 import com.xteink.companion.protocol.TicketDisplayMode
@@ -136,7 +135,9 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     private val bookLibrary = BookLibraryRepository(application)
     private val connectionPreferences =
         application.getSharedPreferences(BookUploadPersistence.PreferencesName, Application.MODE_PRIVATE)
-    private var latestRelease: FirmwareRelease? = null
+    private var pendingFirmwareInstall: PendingFirmwareInstall? = decodePendingFirmwareInstall()
+    private var firmwareInstallJob: Job? = null
+    private var latestRelease: FirmwareRelease? = pendingFirmwareInstall?.toRelease()
     private var backgroundDisconnectJob: Job? = null
     private var reconnectJob: Job? = null
     private var focusSyncJob: Job? = null
@@ -279,6 +280,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                         ),
                     )
                 }
+                maybeCompletePendingFirmwareInstall(capabilities)
                 scheduleInteractiveLeaseForConnection(link.capabilitiesSequence)
                 if (transportConnected && capabilities != null) {
                     reconnectAttempt = 0
@@ -290,6 +292,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                     drainPendingTicketSend()
                     drainPendingTicketRemoval()
                     resumePendingBookUploadIfPossible()
+                    drainPendingFirmwareInstall()
                     if (link.deviceStatus?.activity == DeviceActivity.Reading) scheduleReadingRadioQuiet()
                 } else if (reconnectRequired && !connectionBlocked) {
                     scheduleReconnect()
@@ -934,51 +937,33 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun flashLatestFirmware() {
-        val release = latestRelease ?: return
-        val link = companionClient.state.value
-        val transport = selectFirmwareTransport(
-            usbConnected = _uiState.value.device.usbConnected,
-            bleConnected = _uiState.value.isX3TransportConnected && link.phase == LinkPhase.Connected,
-            bleSupportsFirmwareUpdate = link.capabilities?.supportsFirmwareUpdate == true,
-        )
-        if (transport == FirmwareTransport.Unavailable) {
-            _uiState.update { it.copy(notice = UiNotice.DeviceMessage("Connected X3 does not advertise managed firmware update support")) }
+        val release = latestRelease ?: run {
+            reportDeviceError(IllegalStateException("Firmware selection is no longer available"))
             return
         }
-        val useUsb = transport == FirmwareTransport.GuardedUsb
-        if (!useUsb) ensureTransportConnected()
-        viewModelScope.launch {
-            _uiState.update {
-                it.copy(device = it.device.copy(
-                    firmwareCheckPhase = FirmwareCheckPhase.Downloading,
-                    firmwareProgress = null,
-                    message = null,
-                ))
-            }
-            val flashResult = runCatching {
-                val file = firmwareReleases.downloadVerified(release)
-                _uiState.update { it.copy(device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Transferring)) }
-                if (useUsb) {
-                    withExclusiveUsbMaintenance { usbFlasher.flash(file) }
-                } else {
-                    companionClient.awaitConnected()
-                    intentionalTransportIdle = true
-                    companionClient.flashFirmware(release, file)
-                }
-            }
-            if (flashResult.isSuccess) {
-                _uiState.update { it.copy(device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Complete)) }
-                // USB flashing returns after hard reset; BLE flashing returns
-                // before the delayed on-device copy and reboot. Keep Android
-                // from opening a new GATT client inside either reset window.
-                delay(if (useUsb) 7_000 else 12_000)
-                intentionalTransportIdle = false
-                ensureTransportConnected()
-            } else {
-                intentionalTransportIdle = false
-                flashResult.exceptionOrNull()?.let(::reportDeviceError)
-            }
+        val pending = PendingFirmwareInstall(
+            model = release.model,
+            version = release.version,
+            sizeBytes = release.sizeBytes,
+            sha256 = release.sha256,
+            source = release.source,
+            assetName = release.assetName,
+            downloadUrl = release.downloadUrl,
+        )
+        if (pendingFirmwareInstall?.let { FirmwareInstallPendingPolicy.isSame(it, pending) } != true) {
+            pendingFirmwareInstall = pending
+            persistPendingFirmwareInstall()
         }
+        intentionalTransportIdle = false
+        _uiState.update {
+            it.copy(device = it.device.copy(
+                firmwareCheckPhase = FirmwareCheckPhase.Downloading,
+                firmwareProgress = null,
+                message = "Waiting for X3 to resume firmware installation",
+            ))
+        }
+        ensureTransportConnected()
+        drainPendingFirmwareInstall()
     }
 
     override fun onCleared() {
@@ -1263,6 +1248,96 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /** Drains durable work whenever the shared USB-availability lifecycle permits it. */
+    private fun drainPendingFirmwareInstall() {
+        val pending = pendingFirmwareInstall ?: return
+        val link = companionClient.state.value
+        if (firmwareInstallJob?.isActive == true ||
+            !FirmwareInstallPendingPolicy.shouldReplay(
+                pending = pending,
+                protocolReady = link.phase == LinkPhase.Connected && link.capabilities != null,
+                supportsFirmwareUpdate = link.capabilities?.supportsFirmwareUpdate == true,
+            )
+        ) return
+        val release = latestRelease ?: pending.toRelease().also { latestRelease = it }
+        firmwareInstallJob = viewModelScope.launch {
+            val result = runCatching {
+                val file = firmwareReleases.downloadVerified(release)
+                _uiState.update { it.copy(device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Transferring, message = null)) }
+                // Firmware transfer owns the lease explicitly; await its ACK
+                // before BEGIN so a disconnect cannot create a false-ready tap.
+                companionClient.acquireInteractiveLease()
+                companionClient.flashFirmware(release, file)
+            }
+            if (result.isSuccess) {
+                _uiState.update { it.copy(device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Complete, message = "Device is restarting")) }
+                delay(12_000)
+                ensureTransportConnected()
+            } else {
+                // A disconnect or missed physical Confirm is retryable. Keep the
+                // identity/hash durable and let the next protocol-ready session
+                // replay the transaction without another UI tap.
+                _uiState.update { it.copy(device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Downloading, message = "Waiting for X3 to resume firmware installation")) }
+                handleDeferredTransportFailure(result.exceptionOrNull())
+            }
+            firmwareInstallJob = null
+        }
+    }
+
+    private fun maybeCompletePendingFirmwareInstall(capabilities: DeviceCapabilities?) {
+        val pending = pendingFirmwareInstall ?: return
+        if (_uiState.value.device.firmwareCheckPhase != FirmwareCheckPhase.Complete ||
+            capabilities?.firmwareVersion != pending.version
+        ) return
+        pendingFirmwareInstall = null
+        persistPendingFirmwareInstall()
+        _uiState.update { it.copy(notice = null, device = it.device.copy(message = null)) }
+    }
+
+    private fun decodePendingFirmwareInstall(): PendingFirmwareInstall? = runCatching {
+        val version = connectionPreferences.getString(PendingFirmwareVersionKey, null) ?: return null
+        PendingFirmwareInstall(
+            model = connectionPreferences.getString(PendingFirmwareModelKey, "X3") ?: "X3",
+            version = version,
+            sizeBytes = connectionPreferences.getLong(PendingFirmwareSizeKey, 0L),
+            sha256 = connectionPreferences.getString(PendingFirmwareShaKey, null) ?: return null,
+            source = FirmwareSource.valueOf(connectionPreferences.getString(PendingFirmwareSourceKey, FirmwareSource.LocalFile.name)!!),
+            assetName = connectionPreferences.getString(PendingFirmwareAssetKey, "pending-firmware.bin") ?: "pending-firmware.bin",
+            downloadUrl = connectionPreferences.getString(PendingFirmwareUrlKey, "") ?: "",
+            attempt = connectionPreferences.getInt(PendingFirmwareAttemptKey, 0),
+        )
+    }.getOrNull()
+
+    private fun persistPendingFirmwareInstall() {
+        val editor = connectionPreferences.edit()
+        val pending = pendingFirmwareInstall
+        if (pending == null) {
+            editor.remove(PendingFirmwareModelKey).remove(PendingFirmwareVersionKey)
+                .remove(PendingFirmwareSizeKey).remove(PendingFirmwareShaKey)
+                .remove(PendingFirmwareSourceKey).remove(PendingFirmwareAssetKey)
+                .remove(PendingFirmwareUrlKey).remove(PendingFirmwareAttemptKey)
+        } else {
+            editor.putString(PendingFirmwareModelKey, pending.model)
+                .putString(PendingFirmwareVersionKey, pending.version)
+                .putLong(PendingFirmwareSizeKey, pending.sizeBytes)
+                .putString(PendingFirmwareShaKey, pending.sha256)
+                .putString(PendingFirmwareSourceKey, pending.source.name)
+                .putString(PendingFirmwareAssetKey, pending.assetName)
+                .putString(PendingFirmwareUrlKey, pending.downloadUrl)
+                .putInt(PendingFirmwareAttemptKey, pending.attempt)
+        }
+        check(editor.commit()) { "Could not persist the pending firmware install" }
+    }
+
+    private fun PendingFirmwareInstall.toRelease() = FirmwareRelease(
+        model = model,
+        source = source,
+        version = version,
+        assetName = assetName,
+        downloadUrl = downloadUrl,
+        sizeBytes = sizeBytes,
+        sha256 = sha256,
+    )
+
     private fun drainPendingUsbWork() {
         if (usbMaintenanceActive) return
         resumePendingBookUploadIfPossible()
@@ -1684,7 +1759,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             state.device.firmwareCheckPhase == FirmwareCheckPhase.Transferring
         val bluetoothBookUpload = pendingBookUploadMethod == BookTransferMethod.Bluetooth &&
             (pendingBookUploadIds.isNotEmpty() || bookUploadJob?.isActive == true)
-        return interactiveTransport.isActive || radioPolicySyncPending || pendingTicketPayload != null || ticketSendJob?.isActive == true || firmwareNeedsLink || pendingFocusSync || bluetoothBookUpload ||
+        return interactiveTransport.isActive || radioPolicySyncPending || pendingTicketPayload != null || ticketSendJob?.isActive == true || pendingFirmwareInstall != null || firmwareNeedsLink || pendingFocusSync || bluetoothBookUpload ||
             pendingDeletePaths.isNotEmpty() || state.ticket.removalPending
     }
 
@@ -1944,5 +2019,13 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         const val BackgroundDisconnectGraceMs = 1_500L
         const val LastConnectedModelKey = "last_connected_model"
         const val PendingDeletePathsKey = "pending_delete_paths"
+        const val PendingFirmwareModelKey = "pending_firmware_model"
+        const val PendingFirmwareVersionKey = "pending_firmware_version"
+        const val PendingFirmwareSizeKey = "pending_firmware_size"
+        const val PendingFirmwareShaKey = "pending_firmware_sha256"
+        const val PendingFirmwareSourceKey = "pending_firmware_source"
+        const val PendingFirmwareAssetKey = "pending_firmware_asset"
+        const val PendingFirmwareUrlKey = "pending_firmware_url"
+        const val PendingFirmwareAttemptKey = "pending_firmware_attempt"
     }
 }
