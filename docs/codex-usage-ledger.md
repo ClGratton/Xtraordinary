@@ -1,5 +1,11 @@
 # Codex usage ledger
 
+## 2026-08-24 - Dev51 acceptance and capability-bound OTA/theme checkpoint
+
+- Product baseline from pushed `7f93110`: guarded Pixel-host ROM deployment wrote selected app0 `0x10000` using firmware SHA `465C5FB999B9B7E63926B0B91BAF895CFFFE843E0A31C130E8ACFB169708CB18`; ROM MD5 and hard reset passed. Fresh BLE Capabilities, StatusChanged, revisioned LibraryPage, SetRadioPolicy ACK, and SetReaderPolicy ACK accepted dev51. Bond/app data/NVS/SD/books were preserved.
+- Pushed `ecc86d7`; focused canonical Android wrapper passed protocol, Community/Play unit, lint, and assemblies with `AllowDeferredUiReviewDebt`. Installed retained-data Community dev51 APK: 86,612,485 bytes, SHA-256 `8136BF7A6346CCC0EF05EF7C4309D818B08587D33257DADED3A37CFB53706212`, versionCode 52. The top-left update status and shared theme hysteresis are source/build verified; UI reviewer and screenshot acceptance remain skipped by explicit instruction.
+- Capability boundary: managed BLE OTA is only for fresh Xtraordinary companion-family support; USB remains separate and stock/CrossPoint remain USB-only. Pixel host USB is currently present, so no OTA was attempted via USB or claimed. BLE-only transfer/ACK/reboot/fresh version proof remains the next device outcome. Pixel timeout must be restored and verified at `1800000` ms; maintenance lease is not claimed unless matching evidence exists.
+
 ## 2026-08-24 - Guarded Pixel-host dev51 deployment boundary
 
 - Corrected host inventory evidence found X3 at Pixel `/dev/bus/usb/001/002`, vendor 12346/product 4097. The installed dev51 app verified the exact artifact SHA `465C5FB999B9B7E63926B0B91BAF895CFFFE843E0A31C130E8ACFB169708CB18` and used the production guarded USB route. It failed closed at `ESP flasher stub did not start` immediately after MEM_END; no otadata read, selected-slot resolution, application write, reboot-to-app, or fresh dev51 Capabilities/StatusChanged/LibraryPage/policy ACK chain exists. No raw fallback or setup/data mutation occurred. Pixel timeout restored/verified at `1800000` ms; maintenance lease was not activated because matching firmware is not proven active.
