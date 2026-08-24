@@ -324,6 +324,12 @@
 - Durable correction: worker waits are capped at ten minutes and followed by exactly one compact check of real progress evidence. A liveness label alone is insufficient; a proven stall is interrupted and recovered, while genuine progress receives one new bounded wait without polling or nudges.
 - Recursive correction: every acknowledged workflow mistake must update durable guidance plus a machine-checkable rule or focused fixture when practical in the same checkpoint. A chat promise is not remediation, and failing to document the mistake is itself governed by the same rule.
 - Authority boundary: agents retain model routing, compaction, known toolchain/path recovery, evidence-based retry, build sequencing, and safe in-scope recovery. These execution decisions are not delegated to the user. No phone or X3 operation occurred while making this policy correction.
+
+## 2026-08-24 - Pixel screen-timeout lifecycle
+
+- User requirement: every Pixel-backed work phase must prevent the screen from timing out, but must not leave a changed personal setting behind.
+- Live start state: repository ADB read `screen_off_timeout=1800000` ms and `stay_on_while_plugged_in=0` from Pixel `192.168.1.61:36221`. The work timeout was set and verified as `2147483647` ms; the prior 30-minute value is the required restore target for this phase.
+- Durable correction: `scripts/manage-pixel-screen-timeout.ps1` snapshots the original timeout before disabling screen-off, preserves the first snapshot across repeated begins, restores the exact value at every completion/error checkpoint, and applies 30 minutes when state is unavailable or exact restoration fails. The engineering gate requires both the lifecycle policy and helper invariants.
 ## 2026-08-24 - Selected-slot firmware/install blocker
 
 - Policy correction `e4aaa58` enabled the canonical firmware build: `xtraordinary-v0.2.6-dev38-selected-slot-local`, 5,456,368 bytes, SHA-256 `E0E8FA4E3347BB4533CAF34E8CCF7CC25A4306E5988A7CBA64204190A0F389FE`, source-bound release record present.

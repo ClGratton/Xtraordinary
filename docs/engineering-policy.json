@@ -549,6 +549,20 @@
       "message": "Agents must own safe in-scope execution management and ask the user only for decisions requiring new authority."
     },
     {
+      "id": "pixel-work-restores-screen-timeout",
+      "type": "required_pattern",
+      "path": "docs/codex-usage-workflow.md",
+      "pattern": "Pixel-backed work uses `scripts/manage-pixel-screen-timeout\\.ps1`[\\s\\S]*?reads and durably snapshots the current `screen_off_timeout`[\\s\\S]*?disables automatic screen-off[\\s\\S]*?every normal completion, stop, or error checkpoint[\\s\\S]*?restore the exact saved timeout[\\s\\S]*?30-minute \\(`1800000` ms\\) fallback[\\s\\S]*?unbounded timeout may never be left behind",
+      "message": "Pixel-backed work must snapshot and disable screen-off only temporarily, then restore the exact value or a 30-minute fallback."
+    },
+    {
+      "id": "pixel-screen-timeout-helper-is-stateful-and-safe",
+      "type": "required_pattern",
+      "path": "scripts/manage-pixel-screen-timeout.ps1",
+      "pattern": "ValidateSet\\('Begin', 'Restore'\\)[\\s\\S]*?fallbackTimeoutMs = 1800000[\\s\\S]*?workTimeoutMs = 2147483647[\\s\\S]*?screen_off_timeout[\\s\\S]*?originalTimeoutMs[\\s\\S]*?Set-AndVerifyTimeout[\\s\\S]*?Remove-Item",
+      "message": "The Pixel timeout helper must preserve the original value, verify changes, and retain a 30-minute restoration fallback."
+    },
+    {
       "id": "substantial-milestones-use-one-cost-routed-owner",
       "type": "required_pattern",
       "path": "docs/codex-usage-workflow.md",

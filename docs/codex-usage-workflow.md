@@ -116,6 +116,8 @@ An acknowledged workflow mistake is a defect in the durable process. Correct it 
 
 Execution management belongs to the agents. Model selection and escalation, context compaction, known path/toolchain recovery, evidence-based retry, build sequencing, and safe in-scope recovery must not be delegated to the user. User input is reserved for unauthorized destructive action, unresolved irreversible target ambiguity, external credentials or coordination, meaningful scope expansion, or a genuinely product-changing choice.
 
+Pixel-backed work uses `scripts/manage-pixel-screen-timeout.ps1`. `-Action Begin` must run before the phase starts: it reads and durably snapshots the current `screen_off_timeout`, then disables automatic screen-off without replacing an existing snapshot. `-Action Restore` must run at every normal completion, stop, or error checkpoint and restore the exact saved timeout. If the snapshot is unavailable or exact restoration fails, the script applies a 30-minute (`1800000` ms) fallback. The coordinator must verify the resulting setting; an unbounded timeout may never be left behind after work ends.
+
 ## Build budget
 
 - Batch source corrections before compiling.
