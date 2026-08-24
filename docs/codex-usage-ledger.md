@@ -1,5 +1,12 @@
 # Codex usage ledger
 
+## 2026-08-24 - Fresh deployment task audit
+
+- Historical correction: the `compaction-required` result (3% weekly use, 1-point task growth, 145,461 latest input) belongs to task `01a02a88-cd91-7361-a6e3-1941183387f4`; it remains valid history and is not attributed to this fresh owner.
+- Task: `01a033be-a4a5-71e3-a5d7-1d813a0828d0`. Its bound `-EnforceStageGate` audit passed: 4% weekly use in the 10,080-minute window, 0-point task-local weekly growth, replay median 30,915, latest input 41,093, and recent input growth 10%. No weekly-reserve override was needed or accepted.
+- Regression-impact decision: this deployment changes no power, synchronization, pairing, state-truth, USB, or legal behavior. It must preserve the interactive lease and matching-ACK contract, Pixel app data and timeout, Bluetooth bonds, X3 NVS/SD/books, and application-only firmware scope; legal status remains not release-cleared.
+- Pre-build result: no compiler, APK, ADB/mDNS, install, firmware comparison/build/flash, artifact publication, or hardware handshake has started. After this three-document checkpoint is committed/pushed, one canonical Android build may proceed with the explicit deferred-UI-receipt flag only.
+
 ## 2026-08-22 - Final release-artifact gate checkpoint
 
 - Task: `01a02a88-cd91-7361-a6e3-1941183387f4`.

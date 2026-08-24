@@ -1,5 +1,11 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-24 deployment-resume audit checkpoint
+
+The earlier `01a02a88-cd91-7361-a6e3-1941183387f4` task did fail closed on its own 145,461-token replay input; that is retained as historical evidence below, not a result of this deployment owner. This fresh deployment task (`01a033be-a4a5-71e3-a5d7-1d813a0828d0`) passed `scripts/audit-codex-task-usage.ps1 -EnforceStageGate`: signed-in weekly use 4%, task-local weekly growth 0 points, replay median 30,915, latest input 41,093, and recent growth 10%. No weekly-reserve override is required or accepted.
+
+The bounded regression-impact audit found no proposed behavioral change: deployment preserves the existing fast-lease-before-transaction and acknowledgement truth contract, keeps Bluetooth bonds, Pixel app data, X3 NVS/SD/books, and uses application-only firmware flashing if and only if a source-matching delta requires it. The legal audit remains **not release-cleared** and does not permit public-release claims. With this checkpoint committed and pushed, run exactly one canonical Android build with `-AllowDeferredUiReviewDebt`; no protected device stage has started yet.
+
 ## 2026-08-22 final release-artifact checkpoint
 
 Pushed source is clean through `586cbac59fde4ac22b69217f5eb6b8858dd3cdc6` on `codex/x3-build-deploy-acceptance`. The fixed Android notice inventory now hashes only its declared text payload canonically: `scripts/test-android-release-notices.ps1` passed both CRLF/LF equivalence and genuine-content-mismatch rejection, and the resolved Community/Play graphs remained semantically unchanged at 147/180 modules. Legal status remains **not release-cleared**.
