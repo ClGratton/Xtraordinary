@@ -22,6 +22,8 @@ import kotlinx.coroutines.withTimeout
 import java.io.ByteArrayOutputStream
 import java.io.Closeable
 import java.io.File
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.security.MessageDigest
 import java.util.ArrayDeque
 
@@ -126,12 +128,16 @@ class UsbEspFlasher(context: Context) : Closeable {
         )
         runCatching {
             RomConnection.open(usbManager, device).use { connection ->
-                // Query the running application before touching reset lines.
-                // Old firmware without this evidence fails closed and must be
-                // bootstrapped through the guarded Windows selected-slot path.
                 connection.prepareSerial()
-                val otaSelection = X3OtaSlotPolicy.parseRuntimeTrace(connection.requestRuntimeTrace(8_000))
+                connection.resetToBootloader()
+                connection.syncAndPrepare()
+                val stub = Esp32C3StubAsset.load(appContext)
+                connection.uploadReadStub(stub)
+                val otaData = connection.readFlashReadOnly(0xE000, 0x2000)
+                val otaSelection = X3OtaSlotPolicy.parseOtadata(otaData)
                 val selectedOffset = otaSelection.requireSelectedFlashOffset()
+                // Restart into the ROM loader for the application-only write;
+                // otadata has been read but is never written by this flow.
                 connection.resetToBootloader()
                 _state.value = _state.value.copy(
                     phase = UsbFlashPhase.EnteringBootloader,
@@ -346,6 +352,53 @@ class UsbEspFlasher(context: Context) : Closeable {
                 EspRomProtocol.flashBeginPayload(size, offset),
                 timeoutMs = EraseTimeoutMs,
             )
+        }
+
+        fun uploadReadStub(stub: Esp32StubImage) {
+            val blockSize = 0x400
+            val blocks = (stub.text.size + blockSize - 1) / blockSize
+            command(
+                EspRomProtocol.MemBegin,
+                EspRomProtocol.memBeginPayload(stub.text.size, blocks, blockSize, stub.textStart),
+                timeoutMs = 5_000,
+            )
+            repeat(blocks) { sequence ->
+                val start = sequence * blockSize
+                val end = minOf(start + blockSize, stub.text.size)
+                val block = stub.text.copyOfRange(start, end)
+                command(
+                    EspRomProtocol.MemData,
+                    EspRomProtocol.memDataPayload(block, sequence),
+                    EspRomProtocol.checksum(block),
+                    timeoutMs = 5_000,
+                )
+            }
+            command(EspRomProtocol.MemEnd, EspRomProtocol.memEndPayload(stub.entry), timeoutMs = 5_000)
+            require(readSerialText(1_000).contains("OHAI")) { "ESP flasher stub did not start" }
+            syncAndPrepare()
+        }
+
+        fun readFlashReadOnly(offset: Int, length: Int): ByteArray {
+            require(length > 0 && length % 0x1000 == 0) { "Stub flash reads must be sector aligned" }
+            val response = command(
+                EspRomProtocol.ReadFlash,
+                EspRomProtocol.readFlashPayload(offset, length),
+                timeoutMs = 5_000,
+            )
+            require(response.data.size >= 2) { "Missing read-flash acknowledgement" }
+            val bytes = ByteArrayOutputStream(length)
+            while (bytes.size() < length) {
+                val frame = readSlipPacket(3_000)
+                require(frame.isNotEmpty() && frame.size <= 0x1000) { "Invalid stub flash-read frame" }
+                bytes.write(frame)
+                val count = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(bytes.size()).array()
+                writeAll(count)
+            }
+            val digestFrame = readSlipPacket(3_000)
+            require(digestFrame.size == 16) { "Missing stub flash-read MD5" }
+            val actual = MessageDigest.getInstance("MD5").digest(bytes.toByteArray())
+            require(actual.contentEquals(digestFrame)) { "Stub flash-read MD5 mismatch" }
+            return bytes.toByteArray()
         }
 
         private fun readRegister(address: Int): Int = command(

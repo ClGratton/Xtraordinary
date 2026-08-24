@@ -3,6 +3,7 @@ param(
     [string]$Version,
     [ValidateRange(1, 8)]
     [int]$Jobs = 2,
+    [switch]$AllowDeferredUiReviewDebt,
     [switch]$AllowDocumentedWeeklyReserveOverride
 )
 
@@ -36,7 +37,12 @@ if ($LASTEXITCODE -ne 0) {
     throw "The signed-in weekly reserve is below the protected-stage floor. Checkpoint source or record the explicit user override in docs/codex-usage-ledger.md before another compiler run."
 }
 & $sourceCheck
-& $policyCheck -Mode FirmwareRelease
+if ($AllowDeferredUiReviewDebt) {
+    Write-Host 'EXPLICIT NON-DEFAULT FIRMWARE RELEASE-DEBT WAIVER: deferring only documented UI-review receipts.' -ForegroundColor Yellow
+    & $policyCheck -Mode FirmwareRelease -AllowDeferredUiReviewDebt
+} else {
+    & $policyCheck -Mode FirmwareRelease
+}
 if (-not $?) {
     throw "Engineering policy gate failed"
 }

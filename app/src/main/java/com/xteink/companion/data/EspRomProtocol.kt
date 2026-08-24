@@ -18,6 +18,10 @@ internal object EspRomProtocol {
     const val ReadRegister = 0x0A
     const val SpiSetParameters = 0x0B
     const val SpiAttach = 0x0D
+    const val MemBegin = 0x05
+    const val MemEnd = 0x06
+    const val MemData = 0x07
+    const val ReadFlash = 0x0E
 
     private const val DirectionRequest = 0x00
     private const val DirectionResponse = 0x01
@@ -53,6 +57,17 @@ internal object EspRomProtocol {
         littleEndianInts(address, value, -1, 0)
 
     fun spiAttachPayload(): ByteArray = littleEndianInts(0, 0)
+
+    fun memBeginPayload(size: Int, blocks: Int, blockSize: Int, offset: Int): ByteArray =
+        littleEndianInts(size, blocks, blockSize, offset)
+
+    fun memDataPayload(block: ByteArray, sequence: Int): ByteArray =
+        littleEndianInts(block.size, sequence, 0, 0) + block
+
+    fun memEndPayload(entry: Int): ByteArray = littleEndianInts(0, entry)
+
+    fun readFlashPayload(offset: Int, length: Int): ByteArray =
+        littleEndianInts(offset, length, 0x1000, 64)
 
     fun spiSetParametersPayload(): ByteArray = littleEndianInts(
         0,

@@ -1,5 +1,10 @@
 # Codex usage ledger
 
+## 2026-08-24 - Explicit release-debt waiver for build and physical acceptance
+
+- User authorization: skip screenshot/UI verification for this milestone; `AllowDeferredUiReviewDebt` may be used for the canonical Android build and the equivalent firmware wrapper path only.
+- Scope: the waiver defers only `ui-changes-require-stable-terra-reviews` receipts and prints the complete debt list. Firmware notices, source provenance, usage reserve, compiler, artifact, USB, selected-slot, and fresh protocol acceptance rules remain fail-closed.
+
 ## 2026-08-24 - Firmware transport contract correction
 
 - Source correction: USB is restored as the primary LocalFile/stock/CrossPoint takeover and recovery route; managed BLE is restricted to fresh Xtraordinary-to-Xtraordinary Capabilities with explicit update support. The firmware BEGIN physical-Confirm guard was removed; SHA-256, ACK, commit, and apply checks remain.
