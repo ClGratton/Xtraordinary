@@ -1,5 +1,11 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-24 managed BLE pending transaction live boundary
+
+The installed persistent-intent APK retained the exact dev38 transaction in `xtraordinary_connection.xml` (LocalFile, 5,456,368 bytes, SHA-256 `E0E8FA4E3347BB4533CAF34E8CCF7CC25A4306E5988A7CBA64204190A0F389FE`). After a fresh GATT session, dev37 Capabilities, StatusChanged, revisioned LibraryPage, policy ACKs, and the lease ACK arrived; without another tap the lifecycle emitted `BeginFirmware`. X3 returned NACK before any FirmwareChunk, consistent with `CompanionService::beginFirmware` requiring the physical Confirm button. No chunks, commit/apply, reboot, flash, reset, pairing, bond/app-data, NVS/SD/book mutation occurred.
+
+Pushed `ed45ec0` to bound `CompanionCommandRejectedException` retries to the tested two-attempt physical-Confirm window and clear the pending transaction with an explicit prompt only after that bound. This source correction was not included in the preceding passing APK, so it requires the next canonical build/install. The running candidate was stopped to halt retries; Pixel timeout restored and verified at `1800000` ms. The only remaining physical action is holding Confirm while the next installed candidate automatically emits BEGIN; no chat synchronization is required.
+
 ## 2026-08-24 persistent managed-install lifecycle checkpoint
 
 Pushed `c96d547`, `c30cfd7`, and `8e4a9bf`. The managed firmware Install action now writes a durable pending transaction containing model/version/size/SHA/source and local artifact URL, keeps it across transient disconnects, requests persistent transport, awaits the interactive-lease ACK, and drains automatically on fresh Capabilities with `supportsFirmwareUpdate` without another tap. The existing guarded USB branch remains exclusive and policy-compliant. Focused tests cover disconnect after selection, disconnect after lease ACK, duplicate identity/replay, and one bounded physical-Confirm NACK retry.

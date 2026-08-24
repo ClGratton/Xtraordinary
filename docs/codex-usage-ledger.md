@@ -1,5 +1,10 @@
 # Codex usage ledger
 
+## 2026-08-24 - Persistent managed-install live acceptance boundary
+
+- Live evidence: retained dev38 pending identity was verified in the app's repository-resolved preferences. Fresh dev37 Capabilities, StatusChanged, revisioned LibraryPage, policy ACKs, and interactive-lease ACK arrived; the persistent lifecycle automatically emitted `BeginFirmware` without another tap. X3 returned NACK before any FirmwareChunk, matching the firmware Confirm guard. No transfer, reboot, flash, reset, pairing, or data mutation occurred.
+- Durable correction: pushed `ed45ec0` to bound physical-Confirm NACK retries to the focused two-attempt policy. This correction is source-only after the preceding passing APK; the running candidate was stopped and Pixel timeout restored to `1800000` ms. Next protected phase requires canonical build/install, then one automatic BEGIN while Confirm is held and fresh post-reboot acceptance.
+
 ## 2026-08-24 - Persistent managed-install lifecycle checkpoint
 
 - Source: pushed `c96d547`, `c30cfd7`, and `8e4a9bf`. The reusable pending firmware transaction persists artifact identity/hash/source, retains intent through disconnects, awaits the interactive-lease ACK, and automatically replays on fresh protocol-ready Capabilities; focused lifecycle tests passed in the canonical wrapper.
