@@ -67,6 +67,14 @@ class PayloadCodecTest {
     }
 
     @Test
+    fun capabilitiesAcceptObserved51ByteFirmwareVersion() {
+        val expected = DeviceCapabilities("X3", "x".repeat(51), 9u, true)
+        val actual = PayloadCodec.decodeCapabilities(PayloadCodec.encodeCapabilities(expected))
+
+        assertEquals(expected, actual)
+    }
+
+    @Test
     fun legacyFixedWidthCapabilitiesDecodeWithoutUsingCachedState() {
         val bytes = ByteBuffer.allocate(24 + 48 + 9).order(ByteOrder.LITTLE_ENDIAN).apply {
             put("X3".toByteArray())

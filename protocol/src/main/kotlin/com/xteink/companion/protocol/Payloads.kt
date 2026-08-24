@@ -16,6 +16,7 @@ const val MAX_WIRE_PATH_BYTES = 512
 const val FIRMWARE_CHUNK_BYTES = 216
 const val BOOK_UPLOAD_CHUNK_BYTES = 488
 const val TICKET_BARCODE_CHUNK_BYTES = 488
+const val CAPABILITIES_FIRMWARE_VERSION_BYTES = 64
 
 data class DeviceCapabilities(
     val model: String,
@@ -274,7 +275,7 @@ object PayloadCodec {
 
     fun encodeCapabilities(value: DeviceCapabilities): ByteArray = writer(32) {
         putUtf8(value.model, 24)
-        putUtf8(value.firmwareVersion, 48)
+        putUtf8(value.firmwareVersion, CAPABILITIES_FIRMWARE_VERSION_BYTES)
         putInt(value.libraryRevision.toInt())
         put(if (value.supportsFirmwareUpdate) 1 else 0)
         put(if (value.ticketPresent) 1 else 0)
@@ -294,7 +295,7 @@ object PayloadCodec {
         }
         return if (currentLength <= 24 && bytes.size >= 2 + currentLength + 2) {
             reader(bytes) {
-                decodeCapabilitiesFields(utf8(24), utf8(48))
+                decodeCapabilitiesFields(utf8(24), utf8(CAPABILITIES_FIRMWARE_VERSION_BYTES))
             }
         } else {
             decodeLegacyCapabilities(bytes)
