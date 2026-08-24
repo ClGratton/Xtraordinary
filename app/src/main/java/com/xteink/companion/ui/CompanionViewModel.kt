@@ -891,6 +891,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 firmwareCheckPhase = FirmwareCheckPhase.Checking,
                 firmwareSource = FirmwareSource.LocalFile,
                 latestFirmwareVersion = null,
+                firmwareCandidateIsInstallable = false,
                 message = null,
             ))
         }
@@ -909,6 +910,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                             firmwareCheckPhase = FirmwareCheckPhase.Available,
                             firmwareSource = FirmwareSource.LocalFile,
                             latestFirmwareVersion = release.version,
+                            firmwareCandidateIsInstallable = true,
                             message = "SHA-256 ${release.sha256.uppercase()}",
                         ))
                     }
@@ -923,6 +925,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 firmwareCheckPhase = FirmwareCheckPhase.Checking,
                 firmwareSource = source,
                 latestFirmwareVersion = null,
+                firmwareCandidateIsInstallable = false,
                 message = null,
             ))
         }
@@ -931,11 +934,22 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 .onSuccess { release ->
                     latestRelease = release
                     val currentVersion = _uiState.value.device.firmwareVersion
+                    val relation = firmwareVersionRelation(currentVersion, release.version)
                     _uiState.update {
                         it.copy(device = it.device.copy(
-                            firmwareCheckPhase = firmwareCheckPhaseFor(currentVersion, release.version),
+                            firmwareCheckPhase = when (relation) {
+                                FirmwareVersionRelation.CatalogNewer,
+                                FirmwareVersionRelation.Unknown -> FirmwareCheckPhase.Available
+                                FirmwareVersionRelation.Equal,
+                                FirmwareVersionRelation.CurrentAhead -> FirmwareCheckPhase.UpToDate
+                            },
                             firmwareSource = release.source,
                             latestFirmwareVersion = release.version,
+                            // The default catalog must never turn a downgrade
+                            // into an install action. Explicit source choices
+                            // remain install candidates.
+                            firmwareCandidateIsInstallable = source != FirmwareSource.Xtraordinary ||
+                                relation != FirmwareVersionRelation.CurrentAhead,
                         ))
                     }
                 }
@@ -948,6 +962,12 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     fun flashLatestFirmware(forceManagedBle: Boolean = false) {
         val release = latestRelease ?: run {
             reportDeviceError(IllegalStateException("Firmware selection is no longer available"))
+            return
+        }
+        if (release.source == FirmwareSource.Xtraordinary &&
+            !_uiState.value.device.firmwareCandidateIsInstallable
+        ) {
+            reportDeviceError(IllegalStateException("The catalog firmware is older than the firmware already installed on X3"))
             return
         }
         // Preserve the established upload semantics: a physically connected X3

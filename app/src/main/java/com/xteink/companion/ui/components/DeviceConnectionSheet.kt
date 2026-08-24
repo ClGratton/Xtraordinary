@@ -847,6 +847,7 @@ private fun FirmwareInstallAction(
         managedBleFirmwareReady = device.managedBleFirmwareReady,
         selectedVersion = device.latestFirmwareVersion,
         managedDeviceKnown = managedDeviceKnown,
+        candidateIsInstallable = device.firmwareCandidateIsInstallable,
     )
     val preferredRouteName = if (FirmwareInstallRoute.ManagedBle in routes) {
         FirmwareInstallRoute.ManagedBle.name

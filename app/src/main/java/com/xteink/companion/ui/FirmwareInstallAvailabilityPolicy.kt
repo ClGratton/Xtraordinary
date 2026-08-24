@@ -15,8 +15,11 @@ internal fun firmwareInstallRoutes(
     managedBleFirmwareReady: Boolean,
     selectedVersion: String?,
     managedDeviceKnown: Boolean = false,
+    candidateIsInstallable: Boolean = true,
 ): Set<FirmwareInstallRoute> {
-    if (phase != FirmwareCheckPhase.Available && phase != FirmwareCheckPhase.UpToDate) return emptySet()
+    if (!candidateIsInstallable || (phase != FirmwareCheckPhase.Available && phase != FirmwareCheckPhase.UpToDate)) {
+        return emptySet()
+    }
     val routes = linkedSetOf<FirmwareInstallRoute>()
     // USB is an explicit, always-visible recovery/reinstall route. Its action
     // explains the cable requirement when the device is not present.

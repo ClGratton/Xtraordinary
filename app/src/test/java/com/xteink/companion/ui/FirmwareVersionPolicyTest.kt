@@ -20,6 +20,16 @@ class FirmwareVersionPolicyTest {
         ),
     )
 
+    @Test fun olderCatalogRelationIsExplicitlyCurrentAhead() = assertEquals(
+        FirmwareVersionRelation.CurrentAhead,
+        firmwareVersionRelation("xtraordinary-v0.2.6-dev51", "xtraordinary-v0.2.4"),
+    )
+
+    @Test fun equalCatalogRelationAllowsReinstall() = assertEquals(
+        FirmwareVersionRelation.Equal,
+        firmwareVersionRelation("xtraordinary-v0.2.6-dev51", "xtraordinary-v0.2.6-dev51"),
+    )
+
     @Test fun stableReleaseIsNewerThanMatchingDevBuild() = assertEquals(
         FirmwareCheckPhase.Available,
         firmwareCheckPhaseFor(

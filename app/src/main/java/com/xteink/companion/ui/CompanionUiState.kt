@@ -242,6 +242,7 @@ data class DeviceUiState(
     val firmwareCheckPhase: FirmwareCheckPhase = FirmwareCheckPhase.Idle,
     val firmwareSource: FirmwareSource = FirmwareSource.Xtraordinary,
     val latestFirmwareVersion: String? = null,
+    val firmwareCandidateIsInstallable: Boolean = false,
     val firmwareProgress: Float? = null,
     val batteryPercentage: Int? = null,
     val charging: Boolean = false,

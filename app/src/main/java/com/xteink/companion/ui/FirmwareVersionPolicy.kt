@@ -5,30 +5,42 @@ package com.xteink.companion.ui
  * update. Xtraordinary versions use semver-like ordering with numbered dev
  * builds below the corresponding stable release.
  */
+internal enum class FirmwareVersionRelation {
+    CatalogNewer,
+    Equal,
+    CurrentAhead,
+    Unknown,
+}
+
 internal fun firmwareCheckPhaseFor(
     currentVersion: String?,
     releaseVersion: String,
-): FirmwareCheckPhase = if (isFirmwareReleaseNewer(currentVersion, releaseVersion)) {
-    FirmwareCheckPhase.Available
-} else {
-    FirmwareCheckPhase.UpToDate
+): FirmwareCheckPhase = when (firmwareVersionRelation(currentVersion, releaseVersion)) {
+    FirmwareVersionRelation.CatalogNewer,
+    FirmwareVersionRelation.Unknown -> FirmwareCheckPhase.Available
+    FirmwareVersionRelation.Equal,
+    FirmwareVersionRelation.CurrentAhead -> FirmwareCheckPhase.UpToDate
 }
 
-internal fun isFirmwareReleaseNewer(currentVersion: String?, releaseVersion: String): Boolean {
+internal fun firmwareVersionRelation(currentVersion: String?, releaseVersion: String): FirmwareVersionRelation {
     val current = currentVersion?.trim().orEmpty()
     val release = releaseVersion.trim()
-    if (current.isEmpty() || release.isEmpty()) return current.isEmpty() && release.isNotEmpty()
+    if (current.isEmpty() || release.isEmpty()) return FirmwareVersionRelation.Unknown
 
     val currentXtraordinary = parseXtraordinaryVersion(current)
     val releaseXtraordinary = parseXtraordinaryVersion(release)
     if (currentXtraordinary != null && releaseXtraordinary != null) {
-        return releaseXtraordinary > currentXtraordinary
+        return when {
+            releaseXtraordinary > currentXtraordinary -> FirmwareVersionRelation.CatalogNewer
+            releaseXtraordinary < currentXtraordinary -> FirmwareVersionRelation.CurrentAhead
+            else -> FirmwareVersionRelation.Equal
+        }
     }
     if ((currentXtraordinary == null) != (releaseXtraordinary == null)) {
         // A source-family change is an install candidate, not a numeric
         // comparison across unrelated namespaces (for example XT V5.1.6 vs
         // xtraordinary-v0.2.6).
-        return true
+        return FirmwareVersionRelation.CatalogNewer
     }
 
     // Non-Xtraordinary releases can still expose numeric tags, but only compare
@@ -36,11 +48,18 @@ internal fun isFirmwareReleaseNewer(currentVersion: String?, releaseVersion: Str
     val currentNumbers = numericVersion(current)
     val releaseNumbers = numericVersion(release)
     return if (currentNumbers != null && releaseNumbers != null) {
-        compareNumericVersions(releaseNumbers, currentNumbers) > 0
+        when (compareNumericVersions(releaseNumbers, currentNumbers)) {
+            1 -> FirmwareVersionRelation.CatalogNewer
+            0 -> FirmwareVersionRelation.Equal
+            else -> FirmwareVersionRelation.CurrentAhead
+        }
     } else {
-        false
+        FirmwareVersionRelation.Unknown
     }
 }
+
+internal fun isFirmwareReleaseNewer(currentVersion: String?, releaseVersion: String): Boolean =
+    firmwareVersionRelation(currentVersion, releaseVersion) == FirmwareVersionRelation.CatalogNewer
 
 private data class XtraordinaryVersion(
     val major: Int,
