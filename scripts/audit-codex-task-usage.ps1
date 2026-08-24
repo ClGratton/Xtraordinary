@@ -139,8 +139,8 @@ Get-Content -LiteralPath $resolvedRollout -ReadCount 500 | ForEach-Object {
         try { $item = $line | ConvertFrom-Json -Depth 50 } catch { continue }
         $timestamp = if ($item.timestamp) { [datetime]$item.timestamp } else { $null }
 
-        if (-not $rolloutThreadId -and $item.type -eq 'session_meta' -and $item.payload.id) {
-            $rolloutThreadId = [string]$item.payload.id
+        if (-not $rolloutThreadId -and $item.type -eq 'session_meta') {
+            $rolloutThreadId = if ($item.payload.id) { [string]$item.payload.id } elseif ($item.payload.thread_id) { [string]$item.payload.thread_id } else { $null }
         }
 
         if ($item.type -eq 'event_msg' -and $item.payload.type -eq 'context_compacted' -and $timestamp) {
@@ -175,6 +175,16 @@ Get-Content -LiteralPath $resolvedRollout -ReadCount 500 | ForEach-Object {
 }
 
 $expectedThreadId = if ($ThreadId) { $ThreadId } elseif (-not $RolloutPath -and $env:CODEX_THREAD_ID) { $env:CODEX_THREAD_ID } elseif (-not $RolloutPath -and $env:CODEX_SESSION_ID) { $env:CODEX_SESSION_ID } else { $null }
+if ($expectedThreadId -and -not $rolloutThreadId) {
+    [pscustomobject]@{
+        status = 'not-applicable'
+        rolloutPath = $resolvedRollout
+        expectedThreadId = $expectedThreadId
+        routingDecision = 'unbound-worker'
+        reason = 'Resolved rollout has no machine-readable thread identity; the audit will not attribute another task rollout.'
+    } | ConvertTo-Json -Depth 5
+    exit 0
+}
 if ($expectedThreadId -and $rolloutThreadId -ne $expectedThreadId) {
     throw "Resolved rollout belongs to thread '$rolloutThreadId', not invoking thread '$expectedThreadId'."
 }
@@ -261,6 +271,7 @@ $history = @($meterRows | Group-Object { [long]([math]::Floor([double]$_.resetsA
 $result = [pscustomobject]@{
     status = if ($weeklyReserveOverrideAccepted) { 'explicit-weekly-reserve-override' } elseif ($blockingViolations.Count) { 'weekly-budget-exhausted' } elseif ($replaySignals.Count) { 'compaction-recommended' } elseif ($weeklyIncrease -gt $MaxTaskWeeklyIncreasePercent) { 'task-budget-checkpoint' } elseif ($budgetViolations.Count) { 'weekly-reserve-warning' } else { 'within-budget' }
     threadId = $rolloutThreadId
+    routingDecision = if ($env:CODEX_AGENT_ROLE -match '(?i)sol|root' -or $env:CODEX_MODEL -match '(?i)gpt-5\.6') { 'delegate-required' } else { 'allowed' }
     rolloutPath = $resolvedRollout
     currentResetAt = $currentReset
     currentWeeklyMeter = if ($latestMeter) { $latestMeter.usedPercent } else { $null }

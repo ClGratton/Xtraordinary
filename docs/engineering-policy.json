@@ -1193,6 +1193,12 @@
       "path": "AGENTS.md",
       "pattern": "Physical-action coordination is agent-owned[\\s\\S]*?without requiring a chat reply",
       "message": "Agents must launch and time bounded physical workflows without requiring a chat reply merely to synchronize an irreducible physical action."
+    },
+    {
+      "id": "usage-audit-has-binding-fixture",
+      "type": "required_file",
+      "path": "scripts/test-audit-codex-task-usage.ps1",
+      "message": "The usage audit needs executable fixtures for unbound workers, mismatched-thread rejection, and valid identity routing."
     }
   ]
 }
