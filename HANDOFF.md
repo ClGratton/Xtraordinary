@@ -1,5 +1,13 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-24 dev50 USB selected-slot checkpoint
+
+The pushed source `382438b` bundles the upstream Espressif ESP32-C3 v2 stub asset (SHA-256 `47FD549A9746E6ACD3BE7C9F56BA71A02D9DAB9FF380501C4F71C79F762ABEF4`) with provenance preserved. Android uploads the stub through existing MEM_BEGIN/DATA/END, performs read-only READ_FLASH of otadata, and passes bytes through the tested CRC/sequence/state selector before writing only the selected application partition; no otadata write path is present. The focused Android wrapper passed protocol/unit/lint/assembly tasks with the explicit stale UI-review debt waiver; screenshots and UI acceptance remain skipped.
+
+Community dev50 APK: 85,803,099 bytes, SHA-256 `DDBF89D0E09535B3583B5CA0009BC49CD402577A0D6388AC9A5DFF9741D2ED7C`, versionCode 51/versionName 0.2.0-dev50. Retained-data install succeeded; pinned Pixel endpoint `192.168.1.61:36221` reports matching on-device base.apk SHA and timeout `1800000` ms. Firmware wrapper passed sequentially with the narrow waiver from pushed `382438b`, producing 5,456,336 bytes, SHA-256 `1A8AAAA21664E5DB638719826AF2319C8C1E8A8C53D56B9523EBA513A86E6ED6`.
+
+Deployment is externally blocked at target discovery: Pixel USB reports host-only/disconnected (`connected=false`, `configured=false`, `kernel_state=DISCONNECTED`) and no present VID:303A:1001 X3 interface/serial target. No stub upload, otadata read, selected-slot write, flash, reboot, bond/app-data, NVS/SD/book mutation occurred. The installer emitted a post-check ambiguity after a second current mDNS alias appeared, but direct pinned-endpoint verification is exact. Remaining proof is physical X3 enumeration, read-only slot evidence, guarded application-only write, reboot, and fresh Capabilities + StatusChanged + revisioned LibraryPage + matching policy ACKs.
+
 ## 2026-08-24 firmware transport contract correction
 
 Restored the pre-`20d639b` user-facing USB-first upload semantics: USB owns LocalFile, stock, CrossPoint, takeover, and recovery; managed BLE is additional and only for fresh Xtraordinary-to-Xtraordinary Capabilities with companion update support. Removed the firmware Confirm-button guard while retaining bonded/encrypted protocol, artifact hash, commit, and apply safety. Added Android otadata parser tests for CRC-valid highest sequence and invalid fail-closed records. The current Android ROM implementation has no flash-read/stub primitive, so `UsbEspFlasher` still fails closed before write when runtime selected-slot evidence is absent; no address is assumed and otadata is never rewritten. App candidate is now dev50/versionCode 51.

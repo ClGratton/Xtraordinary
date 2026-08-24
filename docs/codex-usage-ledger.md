@@ -1,5 +1,11 @@
 # Codex usage ledger
 
+## 2026-08-24 - Dev50 USB selected-slot artifact and target boundary
+
+- Pushed source `382438b` contains the canonical Espressif ESP32-C3 v2 stub asset (SHA-256 `47FD549A9746E6ACD3BE7C9F56BA71A02D9DAB9FF380501C4F71C79F762ABEF4`) and read-only MEM_BEGIN/DATA/END plus READ_FLASH framing. Otadata is read-only and selection remains the existing CRC/sequence/state parser; no otadata write command exists.
+- Focused Android wrapper passed protocol tests, both flavor unit tests/lint, and both assemblies with only the explicitly user-waived UI-review receipts deferred. Community dev50 APK is 85,803,099 bytes, SHA-256 `DDBF89D0E09535B3583B5CA0009BC49CD402577A0D6388AC9A5DFF9741D2ED7C`; retained-data install and pinned-endpoint on-device SHA verification succeeded. Firmware wrapper passed sequentially with the narrow waiver; firmware is 5,456,336 bytes, SHA-256 `1A8AAAA21664E5DB638719826AF2319C8C1E8A8C53D56B9523EBA513A86E6ED6`.
+- The installer post-check saw a duplicate current mDNS alias after install; exact verification used repository ADB and pinned `192.168.1.61:36221`. Timeout is `1800000` ms. USB resolver still finds no VID:303A:1001 X3 target; dumpsys reports host-only/disconnected. No X3 mutation or selected-slot proof ran. Remaining acceptance is physical target enumeration, read-only otadata/slot proof, guarded application-only write, reboot, and fresh protocol truth chain.
+
 ## 2026-08-24 - Explicit release-debt waiver for build and physical acceptance
 
 - User authorization: skip screenshot/UI verification for this milestone; `AllowDeferredUiReviewDebt` may be used for the canonical Android build and the equivalent firmware wrapper path only.
