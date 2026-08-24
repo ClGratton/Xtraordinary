@@ -1007,6 +1007,14 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         drainPendingFirmwareInstall()
     }
 
+    suspend fun beginMaintenanceLease(seconds: Int) {
+        companionClient.acquireMaintenanceLease(seconds)
+    }
+
+    suspend fun endMaintenanceLease() {
+        runCatching { companionClient.releaseMaintenanceLease() }
+    }
+
     override fun onCleared() {
         if (pendingBookUploadIds.isNotEmpty() || bookUploadJob?.isActive == true) {
             bookUploadGeneration += 1L

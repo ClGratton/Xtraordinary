@@ -593,6 +593,17 @@ class BluetoothCompanionClient(private val context: Context) {
         // demotion; current firmware also clears the lease on disconnect.
         send(MessageType.AcquireInteractiveLease, PayloadCodec.encodeInteractiveLease(2), awaitAck = false)
     }
+    /** Test/device-work only: holds inactivity sleep without fast-link promotion. */
+    suspend fun acquireMaintenanceLease(seconds: Int) {
+        sendAwaitingAck(
+            MessageType.AcquireMaintenanceLease,
+            PayloadCodec.encodeMaintenanceLease(X3MaintenanceLeaseContract.boundedSeconds(seconds)),
+            timeoutMillis = 10_000,
+        )
+    }
+    suspend fun releaseMaintenanceLease() {
+        send(MessageType.AcquireMaintenanceLease, PayloadCodec.encodeMaintenanceLease(0), awaitAck = false)
+    }
     suspend fun clearTicket() = sendAwaitingAck(MessageType.ClearTicket)
     suspend fun awaitConnected(timeoutMillis: Long = 20_000) {
         withTimeout(timeoutMillis) {

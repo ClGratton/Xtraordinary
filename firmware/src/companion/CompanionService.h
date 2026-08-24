@@ -58,6 +58,7 @@ class CompanionService {
   volatile uint32_t connectedAtMs_ = 0;
   volatile uint32_t lastBleActivityMs_ = 0;
   volatile uint32_t interactiveLeaseUntilMs_ = 0;
+  volatile uint32_t maintenanceLeaseUntilMs_ = 0;
   volatile bool connectionParamsPending_ = false;
   volatile bool deepSleepShutdownFinished_ = false;
   volatile bool deepSleepShutdownStopped_ = false;
@@ -134,6 +135,8 @@ class CompanionService {
   bool shouldUseSlowConnection() const;
   bool interactiveLeaseActive() const;
   void acquireInteractiveLease(uint16_t seconds);
+  bool maintenanceLeaseActive() const;
+  void acquireMaintenanceLease(uint16_t seconds);
   void requestFastConnection();
   void scheduleSlowConnection();
   bool decodeTicket(const EnvelopeView& envelope);

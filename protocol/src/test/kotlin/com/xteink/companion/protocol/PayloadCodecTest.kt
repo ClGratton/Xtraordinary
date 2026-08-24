@@ -105,6 +105,14 @@ class PayloadCodecTest {
         assertTrue(PayloadCodec.encodeInteractiveLease(30).contentEquals(byteArrayOf(0x1e, 0x00)))
         assertTrue(PayloadCodec.encodeInteractiveLease(500).contentEquals(byteArrayOf(0x78, 0x00)))
         assertEquals(MessageType.AcquireInteractiveLease, MessageType.fromWireValue(0x38u))
+        assertEquals(MessageType.AcquireMaintenanceLease, MessageType.fromWireValue(0x39u))
+    }
+
+    @Test
+    fun maintenanceLeaseAllowsBoundedRenewalAndExplicitRelease() {
+        assertTrue(PayloadCodec.encodeMaintenanceLease(30).contentEquals(byteArrayOf(0x1e, 0x00)))
+        assertTrue(PayloadCodec.encodeMaintenanceLease(900).contentEquals(byteArrayOf(0x58, 0x02)))
+        assertTrue(PayloadCodec.encodeMaintenanceLease(0).contentEquals(byteArrayOf(0x00, 0x00)))
     }
 
     @Test

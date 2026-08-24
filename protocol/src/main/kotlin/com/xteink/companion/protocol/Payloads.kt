@@ -211,6 +211,10 @@ object PayloadCodec {
     fun encodeInteractiveLease(seconds: Int): ByteArray =
         ByteBuffer.allocate(2).little().putShort(seconds.coerceIn(2, 120).toShort()).array()
 
+    /** Ephemeral device-test lease; zero is an explicit release. */
+    fun encodeMaintenanceLease(seconds: Int): ByteArray =
+        ByteBuffer.allocate(2).little().putShort(seconds.coerceIn(0, 600).toShort()).array()
+
     fun encodeTicketBarcodeBegin(sizeBytes: Int): ByteArray {
         require(sizeBytes in 1..(64 * 1024)) { "Ticket barcode image is outside the supported range" }
         return ByteBuffer.allocate(4).little().putInt(sizeBytes).array()

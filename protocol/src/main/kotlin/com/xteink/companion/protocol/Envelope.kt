@@ -30,6 +30,7 @@ enum class MessageType(val wireValue: UByte) {
     TicketBarcodeChunk(0x36u),
     CommitTicketBarcode(0x37u),
     AcquireInteractiveLease(0x38u),
+    AcquireMaintenanceLease(0x39u),
     GetLibrary(0x40u),
     LibraryPage(0x41u),
     DeleteLibraryEntries(0x42u),

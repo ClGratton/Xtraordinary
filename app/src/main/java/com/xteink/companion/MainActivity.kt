@@ -54,6 +54,7 @@ import kotlinx.coroutines.withContext
 private const val PrepareX3ResetAction = "com.xteink.companion.action.PREPARE_X3_RESET"
 private const val ReadX3CrashReportAction = "com.xteink.companion.action.READ_X3_CRASH_REPORT"
 private const val ReadX3DiagnosticsAction = "com.xteink.companion.action.READ_X3_DIAGNOSTICS"
+private const val X3MaintenanceLeaseAction = "com.xteink.companion.action.X3_MAINTENANCE_LEASE"
 private const val DeployLogTag = "XteinkDeploy"
 private const val FlightImportLogTag = "FlightPassImport"
 private const val GoogleBackupLogTag = "GoogleBackup"
@@ -386,13 +387,13 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        if (!handleDiagnosticIntent(intent) && !handleExternalResetIntent(intent)) handleSharedFlightPass(intent)
+        if (!handleDiagnosticIntent(intent) && !handleExternalResetIntent(intent) && !handleMaintenanceIntent(intent)) handleSharedFlightPass(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (!handleDiagnosticIntent(intent) && !handleExternalResetIntent(intent)) handleSharedFlightPass(intent)
+        if (!handleDiagnosticIntent(intent) && !handleExternalResetIntent(intent) && !handleMaintenanceIntent(intent)) handleSharedFlightPass(intent)
     }
 
     override fun onStart() {
@@ -439,6 +440,22 @@ class MainActivity : ComponentActivity() {
                 val label = if (diagnostics) "X3_DIAGNOSTICS" else "X3_CRASH_REPORT"
                 Log.e(DeployLogTag, "${label}_FAILED", it)
             }
+        }
+        return true
+    }
+
+    private fun handleMaintenanceIntent(intent: Intent): Boolean {
+        val isDebuggable = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+        if (!isDebuggable || intent.action != X3MaintenanceLeaseAction) return false
+        externalResetPreparationRequested = true
+        val seconds = intent.getIntExtra("seconds", 0).coerceIn(0, 600)
+        lifecycleScope.launch {
+            runCatching {
+                if (seconds == 0) viewModel.endMaintenanceLease()
+                else viewModel.beginMaintenanceLease(seconds)
+            }.onSuccess {
+                Log.i(DeployLogTag, if (seconds == 0) "X3_MAINTENANCE_RESTORED" else "X3_MAINTENANCE_ACTIVE seconds=$seconds")
+            }.onFailure { Log.e(DeployLogTag, "X3_MAINTENANCE_FAILED", it) }
         }
         return true
     }

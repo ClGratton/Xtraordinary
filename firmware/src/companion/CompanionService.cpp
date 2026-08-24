@@ -1,6 +1,7 @@
 #ifdef ENABLE_X3_COMPANION
 
 #include "CompanionService.h"
+#include "MaintenanceLeasePolicy.h"
 
 #include "FinalSyncPolicy.h"
 #include "RuntimeTrace.h"
@@ -232,6 +233,21 @@ bool CompanionService::interactiveLeaseActive() const {
   return interactiveLeaseUntilMs_ != 0 && static_cast<int32_t>(interactiveLeaseUntilMs_ - millis()) > 0;
 }
 
+bool CompanionService::maintenanceLeaseActive() const {
+  return MaintenanceLeasePolicy::active(millis(), maintenanceLeaseUntilMs_);
+}
+
+void CompanionService::acquireMaintenanceLease(uint16_t seconds) {
+  maintenanceLeaseUntilMs_ = MaintenanceLeasePolicy::deadline(millis(), seconds);
+  if (seconds != 0) {
+    advertisingWindowExpired_ = false;
+    advertisingWindowStartedAtMs_ = millis();
+  }
+  // Maintenance deliberately does not request fast connection parameters or
+  // full CPU clock. The ordinary command keeps the current link alive; only
+  // the inactivity/deep-sleep deadline is held.
+}
+
 void CompanionService::acquireInteractiveLease(uint16_t seconds) {
   interactiveLeaseUntilMs_ = millis() + static_cast<uint32_t>(seconds) * 1000u;
   requestFastConnection();
@@ -275,6 +291,7 @@ void CompanionService::loop() {
     interactiveLeaseUntilMs_ = 0;
     scheduleSlowConnection();
   }
+  if (maintenanceLeaseUntilMs_ != 0 && !maintenanceLeaseActive()) maintenanceLeaseUntilMs_ = 0;
   if (bookUploadActive_ &&
       static_cast<uint32_t>(millis() - bookUploadLastActivityMs_) >= BOOK_UPLOAD_IDLE_TIMEOUT_MS) {
     LOG_ERR("CMP", "Aborting stalled book upload");
@@ -546,6 +563,7 @@ void CompanionService::onClientDisconnected() {
   // Interactive mode belongs to one GATT session. Never let a long lease from
   // a departed app keep the next idle connection at full cadence.
   interactiveLeaseUntilMs_ = 0;
+  maintenanceLeaseUntilMs_ = 0;
   connectionHandle_ = 0xffff;
   connectionParamsPending_ = false;
   revisionedStatusSupported_ = false;
@@ -662,6 +680,12 @@ void CompanionService::handlePacket(const uint8_t* bytes, size_t length) {
     case MessageType::ACQUIRE_INTERACTIVE_LEASE:
       ok = envelope.payloadLength == 2 && readU16(envelope.payload) >= 2 && readU16(envelope.payload) <= 120;
       if (ok) acquireInteractiveLease(readU16(envelope.payload));
+      break;
+    case MessageType::ACQUIRE_MAINTENANCE_LEASE:
+      // Zero explicitly ends the ephemeral lease; nonzero values are bounded
+      // and renewed by the next command. Nothing is persisted.
+      ok = envelope.payloadLength == 2 && readU16(envelope.payload) <= MaintenanceLeasePolicy::MAX_SECONDS;
+      if (ok) acquireMaintenanceLease(readU16(envelope.payload));
       break;
     case MessageType::CLEAR_TICKET:
       ok = envelope.payloadLength == 0 && clearTicket();
@@ -1122,7 +1146,7 @@ void CompanionService::updateAdvertisingPolicy() {
   }
   if (advertisingWindowExpired_) return;
   const uint32_t elapsed = millis() - advertisingWindowStartedAtMs_;
-  if (elapsed >= companionSleepAfterMs_) {
+  if (elapsed >= companionSleepAfterMs_ && !maintenanceLeaseActive()) {
     // The main loop enters the visible sleep lifecycle at the same deadline.
     // Do not make a synchronous vendor stop call here before that frame renders;
     // final sync and teardown are owned by finalizeForDeepSleep() behind its

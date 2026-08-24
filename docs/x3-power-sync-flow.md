@@ -92,6 +92,10 @@ Configurable app choices:
 
 ## Reusable interactive transport lease
 
+### Ephemeral maintenance lease (device work only)
+
+The repository debug workflow may send `AcquireMaintenanceLease` (`0x39`) with a 1–600 second deadline, renewing it while a bounded hardware phase is active and sending a zero-second payload to restore. This is not the production interactive lease: it prevents the inactivity/deep-sleep deadline from expiring, but never requests transfer-fast BLE parameters or pins the CPU at full speed. The deadline is RAM-only, is cleared on disconnect and expiry, and is never written to radio policy, user settings, or NVS. `scripts/maintain-x3-device.ps1 -Action Run` wraps task commands in `try/finally` and restores the lease on success or failure. App activation is debug-only and the installed firmware must support `AcquireMaintenanceLease` before use.
+
 - Any workflow that knows it will exchange data in both directions acquires an opaque owner from the shared `InteractiveTransportCoordinator`; the coordinator contains no Passes, ticket, Focus, Settings, firmware, or navigation rules.
 - The first owner keeps/reconnects GATT, requests the bounded interactive lease at balanced/intermediate connection priority, and starts one shared watchdog renewal. Additional owners reuse it. High-throughput priority is reserved for bulk book/firmware transfer. The last owner stops renewal, keeps balanced parameters, and permits an idle disconnect.
 - The X3 watchdog is 120 seconds and Android renews it every 90 seconds only while at least one owner exists. This is not four-second polling: it is one control message before expiry, while actual data remains event driven.

@@ -9,6 +9,26 @@
       "message": "Focus must not display a running phone timer until X3 acknowledges StartSession."
     },
     {
+      "id": "x3-maintenance-lease-is-ephemeral-and-bounded",
+      "type": "required_pattern",
+      "path": "firmware/src/companion/CompanionService.cpp",
+      "pattern": "ACQUIRE_MAINTENANCE_LEASE[\\s\\S]*?MaintenanceLeasePolicy::MAX_SECONDS[\\s\\S]*?maintenanceLeaseActive",
+      "message": "Device maintenance keep-awake must be bounded, RAM-only, and separate from the interactive fast-link lease."
+    },
+    {
+      "id": "x3-maintenance-workflow-restores-in-finally",
+      "type": "required_pattern",
+      "path": "scripts/maintain-x3-device.ps1",
+      "pattern": "ValidateSet\\('Begin', 'Restore', 'Run'\\)[\\s\\S]*?finally[\\s\\S]*?Restore-Maintenance[\\s\\S]*?X3_MAINTENANCE_LEASE",
+      "message": "Repository X3 maintenance must have explicit begin/restore and try/finally cleanup."
+    },
+    {
+      "id": "x3-maintenance-script-contract-is-tested",
+      "type": "required_file",
+      "path": "scripts/test-maintain-x3-device.ps1",
+      "message": "The X3 maintenance workflow contract requires a focused script test."
+    },
+    {
       "id": "focus-ack-reducer-clears-pending-state",
       "type": "required_pattern",
       "path": "app/src/main/java/com/xteink/companion/ui/FocusSessionStore.kt",
