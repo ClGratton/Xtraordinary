@@ -908,8 +908,8 @@
       "id": "weekly-reserve-override-is-ledger-bound-and-narrow",
       "type": "required_pattern",
       "path": "scripts/audit-codex-task-usage.ps1",
-      "pattern": "AllowDocumentedWeeklyReserveOverride[\\s\\S]*?Test-DocumentedWeeklyReserveOverride[\\s\\S]*?weeklyReserveOverrideAccepted[\\s\\S]*?nonOverridableBudgetViolations[\\s\\S]*?EXPLICIT WEEKLY-RESERVE OVERRIDE",
-      "message": "A weekly-reserve override must be explicit, ledger-bound, and unable to waive task-growth or replay limits."
+      "pattern": "AllowDocumentedWeeklyReserveOverride[\\s\\S]*?Test-DocumentedWeeklyReserveOverride[\\s\\S]*?weeklyReserveViolation[\\s\\S]*?weeklyReserveOverrideAccepted[\\s\\S]*?blockingViolations[\\s\\S]*?replay and task-growth signals remain visible optimization advisories",
+      "message": "A weekly-reserve override must be explicit and ledger-bound; only the 95% protected-stage reserve is overridable while replay and task-growth remain visible advisories."
     },
     {
       "id": "canonical-builds-expose-weekly-reserve-override",
