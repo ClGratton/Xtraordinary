@@ -339,3 +339,8 @@
 
 - One bounded standby-discovery wait produced a live 66-byte Capabilities envelope. Rejection evidence prefix `020058333300787472616f7264696e61` proves current two-byte length-prefixed fields: model length 2 (`X3`), firmware version length 51 (`0x0033`). Pushed `7b0d855` raises only the Capabilities version limit to 64 bytes and adds the exact boundary test; protocol tests pass.
 - Focused canonical Android build passed and retained-data install completed; Community SHA-256 `EEC00C70851B9AEE8A2A40F623ED6D4CFEED354BC9DF093119B4C830B09567B5`. Subsequent relaunch/device-card reconnect attempts saw only `connect requested` with no GATT/notification. No fresh runtime acceptance chain exists; no X3 flash, slot read, reset, bond/app-data/timeout/NVS/SD/book mutation occurred.
+
+## 2026-08-24 - Pixel-host USB enumeration blocker
+
+- Canonical target resolution retained Pixel `192.168.1.61:36221`. Repository-resolved `adb shell dumpsys usb` showed `host_connected=true`, `source_power=true`, `connected=false`, `configured=false`; no current host device or permission entry exists. Historical Espressif manufacturer/product records (`12346`/`4097`) are Aug 22 only, while the Aug 24 event log ends in USB removal.
+- Guarded USB discovery (`UsbEspFlasher.refresh/findDevice`, VID_303A:1001) therefore had no present device to wake/query. No USB command, reset, flash, slot read, or state mutation occurred. Fresh BLE acceptance remains blocked; preserve bond/app data/timeout/NVS/SD/books.
