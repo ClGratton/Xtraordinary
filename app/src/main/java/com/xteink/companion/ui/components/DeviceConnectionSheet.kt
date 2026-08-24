@@ -69,6 +69,7 @@ import com.xteink.companion.data.UsbFlashPhase
 import com.xteink.companion.ui.DeviceUiState
 import com.xteink.companion.ui.DevicePresence
 import com.xteink.companion.ui.FirmwareCheckPhase
+import com.xteink.companion.ui.firmwareInstallAvailable
 import com.xteink.companion.ui.devicePresence
 
 enum class DeviceSetupStep {
