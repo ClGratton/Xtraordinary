@@ -214,6 +214,13 @@
         "app/src/test/java/com/xteink/companion/ui/CompanionPresentationStoreTest.kt",
         "app/src/test/java/com/xteink/companion/ui/BookUploadLifecyclePolicyTest.kt",
         "app/src/test/java/com/xteink/companion/ui/ConnectionPolicyTest.kt",
+        "app/src/test/java/com/xteink/companion/ui/FirmwareInstallAvailabilityPolicyTest.kt",
+        "app/src/test/java/com/xteink/companion/ui/FirmwareInstallPendingTest.kt",
+        "app/src/test/java/com/xteink/companion/ui/FirmwareVersionPolicyTest.kt",
+        "app/src/test/java/com/xteink/companion/ui/FocusFormattingTest.kt",
+        "app/src/test/java/com/xteink/companion/ui/FocusSessionStoreTest.kt",
+        "app/src/test/java/com/xteink/companion/ui/RadioPolicyOptionsTest.kt",
+        "app/src/test/java/com/xteink/companion/ui/theme/ThemeColorContractTest.kt",
         "app/src/test/java/com/xteink/companion/ui/components/SetupActionLayoutPolicyTest.kt",
         "app/src/test/java/com/xteink/companion/ui/components/AdaptiveViewportLayoutPolicyTest.kt"
       ],
