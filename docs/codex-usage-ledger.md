@@ -1,5 +1,9 @@
 # Codex usage ledger
 
+## 2026-08-24 - Guarded Pixel-host dev51 deployment boundary
+
+- Corrected host inventory evidence found X3 at Pixel `/dev/bus/usb/001/002`, vendor 12346/product 4097. The installed dev51 app verified the exact artifact SHA `465C5FB999B9B7E63926B0B91BAF895CFFFE843E0A31C130E8ACFB169708CB18` and used the production guarded USB route. It failed closed at `ESP flasher stub did not start` immediately after MEM_END; no otadata read, selected-slot resolution, application write, reboot-to-app, or fresh dev51 Capabilities/StatusChanged/LibraryPage/policy ACK chain exists. No raw fallback or setup/data mutation occurred. Pixel timeout restored/verified at `1800000` ms; maintenance lease was not activated because matching firmware is not proven active.
+
 ## 2026-08-24 - Pixel-host USB inventory correction
 
 - Coordinator mistake: `device_manager.connected=false` was incorrectly treated as absence of an X3 attached to the Pixel host. Fresh repository-ADB `dumpsys usb` evidence shows `host_manager.devices` `/dev/bus/usb/001/002`, vendor `12346`, product `4097` (Espressif X3). The shared resolver now parses host-manager inventory and its fixture, while gadget state remains independent. No compiler or device mutation occurred during this correction; the existing dev51 artifact remains source-matched.

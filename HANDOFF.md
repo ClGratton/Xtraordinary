@@ -1,5 +1,9 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-24 guarded Pixel-host dev51 deployment boundary
+
+The corrected resolver found the X3 in Pixel `host_manager.devices` at `/dev/bus/usb/001/002`, vendor 12346/product 4097. The installed dev51 app verified the exact selected artifact SHA `465C5FB999B9B7E63926B0B91BAF895CFFFE843E0A31C130E8ACFB169708CB18` and entered its existing guarded USB flow. It failed closed at `ESP flasher stub did not start` immediately after MEM_END; no read-only otadata result, selected-slot resolution, application write, reboot-to-app, or fresh dev51 protocol chain exists. No raw fallback, reset/setup wipe, pairing change, app-data, NVS, SD, or books mutation was performed. Timeout is restored and verified at `1800000` ms; maintenance lease remains inactive until matching firmware is proven active.
+
 ## 2026-08-24 Pixel-host USB inventory correction
 
 Fresh repository-ADB `dumpsys usb` shows `host_manager.devices` at `/dev/bus/usb/001/002`, vendor `12346`, product `4097`, manufacturer Espressif. The earlier `connected=false` observation was Pixel gadget state, not host inventory. Target discovery now parses this host-manager record with a focused fixture and does not let gadget state negate a present host X3. No build or device mutation occurred during the correction. Continue with the existing guarded production USB path using the already-built dev51 artifact, then require fresh Capabilities, StatusChanged, revisioned LibraryPage, and policy ACKs.
