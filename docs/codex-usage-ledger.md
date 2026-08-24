@@ -370,3 +370,7 @@
 
 - Pixel Downloads received the canonical firmware; the app verified version `xtraordinary-v0.2.6-dev38-selected-slot-local` and SHA-256 `E0E8FA4E3347BB4533CAF34E8CCF7CC25A4306E5988A7CBA64204190A0F389FE`.
 - The existing managed BLE install was prepared, but no `BEGIN_FIRMWARE` was sent: BLE had no advertisement and Pixel USB was `connected=false/configured=false`. Confirm was not consumed; no transfer/commit/apply/reboot or device-state mutation occurred.
+
+## 2026-08-24 - Managed OTA retry transport boundary
+
+- One bounded retry after navigation-button wake waited roughly 75 seconds. The app logged only `connect requested model=X3 phase=Disconnected`; no BLE scan/GATT/notifications or USB enumeration reached the install path. `BEGIN_FIRMWARE` was never sent, so Confirm timing was not exercised and no transfer/reboot/device mutation occurred.

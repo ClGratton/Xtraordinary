@@ -16,6 +16,10 @@ The existing BLE `BEGIN_FIRMWARE`/chunk/commit/apply path is present in the inst
 
 The canonical dev38 artifact was copied to Pixel Downloads and the app verified version `xtraordinary-v0.2.6-dev38-selected-slot-local` with SHA-256 `E0E8FA4E3347BB4533CAF34E8CCF7CC25A4306E5988A7CBA64204190A0F389FE`. Relaunch produced only `connect requested model=X3 phase=Disconnected`; no BLE advertisement arrived and Pixel USB was `connected=false/configured=false`. `BEGIN_FIRMWARE` was never sent, so Confirm was not consumed and no transfer, commit/apply, reboot, or device-state mutation occurred.
 
+## 2026-08-24 managed OTA retry boundary
+
+One bounded retry after a navigation-button wake waited about 75 seconds (the configured standby interval plus margin). The installed app again logged only `connect requested model=X3 phase=Disconnected`; no X3 scan match, GATT, service discovery, notifications, or USB enumeration occurred. The verified local dev38 artifact remained selected but `BEGIN_FIRMWARE` was never sent, so no Confirm timing retry applies and no transfer, reboot, or device-state mutation occurred.
+
 ## 2026-08-24 BLE bootstrap crash containment checkpoint
 
 The live Pixel crash was reproduced twice on the `a57565b` candidate: `IllegalArgumentException: Invalid UTF-8 field length` at `PayloadCodec.decodeCapabilities` (`Payloads.kt:472/297`) from `BluetoothCompanionClient.handleEnvelope:895`. The cause was confirmed in source: `runCatching { EnvelopeCodec.decode(bytes) }.onSuccess { ... payload decode ... }` did not contain exceptions thrown inside `onSuccess`, so malformed Capabilities killed the main process. Pushed `77d58b0` wraps decode and dispatch independently, logs only message type/id, payload size, and a 16-byte hex prefix on rejection, and transitions the link to error without process death. No unverified wire-format fallback was added; all repository firmware versions emit two-byte length-prefixed capability fields.
