@@ -897,6 +897,7 @@ class BluetoothCompanionClient(private val context: Context) {
                 }
                 MessageType.Capabilities -> {
                     val capabilities = PayloadCodec.decodeCapabilities(envelope.payload)
+                    Log.i(LogTag, "fresh capabilities model=${capabilities.model} firmwareVersion=${capabilities.firmwareVersion}")
                     capabilitiesSequence += 1L
                     _state.value = _state.value.copy(
                         capabilities = capabilities,
