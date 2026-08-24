@@ -8,6 +8,7 @@ import org.junit.Test
 class PassModeLayoutPolicyTest {
     @Test fun normalChooserKeepsReviewedBounds() {
         assertEquals(152.dp, PassModeLayoutPolicy.optionHeight(1f))
+        assertEquals(152.dp, PassModeLayoutPolicy.optionHeight(1.15f))
     }
 
     @Test fun enlargedTextReceivesContentRoomWithoutChangingSiblingGeometry() {

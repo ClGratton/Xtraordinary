@@ -416,7 +416,11 @@ private fun UnifiedPassBody(
       val accessibilityLayout = compactFacts
       Column(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        // Route, operational facts, identity, freshness, and the face action
+        // each own a meaningful vertical band. Weighted spacers previously
+        // pushed most slack below the facts and left the route crammed at the
+        // top while the lower hierarchy became ownerless.
+        verticalArrangement = Arrangement.SpaceBetween,
       ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -431,7 +435,6 @@ private fun UnifiedPassBody(
             )
             Text(pass.destination, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
         }
-        Spacer(modifier = Modifier.weight(0.25f))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -510,7 +513,6 @@ private fun UnifiedPassBody(
                 )
             }
         }
-        Spacer(modifier = Modifier.weight(0.25f))
         if (accessibilityLayout) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 PassengerIdentity(pass = pass)
@@ -546,7 +548,6 @@ private fun UnifiedPassBody(
             }
         }
         TicketMetadata(pass)
-        Spacer(modifier = Modifier.weight(0.5f))
         TurnSurfaceControl(
             label = stringResource(R.string.show_pass_code),
             destination = PassFaceDestination.Code,

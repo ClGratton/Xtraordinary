@@ -138,6 +138,8 @@ Normal-scale header, card, deployment status, and mode/action fit the first cont
 
 At normal text scale the pass height is viewport-responsive: compact screens keep the reviewed minimum, while taller supported phone viewports give the pass all remaining height after the named header, status, chooser, spacing, and navigation budget. Do not impose an arbitrary maximum that recreates an ownerless band below the chooser. Font-scale expansion remains a separate policy so accessibility growth is never inferred from screen height.
 
+The Pixel's physical normal scale is `font_scale=1.15` (about 411 by 923 dp at 420 dpi). It remains on the responsive card budget and the 152 dp chooser/action baseline; the larger-text 400 dp card and 176 dp chooser are reserved for scales above the normal band. Inside the card, route, operational facts, identity/freshness, and the labelled face action distribute the available height as authored hierarchy rather than weighted slack after the route.
+
 ## X3 ticket contract
 
 Matrix and linear tickets are one design. Header and operational regions use identical coordinates; only scanner-chamber aspect ratio changes.
