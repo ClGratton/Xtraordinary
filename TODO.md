@@ -13,11 +13,13 @@ This is the actionable backlog. Older unchecked items in `docs/x3-takeover-track
 - Source presence is not a build; a build is not an install; an install is not physical acceptance.
 - Existing measured behavior is a constraint. Before changing power, radio, pairing, acknowledgement, persistence, USB, reader-refresh, or legal behavior, compare the proposed change with the linked policy and hardware evidence. If they conflict, document the evidence-backed decision before editing.
 - Preserve Pixel app data, the Android/X3 Bluetooth bond, X3 NVS, SD books, reading history, and current device settings unless the user explicitly authorizes a targeted reset.
+- Usage-policy replay, context-growth, and five-point task-consumption findings are optimization advisories. They no longer require a fresh visible task or block source fixes. Only the 95% signed-in weekly protected-stage floor blocks a compiler/device phase without a documented override; older entries that say "resume only in a fresh task" are incident history, not current execution policy.
 
 ## Execution order
 
 ### P0 — Build, deploy, and accept the current source
 
+- [x] Remove self-amplifying Codex overhead: keep one visible coordinator, make delegation optional and Luna-medium-first, reserve Luna xhigh/Terra for measured escalation, run the usage audit once at entry and once per protected stage, and stop replay/task-growth advisories from forcing task cascades or blocking ordinary source correction. The policy, audit, wrappers, machine rules, benchmark basis, and dated ledger are updated together.
 - [x] Finish and push the current milestone's dirty documentation/policy changes; require a clean named branch with matching upstream before compilation.
 - [x] Start the compiler/device phase in a fresh task with a bounded regression-impact audit against `docs/x3-power-sync-flow.md`, `docs/interactive-transport-lifecycle.md`, `docs/usb-firmware-maintenance.md`, `docs/legal-release-audit.md`, and the physical evidence in `HANDOFF.md`.
 - [~] Final release-artifact attempt: Android and firmware notice portability checks are pushed through `586cbac`, but the one canonical Android wrapper invocation stopped before compiler entry because the task-bound replay/task-growth gate rejected the weekly waiver. No APK, install, flash, upload, handshake, or device mutation occurred; resume only from a fresh passing audit.

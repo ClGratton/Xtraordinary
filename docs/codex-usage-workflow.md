@@ -32,36 +32,54 @@ Model-call count is reported for forensics and checkpoint cadence only. It is ne
 - the latest post-compaction input above 120,000 tokens;
 - a recent three-sample median above 75,000 tokens after growing more than 35% from the first three-sample median;
 - more than five percentage points of weekly allowance consumed by one task;
-- the signed-in weekly meter reaching 80% used.
+- the signed-in weekly meter reaching the 80% warning threshold or the 95% protected-stage cutoff.
 
-Replay and trend signals produce `compaction-required`. Compact the same task first, then calculate replay from token samples after the latest compaction; compaction count itself is not a violation. Weekly-growth or reserve signals produce `weekly-budget-exhausted`. In either case, the invoking task must not enter another protected stage until its signal is cleared or the minimum remaining stage is assigned to a fresh history-free agent whose own audit passes. Do not require the user to create a replacement task.
+Replay and trend signals produce `compaction-recommended`; five-point task growth produces `task-budget-checkpoint`. They are optimization evidence, not stop conditions. Compact the same task when the owning client can do so, reduce the next packet, and continue a bounded source fix without creating another visible task. The signed-in weekly reserve is the only protected-stage stop: 80% is the warning threshold and 95% is the fail-closed compiler/device threshold unless the user has authorized the documented reserve override. This distinction prevents a measurement from stranding a nearly finished fix and paying for the same context again.
 
-Manual compaction has a precise ownership boundary. Codex app-server schema exposes `thread/compact/start` with only `threadId`, and the owning interactive client can run `/compact` between turns. An agent turn has no direct compaction tool. On Windows there is no supported app-server daemon lifecycle, so a new stdio app-server is a separate in-memory owner: sending `thread/compact/start` for the active desktop thread returns `thread not found`. Resuming that live rollout into the separate process and compacting it concurrently is unsafe and prohibited. When the owning client cannot compact between turns, use a fresh `fork_turns: "none"` agent with a compact source-bound packet for the next bounded stage.
+Manual compaction has a precise ownership boundary. Codex app-server schema exposes `thread/compact/start` with only `threadId`, and the owning interactive client can run `/compact` between turns. An agent turn has no direct compaction tool. On Windows there is no supported app-server daemon lifecycle, so a new stdio app-server is a separate in-memory owner: sending `thread/compact/start` for the active desktop thread returns `thread not found`. Resuming that live rollout into the separate process and compacting it concurrently is unsafe and prohibited. When the owning client cannot compact between turns, stay in the same coordinator and finish the smallest coherent source stage. A single internal `fork_turns: "none"` worker is optional only when its compact packet is cheaper than continuing; it must not trigger further handoffs.
 
-Run `scripts/audit-codex-task-usage.ps1 -EnforceStageGate` at task entry, before any reviewer wave, before a broad source investigation, and before a compiler or device-deployment phase. The audit binds to `CODEX_THREAD_ID`, falling back to `CODEX_SESSION_ID`, validates the rollout's `session_meta.payload.id`, and must never select the most recently modified rollout belonging to another root task or specialist. An explicit `-RolloutPath` is reserved for fixtures and forensics; pair it with `-ThreadId` when identity enforcement is required. Fewer than two samples return `warming-up`, not failure. Both canonical compiler wrappers execute the same gate before the pushed-source and engineering gates.
+Run `scripts/audit-codex-task-usage.ps1` once at task entry as a non-blocking observation. Run `scripts/audit-codex-task-usage.ps1 -EnforceStageGate` only before a compiler or device-deployment phase; canonical compiler wrappers provide that single protected-stage check. Do not rerun the audit before ordinary source inspection, editing, documentation, focused script tests, or a correction discovered by a failed pre-compiler gate. The audit binds to `CODEX_THREAD_ID`, falling back to `CODEX_SESSION_ID`, validates the rollout's `session_meta.payload.id`, and must never select the most recently modified rollout belonging to another root task or specialist. An explicit `-RolloutPath` is reserved for fixtures and forensics; pair it with `-ThreadId` when identity enforcement is required. Fewer than two samples return `warming-up`, not failure.
 
-An exceptional weekly-reserve continuation requires direct user authorization recorded in the dated ledger before the protected stage. Only then may a canonical wrapper pass the visible `-AllowDocumentedWeeklyReserveOverride` flag. The audit accepts that flag only for the current weekly-meter reserve violation; task-growth and replay signals remain fail-closed, and it prints the active exception. This is not a default, environment, or hidden bypass.
+An exceptional weekly-reserve continuation requires direct user authorization recorded in the dated ledger before the protected stage. Only then may a canonical wrapper pass the visible `-AllowDocumentedWeeklyReserveOverride` flag. The audit accepts that flag only for the 95% protected-stage reserve violation and prints the active exception. Task-growth and replay signals remain visible advisories. This is not a default, environment, or hidden bypass.
 
 ## Required checkpoints
 
 Take and record a meter snapshot:
 
 1. at the start of long-running UI/review work;
-2. immediately before and after every reviewer or subagent wave;
-3. after every compiler/build attempt;
+2. once before and once after a required reviewer wave, not per reviewer;
+3. after a compiler/build attempt;
 4. every 30 minutes while a task remains active, if no other checkpoint occurred.
 
-Also run the audit after every 25 root model calls as a checkpoint, not a stop. Prefer one composed read-only command that answers all related questions; a sequence of tiny shell or reviewer turns is a usage defect even when every individual call is cache-hit.
+Do not audit by model-call count. Prefer one composed read-only command that answers all related questions; a sequence of tiny shell or reviewer turns is a usage defect even when every individual call is cache-hit. The 30-minute checkpoint is enough unless a protected stage or a five-point meter change occurs first.
 
 Report a change of five percentage points or more immediately. A stage that consumes ten percentage points pauses before another reviewer wave or build so the implementation owner can reconcile what remains.
 
 When twenty percent or less remains, stop optional review loops, research, and parallel work. Continue only the minimum path required to leave source safe and documented unless the user explicitly asks to spend more.
 
-## Delegation budget
+## Model routing and delegation budget
+
+Choose by cost per accepted result, not by the largest reasoning label:
+
+- Use `gpt-5.6-luna` medium for bounded repository discovery, log parsing, documentation, mechanical edits, focused test repair, and build/deployment orchestration.
+- Use Luna high for a bounded multi-file implementation or diagnosis. Escalate that same bounded task to Luna xhigh only after medium/high exposes a concrete reasoning gap or when failure is costly and external acceptance checks exist. Xhigh is not a default.
+- Use `gpt-5.6-terra` medium/high for cross-layer synchronization or state-machine changes, firmware/device safety, unfamiliar weakly tested code, and the mandatory UI specialist contracts. Do not use Terra for command running, status collection, or repeating an inspection already completed by the owner.
+- Sol coordinates scope, resolves contradictions, and handles the rare architecture decision that cannot be reduced to a bounded packet. It does not perform bulk shell, build, or reviewer work.
+- Re-evaluate this routing with repository acceptance data rather than brand assumptions. API prices and public benchmarks inform the prior but do not prove Codex subscription-meter cost.
+
+### Evidence basis, checked 2026-08-24
+
+The current OpenAI model catalog prices Luna at $0.20 input / $0.02 cached input / $1.20 output per million API tokens and Terra at $2.00 / $0.20 / $12.00: Luna is one tenth of Terra's API token price. This is strong routing evidence but is not a claim that the signed-in Codex weekly meter applies the same multiplier.
+
+OpenAI's published coding evaluations show the quality gap is usually much smaller than the API price gap: Terra/Luna score 77.4/74.6 on the Artificial Analysis Coding Agent Index, 63.4%/62.7% on SWE-Bench Pro, 69.6%/67.2% on DeepSWE, and 87.4%/84.7% on Terminal-Bench 2.1. Terra retains material advantages in security, self-improvement, and some long-context evaluations, which is why it remains the escalation route for firmware safety, cross-layer state, and weakly tested unfamiliar code.
+
+Independent Codex evidence does not justify Luna xhigh as the default. NixBench's replicated 29-task corpus reports overlapping Luna and Terra family results; its fixed xhigh baseline was 19/29 for both, while Luna high averaged 22.6 tasks in 44.4 seconds and Luna xhigh 22.4 in 53.9 seconds. A separate 294-run Codex study found medium, high, xhigh, and max all accepted 42/42 valid matched tasks while median elapsed time and input tokens increased with effort. Therefore start Luna at medium, measure acceptance externally, and escalate only on an observed gap.
+
+Sources: [OpenAI Luna model](https://developers.openai.com/api/docs/models/gpt-5.6-luna), [OpenAI Terra model](https://developers.openai.com/api/docs/models/gpt-5.6-terra), [OpenAI GPT-5.6 evaluations](https://openai.com/index/gpt-5-6/), [OpenAI model guidance](https://developers.openai.com/api/docs/guides/latest-model), [Artificial Analysis comparison](https://artificialanalysis.ai/models/comparisons/gpt-5-6-luna-xhigh-vs-gpt-5-6-terra), [NixBench](https://nixbench.com/results.html), and [294-run Codex study](https://instavar.com/research/agents/gpt-5-6-codex-models-reasoning-levels-benchmark-2026).
 
 - Use `fork_turns: "none"` and give each specialist a compact, source-bound packet.
 - Never fork the full history of this long-running task.
-- Use one active specialist by default. Add parallel specialists only when the user explicitly requests a full wave and the pre-wave meter permits it.
+- Use one active worker by default. Add parallel specialists only for tasks with no shared files or sequential dependency, or when a mandatory UI contract requires distinct roles and the pre-wave meter permits it.
 - Consolidate all known changes to the same UI surfaces before their mandatory role wave. Do not pay eight independent reviews for a narrow intermediate fix when another known layout, appearance, or copy change on those surfaces is still pending.
 - Reuse one narrow reviewer for one re-review. Do not spawn a replacement swarm because a reviewer missed a defect.
 - The implementation owner writes code. Reviewers remain read-only and return a verdict plus exact evidence.
@@ -72,19 +90,19 @@ When twenty percent or less remains, stop optional review loops, research, and p
 
 Every milestone task must read `TODO.md` first and treat it as the authoritative actionable backlog. It then reads only the directly relevant current `HANDOFF.md` section and the policy or evidence files linked from that section. Older unchecked tracker entries are incident history unless represented in `TODO.md`; remembered chat scope is not an entrypoint. Update `TODO.md` status at the milestone checkpoint.
 
-Each substantial milestone has one fresh `fork_turns: "none"` `gpt-5.6-terra` execution owner. That owner owns the milestone's implementation, debugging, focused tests, and acceptance evidence from its bounded start through its checkpointed end.
+The visible coordinator remains the owner across related milestones. It may assign one compact `fork_turns: "none"` worker using the model-routing table above, but a worker is not mandatory. The same owner takes a change through implementation, debugging, focused tests, and acceptance evidence from its bounded start through its checkpointed end.
 
-Do not replace that execution owner mid-milestone and do not create a reviewer swarm for the milestone. The coordinator does not duplicate the owner's source inspection: it reconciles one concise result, publishes product/device/next-outcome status, and checks the remaining weekly budget before considering another milestone.
+Do not replace the execution owner mid-milestone and do not create a reviewer swarm for the milestone. The coordinator does not duplicate a worker's source inspection: it reconciles one concise result, publishes product/device/next-outcome status, and checks the remaining weekly budget before considering another milestone.
 
-At the milestone end, the owner checkpoints code, evidence, handoff, tracker, and usage ledger, then terminates. This is bounded milestone ownership, not persistent whole-project ownership or unbounded work assignment.
+At the milestone end, the owner checkpoints code, evidence, handoff, tracker, and usage ledger. Any internal worker then terminates; the visible coordinator remains available for the next related milestone. This is bounded milestone ownership, not persistent whole-project ownership or unbounded work assignment.
 
 Before milestone implementation begins, the execution owner runs a bounded regression-impact audit against the existing power, synchronization, pairing, state-truth, and legal policies plus measured hardware evidence relevant to the change. Existing measured behavior is a constraint. If a proposed fix conflicts with it, evaluate compatibility explicitly and document the evidence-backed decision before editing; never silently regress a policy or replace measured behavior with an assumption.
 
-At the milestone checkpoint, update `TODO.md` status and normalize the completed result and remaining authoritative backlog in the directly relevant current `HANDOFF.md` section. When another substantial milestone remains, automatically create a new user-visible Codex task for that milestone, immediately navigate to and open it in the app, and end the old coordinator. Do not keep one coordinator alive across milestones and do not require user intervention for the handoff.
+At the milestone checkpoint, update `TODO.md` status and normalize the completed result and remaining authoritative backlog in the directly relevant current `HANDOFF.md` section. Continue a related next milestone in the same visible coordinator. Create a new user-visible Codex task only when the user explicitly asks or the objective is genuinely unrelated; if a transition occurs, immediately navigate to and open it in the app. Never create a chain of tasks as a reaction to replay size.
 
 ## User-visible task continuity and status
 
-An automatic continuation or move may create or select another user-visible Codex task. When it does, the visible coordinator must immediately navigate to and open that task in the Codex app with the available task-navigation tool. Never leave the user on the Subagents page, and never treat merely providing a task name or ID as a handoff. The user must land in the task where visible coordination continues.
+A user-requested continuation or move may create or select another user-visible Codex task. When it does, the visible coordinator must immediately navigate to and open that task in the Codex app with the available task-navigation tool. Never leave the user on the Subagents page, and never treat merely providing a task name or ID as a handoff. The user must land in the task where visible coordination continues.
 
 At each milestone, the visible coordinator publishes a plain-language product status containing all four facts: completed product work, the current phase, whether the phone or X3 changed, and the next verifiable outcome. Keep subagent and worker implementation details out of user-facing status unless the user asks for them.
 
@@ -114,12 +132,12 @@ Each entry records date, task ID when available, start/end percentages, reset wi
 Use this sequence outside Xtraordinary as well:
 
 1. Create a small durable brief: objective, audience, constraints, source-of-truth files, and definition of done.
-2. Start a fresh task for each materially different objective. Link the brief instead of carrying an old chat.
-3. Primary agent inspects and implements. Delegate only one bounded concern at a time with no inherited history.
+2. Keep one coordinator for related objectives. Start a fresh visible task only when the user requests it or the objective is genuinely unrelated.
+3. Primary agent inspects and implements. Delegate only when the packet is cheaper than continuing, one bounded concern at a time with no inherited history.
 4. Give a specialist the minimum packet: exact question, 2-5 inputs, read-only/edit ownership, output format, and stop condition.
 5. Reconcile once. Batch corrections. Build or render once from the settled candidate.
 6. Store successful commands, decisions, rubrics, and recurring checks in the project; future tasks read those artifacts.
 7. Take meter snapshots at the checkpoints above and stop optional iteration when the budget threshold is reached.
-8. If the audit reports `compaction-required`, compact through the owning client between turns. If that path is unavailable during an active agent turn, give the next bounded stage to a fresh `fork_turns: "none"` agent. If it reports `weekly-budget-exhausted`, stop optional work and preserve the weekly reserve.
+8. If the audit recommends compaction, compact through the owning client when available; otherwise finish the smallest coherent stage in the same coordinator. Never create an agent chain to escape context. At the protected weekly cutoff, stop optional work and preserve enough reserve to checkpoint or complete the explicitly authorized final stage.
 
 For teaching material, default to one source-research pass, one audience/learning-objective outline, primary-agent drafting, and one final pedagogy/factual review. Do not run multiple vague rewrite agents. Ask the reviewer to check named outcomes such as prerequisite fit, misconception risk, worked-example correctness, cognitive load, and assessment alignment.

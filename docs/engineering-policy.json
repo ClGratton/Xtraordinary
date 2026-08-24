@@ -503,14 +503,14 @@
       "id": "codex-usage-workflow-is-durable",
       "type": "required_pattern",
       "path": "docs/codex-usage-workflow.md",
-      "pattern": "## Authoritative meter[\\s\\S]*?scripts/read-codex-usage\\.ps1[\\s\\S]*?account/rateLimits/read[\\s\\S]*?## Required checkpoints[\\s\\S]*?30 minutes[\\s\\S]*?## Delegation budget[\\s\\S]*?fork_turns[\\s\\S]*?## Build budget[\\s\\S]*?## Ledger rule",
-      "message": "Long-running work must retain signed-in usage checkpoints, bounded delegation/build rules, and a durable ledger."
+      "pattern": "## Authoritative meter[\\s\\S]*?scripts/read-codex-usage\\.ps1[\\s\\S]*?account/rateLimits/read[\\s\\S]*?## Required checkpoints[\\s\\S]*?30 minutes[\\s\\S]*?## Model routing and delegation budget[\\s\\S]*?gpt-5\\.6-luna[\\s\\S]*?gpt-5\\.6-terra[\\s\\S]*?fork_turns[\\s\\S]*?## Build budget[\\s\\S]*?## Ledger rule",
+      "message": "Long-running work must retain signed-in usage checkpoints, cost-aware model routing, bounded delegation/build rules, and a durable ledger."
     },
     {
       "id": "visible-codex-task-transitions-open-immediately",
       "type": "required_pattern",
       "path": "docs/codex-usage-workflow.md",
-      "pattern": "automatic continuation or move[\\s\\S]*?another user-visible Codex task[\\s\\S]*?immediately navigate to and open that task in the Codex app[\\s\\S]*?available task-navigation tool[\\s\\S]*?Never leave the user on the Subagents page[\\s\\S]*?never treat merely providing a task name or ID as a handoff",
+      "pattern": "user-requested continuation or move[\\s\\S]*?another user-visible Codex task[\\s\\S]*?immediately navigate to and open that task in the Codex app[\\s\\S]*?available task-navigation tool[\\s\\S]*?Never leave the user on the Subagents page[\\s\\S]*?never treat merely providing a task name or ID as a handoff",
       "message": "A coordinator that changes the user-visible task must immediately open it in Codex instead of leaving the user on Subagents or returning only an identifier."
     },
     {
@@ -528,11 +528,11 @@
       "message": "History-free bounded workers must remain internal and must not create or select a user-visible Codex task."
     },
     {
-      "id": "substantial-milestones-have-one-fresh-terra-owner",
+      "id": "substantial-milestones-use-one-cost-routed-owner",
       "type": "required_pattern",
       "path": "docs/codex-usage-workflow.md",
-      "pattern": "Each substantial milestone has one fresh `fork_turns: \\\"none\\\"` `gpt-5\\.6-terra` execution owner[\\s\\S]*?owns the milestone's implementation, debugging, focused tests, and acceptance evidence[\\s\\S]*?Do not replace that execution owner mid-milestone[\\s\\S]*?do not create a reviewer swarm[\\s\\S]*?coordinator does not duplicate the owner's source inspection[\\s\\S]*?checks the remaining weekly budget before considering another milestone[\\s\\S]*?owner checkpoints code, evidence, handoff, tracker, and usage ledger, then terminates[\\s\\S]*?not persistent whole-project ownership or unbounded work assignment",
-      "message": "Each substantial milestone must retain one fresh Terra execution owner with bounded end-to-end responsibility and no mid-milestone replacement."
+      "pattern": "visible coordinator remains the owner across related milestones[\\s\\S]*?one compact `fork_turns: \\\"none\\\"` worker[\\s\\S]*?worker is not mandatory[\\s\\S]*?same owner takes a change through implementation, debugging, focused tests, and acceptance evidence[\\s\\S]*?Do not replace the execution owner mid-milestone[\\s\\S]*?do not create a reviewer swarm[\\s\\S]*?coordinator does not duplicate a worker's source inspection[\\s\\S]*?Any internal worker then terminates[\\s\\S]*?visible coordinator remains available",
+      "message": "Each substantial milestone must retain one cost-routed end-to-end owner without mandatory delegation, duplicate inspection, or reviewer swarms."
     },
     {
       "id": "milestone-todo-entrypoint-is-authoritative",
@@ -552,15 +552,15 @@
       "id": "milestones-audit-regression-impact-and-handoff-visibly",
       "type": "required_pattern",
       "path": "docs/codex-usage-workflow.md",
-      "pattern": "Before milestone implementation begins[\\s\\S]*?bounded regression-impact audit[\\s\\S]*?power, synchronization, pairing, state-truth, and legal policies[\\s\\S]*?measured hardware evidence[\\s\\S]*?Existing measured behavior is a constraint[\\s\\S]*?document the evidence-backed decision before editing[\\s\\S]*?never silently regress a policy or replace measured behavior with an assumption[\\s\\S]*?normalize the completed result and remaining authoritative backlog[\\s\\S]*?automatically create a new user-visible Codex task[\\s\\S]*?immediately navigate to and open it in the app[\\s\\S]*?end the old coordinator[\\s\\S]*?Do not keep one coordinator alive across milestones[\\s\\S]*?do not require user intervention",
-      "message": "Every substantial milestone must audit compatibility with measured behavior and hand the next milestone to an immediately opened user-visible task."
+      "pattern": "Before milestone implementation begins[\\s\\S]*?bounded regression-impact audit[\\s\\S]*?power, synchronization, pairing, state-truth, and legal policies[\\s\\S]*?measured hardware evidence[\\s\\S]*?Existing measured behavior is a constraint[\\s\\S]*?document the evidence-backed decision before editing[\\s\\S]*?never silently regress a policy or replace measured behavior with an assumption[\\s\\S]*?normalize the completed result and remaining authoritative backlog[\\s\\S]*?Continue a related next milestone in the same visible coordinator[\\s\\S]*?Create a new user-visible Codex task only when the user explicitly asks or the objective is genuinely unrelated[\\s\\S]*?Never create a chain of tasks as a reaction to replay size",
+      "message": "Every substantial milestone must audit compatibility with measured behavior and continue related work without an automatic visible-task cascade."
     },
     {
       "id": "agents-enforce-regression-impact-and-visible-milestone-handoff",
       "type": "required_pattern",
       "path": "AGENTS.md",
-      "pattern": "Before every substantial milestone implementation[\\s\\S]*?bounded regression-impact audit[\\s\\S]*?power, synchronization, pairing, state-truth, and legal policies[\\s\\S]*?measured hardware evidence[\\s\\S]*?document an explicit compatibility decision backed by evidence before editing[\\s\\S]*?never silently regress a policy or replace measurements with assumptions[\\s\\S]*?automatically create the next substantial milestone as a new user-visible Codex task[\\s\\S]*?immediately navigate/open it in the app[\\s\\S]*?end the old coordinator[\\s\\S]*?without requiring user intervention",
-      "message": "Repository agents must audit regression impact and visibly hand off each next substantial milestone."
+      "pattern": "Before every substantial milestone implementation[\\s\\S]*?bounded regression-impact audit[\\s\\S]*?power, synchronization, pairing, state-truth, and legal policies[\\s\\S]*?measured hardware evidence[\\s\\S]*?document an explicit compatibility decision backed by evidence before editing[\\s\\S]*?never silently regress a policy or replace measurements with assumptions[\\s\\S]*?Continue the next related milestone in the same coordinator unless the user explicitly asks for a new task",
+      "message": "Repository agents must audit regression impact and continue related milestones without automatic task churn."
     },
     {
       "id": "codex-usage-reader-keeps-initialized-app-server-handshake",
@@ -570,32 +570,32 @@
       "message": "The canonical signed-in usage reader must preserve the initialized app-server handshake and required weekly-meter fields."
     },
     {
-      "id": "codex-task-audit-enforces-replay-and-weekly-thresholds",
+      "id": "codex-task-audit-separates-advisories-from-protected-reserve",
       "type": "required_pattern",
       "path": "scripts/audit-codex-task-usage.ps1",
-      "pattern": "MaxTaskWeeklyIncreasePercent = 5[\\s\\S]*?MaxMedianInputTokens = 75000[\\s\\S]*?MaxLastInputTokens = 120000[\\s\\S]*?MaxRecentInputGrowthPercent = 35[\\s\\S]*?MaxWeeklyUsedPercent = 80[\\s\\S]*?weekly-budget-exhausted[\\s\\S]*?compaction-required[\\s\\S]*?EnforceStageGate",
-      "message": "The rollout audit must fail closed on excessive post-compaction replay, replay growth, task-local weekly growth, or weekly depletion without using model-call count as a stop."
+      "pattern": "MaxTaskWeeklyIncreasePercent = 5[\\s\\S]*?MaxMedianInputTokens = 75000[\\s\\S]*?MaxLastInputTokens = 120000[\\s\\S]*?MaxRecentInputGrowthPercent = 35[\\s\\S]*?MaxWeeklyUsedPercent = 80[\\s\\S]*?MaxProtectedStageWeeklyUsedPercent = 95[\\s\\S]*?compaction-recommended[\\s\\S]*?task-budget-checkpoint[\\s\\S]*?blockingViolations[\\s\\S]*?EnforceStageGate",
+      "message": "The rollout audit must keep replay and task-growth visible as advisories while failing closed only on the protected-stage weekly reserve."
     },
     {
       "id": "android-wrapper-enforces-codex-task-budget",
       "type": "required_pattern",
       "path": "scripts/build-xtraordinary-app.ps1",
-      "pattern": "audit-codex-task-usage\\.ps1[\\s\\S]*?-EnforceStageGate[\\s\\S]*?compaction or a fresh history-free bounded agent",
-      "message": "The Android compiler wrapper must stop an oversized invoking context before compilation."
+      "pattern": "audit-codex-task-usage\\.ps1[\\s\\S]*?-EnforceStageGate[\\s\\S]*?weekly reserve is below the protected-stage floor",
+      "message": "The Android compiler wrapper must preserve the protected weekly reserve without blocking on replay advisories."
     },
     {
       "id": "firmware-wrapper-enforces-codex-task-budget",
       "type": "required_pattern",
       "path": "scripts/build-x3-firmware.ps1",
-      "pattern": "audit-codex-task-usage\\.ps1[\\s\\S]*?-EnforceStageGate[\\s\\S]*?compaction or a fresh history-free bounded agent",
-      "message": "The firmware compiler wrapper must stop an oversized invoking context before compilation."
+      "pattern": "audit-codex-task-usage\\.ps1[\\s\\S]*?-EnforceStageGate[\\s\\S]*?weekly reserve is below the protected-stage floor",
+      "message": "The firmware compiler wrapper must preserve the protected weekly reserve without blocking on replay advisories."
     },
     {
-      "id": "agents-obey-codex-task-audit-stop",
+      "id": "agents-use-stage-aware-codex-task-audit",
       "type": "required_pattern",
       "path": "AGENTS.md",
-      "pattern": "audit-codex-task-usage\\.ps1 -EnforceStageGate[\\s\\S]*?task entry[\\s\\S]*?never as a call-count stop[\\s\\S]*?CODEX_THREAD_ID[\\s\\S]*?compaction-required[\\s\\S]*?fork_turns",
-      "message": "Agents must act on measured replay and weekly signals, compact first, and use history-free bounded execution when compaction is not safely callable."
+      "pattern": "audit-codex-task-usage\\.ps1` once at task entry for observation[\\s\\S]*?audit-codex-task-usage\\.ps1 -EnforceStageGate` only before a compiler or device-deployment phase[\\s\\S]*?CODEX_THREAD_ID[\\s\\S]*?Replay, growth, and five-point task consumption are optimization signals[\\s\\S]*?must not create a task cascade[\\s\\S]*?Only the protected-stage weekly reserve is fail-closed",
+      "message": "Agents must use a non-blocking entry audit and reserve the fail-closed stage gate for compiler or device work."
     },
     {
       "id": "codex-task-audit-binds-invoking-thread",
@@ -608,7 +608,7 @@
       "id": "codex-task-audit-returns-explicit-success",
       "type": "required_pattern",
       "path": "scripts/audit-codex-task-usage.ps1",
-      "pattern": "ConvertTo-Json -Depth 8[\\s\\S]*?throw 'Codex task usage requires compaction or a fresh history-free bounded agent before the next protected stage\\.'[\\s\\S]*?exit 0",
+      "pattern": "ConvertTo-Json -Depth 8[\\s\\S]*?throw 'Codex weekly reserve is below the protected-stage floor[\\s\\S]*?exit 0",
       "message": "A passing usage audit must explicitly reset the process exit code so canonical wrappers cannot mistake stale native-command failure for a stage-gate failure."
     },
     {

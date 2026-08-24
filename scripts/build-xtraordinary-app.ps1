@@ -69,7 +69,7 @@ if ($AllowDeferredUiReviewDebt -and $UiEvidenceCandidate) {
 
 & $usageAudit -EnforceStageGate -AllowDocumentedWeeklyReserveOverride:$AllowDocumentedWeeklyReserveOverride
 if ($LASTEXITCODE -ne 0) {
-    throw "Codex usage requires compaction or a fresh history-free bounded agent before another compiler run. An explicit user override must be recorded in docs/codex-usage-ledger.md before changing the protected thresholds."
+    throw "The signed-in weekly reserve is below the protected-stage floor. Checkpoint source or record the explicit user override in docs/codex-usage-ledger.md before another compiler run."
 }
 & $sourceCheck
 if ($UiEvidenceCandidate) {

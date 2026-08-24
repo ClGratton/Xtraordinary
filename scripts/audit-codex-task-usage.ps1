@@ -9,7 +9,8 @@ param(
     [int]$MaxMedianInputTokens = 75000,
     [int]$MaxLastInputTokens = 120000,
     [int]$MaxRecentInputGrowthPercent = 35,
-    [int]$MaxWeeklyUsedPercent = 80
+    [int]$MaxWeeklyUsedPercent = 80,
+    [int]$MaxProtectedStageWeeklyUsedPercent = 95
 )
 
 $ErrorActionPreference = 'Stop'
@@ -208,6 +209,7 @@ $weeklyIncrease = if ($currentUsage -and $null -ne $currentUsage.weeklyUsedPerce
 
 $replaySignals = [System.Collections.Generic.List[string]]::new()
 $budgetViolations = [System.Collections.Generic.List[string]]::new()
+$blockingViolations = [System.Collections.Generic.List[string]]::new()
 if ($replayUsage.modelCalls -ge 3 -and $replayUsage.medianInputTokensPerCall -gt $MaxMedianInputTokens) {
     $replaySignals.Add("post-compaction median input $($replayUsage.medianInputTokensPerCall) exceeds $MaxMedianInputTokens tokens")
 }
@@ -224,21 +226,21 @@ if ($weeklyIncrease -gt $MaxTaskWeeklyIncreasePercent) {
     $budgetViolations.Add("task weekly increase ${weeklyIncrease}% exceeds ${MaxTaskWeeklyIncreasePercent}%")
 }
 if ($latestMeter -and $latestMeter.usedPercent -ge $MaxWeeklyUsedPercent) {
-    $budgetViolations.Add("weekly meter $($latestMeter.usedPercent)% reached the ${MaxWeeklyUsedPercent}% reserve cutoff")
+    $budgetViolations.Add("weekly meter $($latestMeter.usedPercent)% reached the ${MaxWeeklyUsedPercent}% warning threshold")
+}
+if ($latestMeter -and $latestMeter.usedPercent -ge $MaxProtectedStageWeeklyUsedPercent) {
+    $blockingViolations.Add("weekly meter $($latestMeter.usedPercent)% reached the ${MaxProtectedStageWeeklyUsedPercent}% protected-stage cutoff")
 }
 
-$weeklyReserveViolation = "weekly meter $($latestMeter.usedPercent)% reached the ${MaxWeeklyUsedPercent}% reserve cutoff"
-$nonOverridableBudgetViolations = @($budgetViolations | Where-Object { $_ -ne $weeklyReserveViolation })
+$weeklyReserveViolation = if ($latestMeter) { "weekly meter $($latestMeter.usedPercent)% reached the ${MaxProtectedStageWeeklyUsedPercent}% protected-stage cutoff" } else { $null }
 $weeklyReserveOverrideAccepted = $false
 if ($AllowDocumentedWeeklyReserveOverride) {
-    if ($nonOverridableBudgetViolations.Count -gt 0 -or $replaySignals.Count -gt 0) {
-        Write-Host 'EXPLICIT WEEKLY-RESERVE OVERRIDE REJECTED: task-growth and replay limits remain fail-closed.' -ForegroundColor Red
-    } elseif ($budgetViolations -contains $weeklyReserveViolation) {
+    if ($blockingViolations -contains $weeklyReserveViolation) {
         if (-not (Test-DocumentedWeeklyReserveOverride)) {
             throw 'The explicit weekly-reserve override requires the documented 2026-08-22 user authorization in docs/codex-usage-ledger.md.'
         }
         $weeklyReserveOverrideAccepted = $true
-        Write-Host "EXPLICIT WEEKLY-RESERVE OVERRIDE: allowing this protected stage at $($latestMeter.usedPercent)% only; all non-reserve budget and replay limits remain fail-closed." -ForegroundColor Yellow
+        Write-Host "EXPLICIT WEEKLY-RESERVE OVERRIDE: allowing this protected stage at $($latestMeter.usedPercent)%; replay and task-growth signals remain visible optimization advisories." -ForegroundColor Yellow
     }
 }
 
@@ -257,7 +259,7 @@ $history = @($meterRows | Group-Object { [long]([math]::Floor([double]$_.resetsA
 })
 
 $result = [pscustomobject]@{
-    status = if ($weeklyReserveOverrideAccepted) { 'explicit-weekly-reserve-override' } elseif ($budgetViolations.Count) { 'weekly-budget-exhausted' } elseif ($replaySignals.Count) { 'compaction-required' } else { 'within-budget' }
+    status = if ($weeklyReserveOverrideAccepted) { 'explicit-weekly-reserve-override' } elseif ($blockingViolations.Count) { 'weekly-budget-exhausted' } elseif ($replaySignals.Count) { 'compaction-recommended' } elseif ($weeklyIncrease -gt $MaxTaskWeeklyIncreasePercent) { 'task-budget-checkpoint' } elseif ($budgetViolations.Count) { 'weekly-reserve-warning' } else { 'within-budget' }
     threadId = $rolloutThreadId
     rolloutPath = $resolvedRollout
     currentResetAt = $currentReset
@@ -279,19 +281,25 @@ $result = [pscustomobject]@{
         maxLastInputTokens = $MaxLastInputTokens
         maxRecentInputGrowthPercent = $MaxRecentInputGrowthPercent
         maxWeeklyUsedPercent = $MaxWeeklyUsedPercent
+        maxProtectedStageWeeklyUsedPercent = $MaxProtectedStageWeeklyUsedPercent
     }
     replaySignals = @($replaySignals)
     budgetViolations = @($budgetViolations)
+    blockingViolations = @($blockingViolations)
     weeklyReserveOverrideAccepted = $weeklyReserveOverrideAccepted
-    recommendedAction = if ($budgetViolations.Count) {
-        'Stop optional work and use a fresh fork_turns:none agent only for the minimum bounded completion path.'
+    recommendedAction = if ($blockingViolations.Count -and -not $weeklyReserveOverrideAccepted) {
+        'Stop optional work before a compiler or device stage; checkpoint source or use the documented explicit reserve override.'
     } elseif ($replaySignals.Count) {
-        'Compact between turns with the owning Codex client; if that is unavailable from an active turn, delegate the next bounded stage to a fresh fork_turns:none agent.'
-    } else { 'Continue with bounded commands and re-audit before the next protected stage.' }
+        'Compact with the owning client when available and shorten the next packet; continue the smallest coherent source stage without creating a task chain.'
+    } elseif ($weeklyIncrease -gt $MaxTaskWeeklyIncreasePercent) {
+        'Report the five-point change, stop optional parallel work, and finish the smallest coherent stage in the same coordinator.'
+    } elseif ($budgetViolations.Count) {
+        'Weekly reserve warning: avoid optional research and reviewer loops; preserve room for the final protected stage.'
+    } else { 'Continue with bounded commands and re-audit only before the next protected stage.' }
 }
 
 $result | ConvertTo-Json -Depth 8
-if (($EnforceStageGate -or $LegacyBuildGate) -and (($nonOverridableBudgetViolations.Count -gt 0) -or $replaySignals.Count -or (($budgetViolations.Count -gt 0) -and -not $weeklyReserveOverrideAccepted))) {
-    throw 'Codex task usage requires compaction or a fresh history-free bounded agent before the next protected stage.'
+if (($EnforceStageGate -or $LegacyBuildGate) -and $blockingViolations.Count -gt 0 -and -not $weeklyReserveOverrideAccepted) {
+    throw 'Codex weekly reserve is below the protected-stage floor. Checkpoint source or use the documented explicit reserve override before compilation or device deployment.'
 }
 exit 0
