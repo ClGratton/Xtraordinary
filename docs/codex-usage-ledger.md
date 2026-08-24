@@ -1,5 +1,11 @@
 # Codex usage ledger
 
+## 2026-08-24 - Selected-slot protected-build checkpoint
+
+- Task: `01a0340f-8c19-7153-a870-15917f706dff`. Entry returned `warming-up`. The compiler-bound audit passed at 25% of the 10,080-minute signed-in window, 2-point task-local growth, 49,628 replay median, and no replay/budget violations; the environment-corrected retry audit also passed at 26% and 3-point growth.
+- Build boundary: the first Android wrapper call stopped before gates because the fresh worktree lacked its ignored `.tools` junction. After restoring the established junction, the sole canonical retry from clean pushed `de1fae5` passed usage and source provenance, then stopped before compiler entry because PowerShell 7 emitted the reviewed Community/Play license inventories without their UTF-8 BOM. The dependency classpaths and license rows were unchanged. Pushed `e32529b` makes the generated license reports and manifest encoding deterministic; the focused Android notice fixture and 165-rule Release gate pass with only the explicit pre-existing 46-item UI-review debt.
+- Stop decision: the post-attempt gate returned `compaction-required` at 26% weekly use and 3-point task growth because recent input median grew 146% to 80,000 tokens. No Android compiler/APK, firmware compiler/artifact, ADB, COM, device read, install, flash, reset, pair/re-pair, bond/app-data/timeout change, NVS/SD/book write, setting edit, live-slot read, or BLE acceptance ran. Resume from clean pushed `e32529b` only in a fresh passing task, then keep Android and firmware builds sequential and preserve the selected-slot/fresh-capabilities acceptance boundary.
+
 ## 2026-08-24 - Selected-slot guard source checkpoint
 
 - Task: `01a033fe-a8b8-7200-a375-13182ed695b7`. Entry `-EnforceStageGate` returned `within-budget` at 16% weekly use, 0-point task-local growth, one 27,017-token input (90.02% cached), and no replay/budget signal. The checkpoint audit returned `compaction-required` at 21% weekly use, 5-point task-local growth, 140,931 replay median, 214,417 latest input, and 562% recent growth; no later protected stage is authorized in this task.
