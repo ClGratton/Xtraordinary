@@ -647,12 +647,16 @@ fun firmwareDualRouteAcceptanceHugeTextScreenshot() {
 @Preview(name = "Quiet firmware dual-route acceptance", widthDp = 412, heightDp = 915, showBackground = true)
 @Composable
 fun quietFirmwareDualRouteAcceptanceScreenshot() {
-    FirmwareDualRouteScreenshot(visualTheme = CompanionVisualTheme.Minimal)
+    FirmwareDualRouteScreenshot(
+        visualTheme = CompanionVisualTheme.Minimal,
+        colorMode = CompanionColorMode.Dark,
+    )
 }
 
 @Composable
 private fun FirmwareDualRouteScreenshot(
     visualTheme: CompanionVisualTheme = CompanionVisualTheme.Expressive,
+    colorMode: CompanionColorMode = CompanionColorMode.Light,
 ) {
     DeviceSheetScreenshot(
         step = DeviceSetupStep.FirmwareDefault,
@@ -660,6 +664,7 @@ private fun FirmwareDualRouteScreenshot(
         managedDeviceModel = "X3",
         device = firmwareDualRouteDeviceState(),
         visualTheme = visualTheme,
+        colorMode = colorMode,
     )
 }
 
@@ -679,8 +684,14 @@ private fun DeviceSheetScreenshot(
     hasManagedDevice: Boolean = false,
     managedDeviceModel: String? = null,
     visualTheme: CompanionVisualTheme = CompanionVisualTheme.Expressive,
+    colorMode: CompanionColorMode = CompanionColorMode.Light,
 ) {
-    X3CompanionTheme(visualTheme = visualTheme, useDynamicColor = false) {
+    X3CompanionTheme(
+        visualTheme = visualTheme,
+        colorMode = colorMode,
+        colorModeProgress = colorMode.ordinal.toFloat(),
+        useDynamicColor = false,
+    ) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.BottomCenter,
