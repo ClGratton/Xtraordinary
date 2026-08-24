@@ -164,8 +164,8 @@
       "id": "android-x3-flash-requires-live-slot-evidence",
       "type": "required_pattern",
       "path": "app/src/main/java/com/xteink/companion/data/UsbEspFlasher.kt",
-      "pattern": "prepareSerial\\(\\)[\\s\\S]*?X3OtaSlotPolicy\\.parseRuntimeTrace\\(connection\\.requestRuntimeTrace[\\s\\S]*?requireSelectedFlashOffset[\\s\\S]*?flashBegin\\(image\\.size, selectedOffset\\)[\\s\\S]*?verifyMd5\\(image, selectedOffset\\)",
-      "message": "Android application flashing must fail closed unless live runtime evidence proves the selected OTA slot."
+      "pattern": "prepareSerial\\(\\)[\\s\\S]*?(?:X3OtaSlotPolicy\\.parseRuntimeTrace\\(connection\\.requestRuntimeTrace|X3OtaSlotPolicy\\.parseOtadata\\(connection\\.readFlashReadOnly)[\\s\\S]*?requireSelectedFlashOffset[\\s\\S]*?flashBegin\\(image\\.size, selectedOffset\\)[\\s\\S]*?verifyMd5\\(image, selectedOffset\\)",
+      "message": "Android application flashing must fail closed unless live runtime or CRC-valid read-only otadata evidence proves the selected OTA slot."
     },
     {
       "id": "firmware-runtime-trace-reports-ota-selection",
