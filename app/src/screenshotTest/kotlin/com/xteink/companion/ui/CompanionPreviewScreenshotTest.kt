@@ -623,15 +623,20 @@ fun deviceModelPickerScreenshot() {
 }
 
 @PreviewTest
-@Preview(name = "Firmware wake guidance", widthDp = 412, heightDp = 915, showBackground = true)
+@Preview(name = "Firmware dual-route acceptance", widthDp = 412, heightDp = 915, showBackground = true)
 @Composable
-fun firmwareWakeGuidanceScreenshot() {
+fun firmwareDualRouteAcceptanceScreenshot() {
     DeviceSheetScreenshot(
         step = DeviceSetupStep.FirmwareDefault,
+        hasManagedDevice = true,
+        managedDeviceModel = "X3",
         device = DeviceUiState(
+            firmwareVersion = "xtraordinary-v0.2.6-dev51",
             firmwareCheckPhase = FirmwareCheckPhase.Available,
-            latestFirmwareVersion = "xtraordinary-v0.2.6-dev16-local",
+            latestFirmwareVersion = "xtraordinary-v0.2.6-dev52",
+            firmwareCandidateIsInstallable = true,
             usbConnected = false,
+            managedBleFirmwareReady = false,
         ),
     )
 }
@@ -640,6 +645,8 @@ fun firmwareWakeGuidanceScreenshot() {
 private fun DeviceSheetScreenshot(
     step: DeviceSetupStep,
     device: DeviceUiState = DeviceUiState(),
+    hasManagedDevice: Boolean = false,
+    managedDeviceModel: String? = null,
 ) {
     X3CompanionTheme(visualTheme = CompanionVisualTheme.Expressive, useDynamicColor = false) {
         Box(
@@ -654,6 +661,8 @@ private fun DeviceSheetScreenshot(
                     onDismiss = {},
                     initialStep = step,
                     device = device,
+                    hasManagedDevice = hasManagedDevice,
+                    managedDeviceModel = managedDeviceModel,
                     modifier = Modifier.padding(top = 20.dp),
                 )
             }
