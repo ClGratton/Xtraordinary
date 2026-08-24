@@ -1186,6 +1186,13 @@
       "type": "required_file",
       "path": "scripts/test-android-release-notices.ps1",
       "message": "The Android notice verifier needs an executable CRLF-equivalence and content-mismatch regression fixture."
+    },
+    {
+      "id": "physical-action-timing-is-agent-owned",
+      "type": "required_pattern",
+      "path": "AGENTS.md",
+      "pattern": "Physical-action coordination is agent-owned[\\s\\S]*?without requiring a chat reply",
+      "message": "Agents must launch and time bounded physical workflows without requiring a chat reply merely to synchronize an irreducible physical action."
     }
   ]
 }

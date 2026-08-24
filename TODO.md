@@ -161,3 +161,4 @@ This is the actionable backlog. Older unchecked items in `docs/x3-takeover-track
 | CrossPoint/CrossInk/XTEINK licensing, firmware distribution, art/brand rights, Terms/Privacy | P2 Legal, licensing, branding, and release readiness |
 | Canonical paths, policy gate, token accounting, compaction, bounded agents, automatic task opening/continuation | Workflow and continuity requirements |
 
+- [~] Physical-action coordination correction: the agent prepares and launches managed workflows and owns bounded timing/retry; it must not require a chat reply merely to synchronize an irreducible physical gesture.

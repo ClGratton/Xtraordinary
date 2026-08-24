@@ -1,5 +1,7 @@
 # Xtraordinary release handoff — 2026-08-13
 
+Coordination correction: the agent prepares and launches managed workflows and owns bounded physical-action timing/retry; it must not require a chat reply merely to synchronize the user's irreducible Confirm gesture.
+
 ## 2026-08-24 managed dev38 transport boundary
 
 The retained app verified local dev38 `xtraordinary-v0.2.6-dev38-selected-slot-local`, SHA-256 `E0E8FA4E3347BB4533CAF34E8CCF7CC25A4306E5988A7CBA64204190A0F389FE`. The required bounded reconnect matched X3 at RSSI -43, opened GATT, discovered services, negotiated MTU 256, and delivered fresh dev37 Capabilities, StatusChanged, revisioned LibraryPage, and matching policy ACKs. The link ended before the managed Install action; USB remained `host_connected=true`, `connected=false`, `configured=false`. `BEGIN_FIRMWARE` was never sent, so no Confirm was consumed and no transfer/commit/apply/reboot or device mutation occurred. Timeout restored to `1800000` ms; screenshot/UI verification remains skipped.

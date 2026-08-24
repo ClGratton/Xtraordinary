@@ -388,3 +388,4 @@
 ## 2026-08-24 - Durable diagnostic-order correction
 
 - Coordinator correction: simultaneous BLE and USB absence must first be classified as X3 powered-off/sleep or physical transport absence; only after wake and reusable fast-lease evidence may Android scan/reconnect lifecycle be blamed. Added this required pattern to AGENTS, USB maintenance workflow, and `docs/engineering-policy.json`.
+- Coordinator correction: agents must prepare and launch bounded managed workflows and own physical-action timing/retry; requiring a chat reply merely to synchronize an irreducible gesture is prohibited.
