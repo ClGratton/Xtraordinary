@@ -1052,16 +1052,23 @@
     {
       "id": "appearance-color-mode-uses-scene-carousel",
       "type": "required_pattern",
-      "path": "app/src/main/java/com/xteink/companion/ui/components/SharedComponents.kt",
-      "pattern": "ColorModeCarousel[\\s\\S]*?onSetColorMode\\(settledMode\\)[\\s\\S]*?MagneticHorizontalPager\\([\\s\\S]*?sceneArtworkFor\\(mode\\)",
-      "message": "Settings light/dark choice must remain a direct-manipulation sea/astronaut carousel rather than redundant chips."
+      "path": "app/src/main/java/com/xteink/companion/ui/components/ControlDeckFocusContent.kt",
+      "pattern": "X3ImageField[\\s\\S]*?MagneticHorizontalPager\\([\\s\\S]*?onDisplayedPosition[\\s\\S]*?sceneArtworkFor\\(mode\\)[\\s\\S]*?LaunchedEffect\\(pagerState\\.settledPage\\)[\\s\\S]*?companionColorModeForSettledPage[\\s\\S]*?onSetColorMode",
+      "message": "The Focus artwork field must be the shared magnetic sea/astronaut Light/Dark carousel, emit its displayed position, and persist only a settled page."
     },
     {
       "id": "settings-exclusive-choices-use-radio-semantics",
       "type": "required_pattern",
       "path": "app/src/main/java/com/xteink/companion/ui/components/SharedComponents.kt",
-      "pattern": "PolicyChoiceRow[\\s\\S]*?selectableGroup\\(\\)[\\s\\S]*?height\\(48\\.dp\\)[\\s\\S]*?Role\\.RadioButton[\\s\\S]*?ColorModeCarousel[\\s\\S]*?selectableGroup\\(\\)[\\s\\S]*?Role\\.RadioButton[\\s\\S]*?ThemeChip[\\s\\S]*?Role\\.RadioButton",
+      "pattern": "PolicyChoiceRow[\\s\\S]*?selectableGroup\\(\\)[\\s\\S]*?height\\(48\\.dp\\)[\\s\\S]*?Role\\.RadioButton[\\s\\S]*?ColorModeChoiceRow[\\s\\S]*?selectableGroup\\(\\)[\\s\\S]*?height\\(48\\.dp\\)[\\s\\S]*?Role\\.RadioButton[\\s\\S]*?ThemeChip[\\s\\S]*?Role\\.RadioButton",
       "message": "Every exclusive Settings choice must expose one radio group, a 48 dp target, and a non-gesture selection route."
+    },
+    {
+      "id": "appearance-color-mode-interpolates-displayed-position",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/theme/Theme.kt",
+      "pattern": "colorModeProgress[\\s\\S]*?interpolateColorScheme\\([\\s\\S]*?progress\\.coerceIn\\(0f, 1f\\)[\\s\\S]*?on\\(background\\)",
+      "message": "Direct scene drag must continuously interpolate the Material palette with contrast-safe content roles rather than stepping only at settlement."
     },
     {
       "id": "minimal-style-changes-more-than-color",
