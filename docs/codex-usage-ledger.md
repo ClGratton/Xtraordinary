@@ -380,6 +380,11 @@
 - Repository ADB proved Bluetooth enabled, companion process alive, and `BLUETOOTH_SCAN`/`CONNECT` granted. Force-stop/relaunch retained data and started one fresh connect request; no scan callback/failure, GATT, notification, or USB event arrived through the bounded standby interval.
 - `BluetoothCompanionClient.connect()` already performs idempotent disconnect/stopScan before each low-latency scan. No stale scan job/backoff/cancellation defect is evidenced; no speculative source fix, Bluetooth cycle, pairing reset, or OTA mutation was performed.
 
+## 2026-08-24 - Managed dev38 transport boundary
+
+- A required 90-second repository-ADB reconnect matched X3 at RSSI -43 and produced fresh dev37 Capabilities, StatusChanged, four revisioned LibraryPage messages, and policy ACKs. The retained app verified local dev38 `xtraordinary-v0.2.6-dev38-selected-slot-local`, SHA-256 `E0E8FA4E3347BB4533CAF34E8CCF7CC25A4306E5988A7CBA64204190A0F389FE`; the BLE session ended before Install and no BEGIN/transfer/reboot occurred.
+- USB remained `host_connected=true`, `connected=false`, `configured=false`; Bluetooth was ON and permissions remained granted. No flash/reset/pairing/app-data/timeout/NVS/SD/books mutation occurred; timeout restored to `1800000` ms. Remaining proof is stable managed BLE transport plus the physical Confirm window, followed by fresh post-reboot dev38 Capabilities/StatusChanged/revisioned LibraryPage/policy ACKs.
+
 ## 2026-08-24 - Durable diagnostic-order correction
 
 - Coordinator correction: simultaneous BLE and USB absence must first be classified as X3 powered-off/sleep or physical transport absence; only after wake and reusable fast-lease evidence may Android scan/reconnect lifecycle be blamed. Added this required pattern to AGENTS, USB maintenance workflow, and `docs/engineering-policy.json`.

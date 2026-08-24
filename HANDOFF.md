@@ -1,5 +1,9 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-24 managed dev38 transport boundary
+
+The retained app verified local dev38 `xtraordinary-v0.2.6-dev38-selected-slot-local`, SHA-256 `E0E8FA4E3347BB4533CAF34E8CCF7CC25A4306E5988A7CBA64204190A0F389FE`. The required bounded reconnect matched X3 at RSSI -43, opened GATT, discovered services, negotiated MTU 256, and delivered fresh dev37 Capabilities, StatusChanged, revisioned LibraryPage, and matching policy ACKs. The link ended before the managed Install action; USB remained `host_connected=true`, `connected=false`, `configured=false`. `BEGIN_FIRMWARE` was never sent, so no Confirm was consumed and no transfer/commit/apply/reboot or device mutation occurred. Timeout restored to `1800000` ms; screenshot/UI verification remains skipped.
+
 ## 2026-08-24 fresh Capabilities and selected-slot proof boundary
 
 Pushed `9fb5c4a` adds a bounded accepted-Capabilities log. After the retained-data Community reinstall (dev49/code 50, APK 85,782,220 bytes, SHA-256 `3E6A6F98A4D9E9F33F7FBCDACFFFB13D22BCA4DC475298C8AC231347D744B90F`), fresh BLE evidence logged firmware `xtraordinary-v0.2.6-dev37-book-reconciliation-local`, then fresh StatusChanged, revisioned LibraryPage pages, and matching policy ACKs. No crash occurred; bond and app data were retained.

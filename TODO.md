@@ -15,6 +15,8 @@ This is the actionable backlog. Older unchecked items in `docs/x3-takeover-track
 - Preserve Pixel app data, the Android/X3 Bluetooth bond, X3 NVS, SD books, reading history, and current device settings unless the user explicitly authorizes a targeted reset.
 - Usage-policy replay, context-growth, and five-point task-consumption findings are optimization advisories. They no longer require a fresh visible task or block source fixes. Only the 95% signed-in weekly protected-stage floor blocks a compiler/device phase without a documented override; older entries that say "resume only in a fresh task" are incident history, not current execution policy.
 
+- [~] 2026-08-24 managed dev38 transport boundary: the retained app verified `xtraordinary-v0.2.6-dev38-selected-slot-local` (5,456,368 bytes, SHA-256 `E0E8FA4E3347BB4533CAF34E8CCF7CC25A4306E5988A7CBA64204190A0F389FE`). A fresh 90-second reconnect matched X3 at RSSI -43 and delivered dev37 Capabilities, StatusChanged, four revisioned LibraryPage messages, and policy ACKs; the BLE session then ended before Install. USB stayed `host_connected=true`, `connected=false`, `configured=false`. `BEGIN_FIRMWARE` was never sent; no transfer, reboot, flash, reset, bond/app-data/timeout/NVS/SD/book mutation occurred. Timeout restored to `1800000` ms. Stable link plus Confirm window remains required.
+
 ## Execution order
 
 ### P0 — Build, deploy, and accept the current source
