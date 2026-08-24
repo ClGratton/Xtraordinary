@@ -54,7 +54,7 @@
     <string name="install_firmware_ota_body">Wakes the paired X3 and verifies support.</string>
     <string name="install_firmware_usb_choice">USB</string>
     <string name="install_firmware_usb">Install by USB</string>
-    <string name="install_firmware_usb_body">For initial setup, recovery, or reinstall.</string>
+    <string name="install_firmware_usb_body">Setup or recovery.</string>
     <string name="connect_usb_for_firmware">Connect USB</string>
     <string name="install_firmware_title">Install firmware</string>
     <string name="install_firmware_body">Choose the firmware to install on your %1$s from this phone.</string>
