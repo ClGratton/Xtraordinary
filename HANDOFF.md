@@ -1,5 +1,11 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-24 Focus appearance selector source checkpoint
+
+The Focus screen's existing 1.60 landscape artwork field is now the sole picture-based Light/Dark selector. It reuses `MagneticHorizontalPager` resistance, threshold haptics, snap, and settled behavior; its generic displayed-position callback feeds a transient `0..1` palette interpolation at the Activity/theme boundary. The durable `CompanionColorMode` callback fires only after a settled page, so an interrupted swipe, fling, return-to-origin, or recreated Focus pager preserves the last settled mode rather than a transient desired value. Settings now offers ordinary text-only Light/Dark radio targets at 48dp; Expressive/Minimal remains independent. Intermediate Material roles use a black-or-white content choice selected for at least normal-text contrast while their containers interpolate.
+
+No new home card/row, artwork asset, shader, blur, firmware, OTA, tickets/device selector behavior, screenshot reference, phone, X3, pairing, app-data, NVS, or SD action belongs to this source checkpoint. Focused source tests cover the magnetic progress mapping, settle-to-persist mode mapping, and intermediate contrast. Compile/test evidence is pending the required clean pushed source checkpoint and remains distinct from screenshot or physical acceptance.
+
 ## 2026-08-24 managed BLE pending transaction live boundary
 
 The installed persistent-intent APK retained the exact dev38 transaction in `xtraordinary_connection.xml` (LocalFile, 5,456,368 bytes, SHA-256 `E0E8FA4E3347BB4533CAF34E8CCF7CC25A4306E5988A7CBA64204190A0F389FE`). After a fresh GATT session, dev37 Capabilities, StatusChanged, revisioned LibraryPage, policy ACKs, and the lease ACK arrived; without another tap the lifecycle emitted `BeginFirmware`. X3 returned NACK before any FirmwareChunk, consistent with `CompanionService::beginFirmware` requiring the physical Confirm button. No chunks, commit/apply, reboot, flash, reset, pairing, bond/app-data, NVS/SD/book mutation occurred.

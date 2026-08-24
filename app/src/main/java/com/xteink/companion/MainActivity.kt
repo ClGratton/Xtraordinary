@@ -14,8 +14,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -228,8 +229,12 @@ class MainActivity : ComponentActivity() {
                     syncLinkedFolder(showNotice = true)
                 }
             }
+            var themeDisplayedPosition by rememberSaveable { mutableFloatStateOf(state.colorMode.ordinal.toFloat()) }
+            LaunchedEffect(state.colorMode) {
+                themeDisplayedPosition = state.colorMode.ordinal.toFloat()
+            }
             SideEffect {
-                val lightSystemBars = state.colorMode == CompanionColorMode.Light
+                val lightSystemBars = themeDisplayedPosition < 0.5f
                 WindowCompat.getInsetsController(window, window.decorView).apply {
                     isAppearanceLightStatusBars = lightSystemBars
                     isAppearanceLightNavigationBars = lightSystemBars
@@ -263,12 +268,17 @@ class MainActivity : ComponentActivity() {
                     requestGoogleAuthorization(CloudAction.Sync, interactive = false)
                 }
             }
-            X3CompanionTheme(visualTheme = state.visualTheme, colorMode = state.colorMode) {
+            X3CompanionTheme(
+                visualTheme = state.visualTheme,
+                colorMode = state.colorMode,
+                colorModeProgress = themeDisplayedPosition,
+            ) {
                 if (setupComplete) {
                     X3CompanionApp(
                         state = state,
                         onSetVisualTheme = viewModel::setVisualTheme,
                         onSetColorMode = viewModel::setColorMode,
+                        onThemeDisplayedPosition = { themeDisplayedPosition = it },
                         onSetRadioPolicy = viewModel::setRadioPolicy,
                         onSetDuration = viewModel::setDuration,
                         onStartFocus = viewModel::startFocus,

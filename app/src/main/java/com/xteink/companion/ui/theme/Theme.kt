@@ -2,6 +2,7 @@ package com.xteink.companion.ui.theme
 
 import android.os.Build
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -12,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -167,17 +169,15 @@ private val CompanionTypography = Typography(
 fun X3CompanionTheme(
     visualTheme: CompanionVisualTheme = CompanionVisualTheme.Expressive,
     colorMode: CompanionColorMode = CompanionColorMode.Light,
+    colorModeProgress: Float = colorMode.ordinal.toFloat(),
     useDynamicColor: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
     val dynamicColorAvailable = useDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-    val colorScheme = when {
-        dynamicColorAvailable && colorMode == CompanionColorMode.Light -> dynamicLightColorScheme(context)
-        dynamicColorAvailable && colorMode == CompanionColorMode.Dark -> dynamicDarkColorScheme(context)
-        colorMode == CompanionColorMode.Light -> ExpressiveColors
-        else -> QuietColors
-    }
+    val lightScheme = if (dynamicColorAvailable) dynamicLightColorScheme(context) else ExpressiveColors
+    val darkScheme = if (dynamicColorAvailable) dynamicDarkColorScheme(context) else QuietColors
+    val colorScheme = interpolateColorScheme(lightScheme, darkScheme, colorModeProgress)
 
     CompositionLocalProvider(LocalCompanionVisualTheme provides visualTheme) {
         MaterialTheme(
@@ -187,4 +187,42 @@ fun X3CompanionTheme(
             content = content,
         )
     }
+}
+
+/** Keeps the app palette in lockstep with the focused artwork pager. */
+internal fun interpolateColorScheme(light: ColorScheme, dark: ColorScheme, progress: Float): ColorScheme {
+    val p = progress.coerceIn(0f, 1f)
+    fun role(from: Color, to: Color) = lerp(from, to, p)
+    fun on(background: Color) = if (background.luminance() > 0.18f) Color.Black else Color.White
+    val primary = role(light.primary, dark.primary)
+    val primaryContainer = role(light.primaryContainer, dark.primaryContainer)
+    val secondary = role(light.secondary, dark.secondary)
+    val secondaryContainer = role(light.secondaryContainer, dark.secondaryContainer)
+    val tertiary = role(light.tertiary, dark.tertiary)
+    val tertiaryContainer = role(light.tertiaryContainer, dark.tertiaryContainer)
+    val background = role(light.background, dark.background)
+    val surface = role(light.surface, dark.surface)
+    val surfaceVariant = role(light.surfaceVariant, dark.surfaceVariant)
+    val error = role(light.error, dark.error)
+    return light.copy(
+        primary = primary, onPrimary = on(primary),
+        primaryContainer = primaryContainer, onPrimaryContainer = on(primaryContainer),
+        secondary = secondary, onSecondary = on(secondary),
+        secondaryContainer = secondaryContainer, onSecondaryContainer = on(secondaryContainer),
+        tertiary = tertiary, onTertiary = on(tertiary),
+        tertiaryContainer = tertiaryContainer, onTertiaryContainer = on(tertiaryContainer),
+        background = background, onBackground = on(background),
+        surface = surface, onSurface = on(surface),
+        surfaceVariant = surfaceVariant, onSurfaceVariant = on(surfaceVariant),
+        error = error, onError = on(error),
+        errorContainer = role(light.errorContainer, dark.errorContainer),
+        onErrorContainer = on(role(light.errorContainer, dark.errorContainer)),
+        outline = role(light.outline, dark.outline),
+        outlineVariant = role(light.outlineVariant, dark.outlineVariant),
+        surfaceContainerLowest = role(light.surfaceContainerLowest, dark.surfaceContainerLowest),
+        surfaceContainerLow = role(light.surfaceContainerLow, dark.surfaceContainerLow),
+        surfaceContainer = role(light.surfaceContainer, dark.surfaceContainer),
+        surfaceContainerHigh = role(light.surfaceContainerHigh, dark.surfaceContainerHigh),
+        surfaceContainerHighest = role(light.surfaceContainerHighest, dark.surfaceContainerHighest),
+    )
 }

@@ -18,3 +18,7 @@ fun sceneArtworkFor(mode: CompanionColorMode): SceneArtwork = when (mode) {
         x3PayloadCrop = R.drawable.x3_astronaut_crop,
     )
 }
+
+/** The settled pager page is the only durable color-mode decision. */
+internal fun companionColorModeForSettledPage(page: Int): CompanionColorMode =
+    CompanionColorMode.entries[page.coerceIn(0, CompanionColorMode.entries.lastIndex)]

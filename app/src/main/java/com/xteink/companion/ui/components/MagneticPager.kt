@@ -66,6 +66,7 @@ internal fun MagneticHorizontalPager(
     colors: MagneticPagerColors,
     modifier: Modifier = Modifier,
     config: MagneticSwipeConfig = DefaultMagneticSwipe,
+    onDisplayedPosition: (Float) -> Unit = {},
     content: @Composable (page: Int, containerColor: Color, contentColor: Color) -> Unit,
 ) {
     val expressiveMotion = LocalCompanionVisualTheme.current == CompanionVisualTheme.Expressive
@@ -81,6 +82,14 @@ internal fun MagneticHorizontalPager(
             stiffness = Spring.StiffnessHigh,
         ),
     )
+    val signedDrag = ((state.currentPage - state.settledPage) + state.currentPageOffsetFraction)
+        .coerceIn(-1f, 1f)
+    val displayedPosition = state.settledPage + config.displayedProgress(
+        signedProgress = signedDrag,
+        resistance = resistanceBlend.value,
+    )
+
+    LaunchedEffect(displayedPosition) { onDisplayedPosition(displayedPosition) }
 
     LaunchedEffect(isDragged) {
         if (isDragged) {
@@ -123,13 +132,6 @@ internal fun MagneticHorizontalPager(
         val pageOffset = ((state.currentPage - page) + state.currentPageOffsetFraction)
             .absoluteValue
             .coerceIn(0f, 1f)
-        val signedDrag = ((state.currentPage - state.settledPage) +
-            state.currentPageOffsetFraction).coerceIn(-1f, 1f)
-        val displayedProgress = config.displayedProgress(
-            signedProgress = signedDrag,
-            resistance = resistanceBlend.value,
-        )
-        val displayedPosition = state.settledPage + displayedProgress
         val selectionProgress = magneticSelectionStrength(
             displayedPosition = displayedPosition,
             page = page,
@@ -140,7 +142,7 @@ internal fun MagneticHorizontalPager(
         val contentColor = lerp(colors.restingContent, colors.selectedContent, selectionProgress)
         Box(
             modifier = Modifier.graphicsLayer {
-                translationX = size.width * (signedDrag - displayedProgress)
+                translationX = size.width * (signedDrag - (displayedPosition - state.settledPage))
                 if (page == state.settledPage) translationX += snapKick.value * size.width
                 scaleX = if (expressiveMotion) 1f - pageOffset * 0.014f else 1f
                 scaleY = if (expressiveMotion) 1f - pageOffset * 0.010f else 1f

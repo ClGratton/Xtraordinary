@@ -540,10 +540,7 @@ fun SettingsSheetContent(
             style = MaterialTheme.typography.titleMedium,
         )
         Spacer(Modifier.height(8.dp))
-        ColorModeCarousel(
-            colorMode = colorMode,
-            onSetColorMode = onSetColorMode,
-        )
+        ColorModeChoiceRow(colorMode = colorMode, onSetColorMode = onSetColorMode)
         Spacer(Modifier.height(12.dp))
         Text(
             text = stringResource(R.string.settings_visual_style),
@@ -881,64 +878,34 @@ private fun PolicyChoiceRow(
 }
 
 @Composable
-private fun ColorModeCarousel(
+private fun ColorModeChoiceRow(
     colorMode: CompanionColorMode,
     onSetColorMode: (CompanionColorMode) -> Unit,
 ) {
-    val modes = CompanionColorMode.entries
-    val pagerState = rememberPagerState(
-        initialPage = colorMode.ordinal,
-        pageCount = { modes.size },
-    )
-    val scope = rememberCoroutineScope()
-    LaunchedEffect(colorMode) {
-        if (pagerState.settledPage != colorMode.ordinal) {
-            pagerState.animateScrollToPage(colorMode.ordinal)
-        }
-    }
-    LaunchedEffect(pagerState.settledPage) {
-        val settledMode = modes[pagerState.settledPage]
-        if (settledMode != colorMode) onSetColorMode(settledMode)
-    }
-
-    MagneticHorizontalPager(
-        state = pagerState,
-        contentPadding = PaddingValues(horizontal = 44.dp),
-        pageSpacing = 12.dp,
-        colors = MagneticPagerColors(
-            restingContainer = MaterialTheme.colorScheme.surfaceContainerLow,
-            selectedContainer = MaterialTheme.colorScheme.secondaryContainer,
-            restingContent = MaterialTheme.colorScheme.onSurfaceVariant,
-            selectedContent = MaterialTheme.colorScheme.onSecondaryContainer,
-        ),
-        modifier = Modifier.fillMaxWidth().height(152.dp).selectableGroup(),
-    ) { page, containerColor, contentColor ->
-        val mode = modes[page]
-        val artwork = sceneArtworkFor(mode)
-        Surface(
-            color = containerColor,
-            contentColor = contentColor,
-            shape = MaterialTheme.shapes.large,
-            modifier = Modifier.fillMaxSize().selectable(
-                selected = pagerState.settledPage == page,
-                role = Role.RadioButton,
-                onClick = { scope.launch { pagerState.animateScrollToPage(page) } },
-            ),
-        ) {
-            Column {
-                Image(
-                    painter = painterResource(artwork.phonePreview),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                )
-                Text(
-                    text = stringResource(
-                        if (mode == CompanionColorMode.Light) R.string.light_mode else R.string.dark_mode,
-                    ),
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                )
+    Row(
+        modifier = Modifier.fillMaxWidth().selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        CompanionColorMode.entries.forEach { mode ->
+            val selected = mode == colorMode
+            Surface(
+                modifier = Modifier.weight(1f).height(48.dp).selectable(
+                    selected = selected,
+                    role = Role.RadioButton,
+                    onClick = { onSetColorMode(mode) },
+                ),
+                shape = MaterialTheme.shapes.medium,
+                color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
+                contentColor = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                border = BorderStroke(if (selected) 2.dp else 1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = if (mode == CompanionColorMode.Light) "Light" else "Dark",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    )
+                }
             }
         }
     }

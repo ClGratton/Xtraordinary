@@ -17,6 +17,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -27,9 +30,11 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,14 +59,18 @@ import com.xteink.companion.ui.FocusUiState
 import com.xteink.companion.ui.CompanionVisualTheme
 import com.xteink.companion.ui.CompanionColorMode
 import com.xteink.companion.ui.sceneArtworkFor
+import com.xteink.companion.ui.companionColorModeForSettledPage
 import java.util.Locale
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 @Composable
 fun ControlDeckFocusContent(
     focus: FocusUiState,
     visualTheme: CompanionVisualTheme,
     colorMode: CompanionColorMode,
+    onSetColorMode: (CompanionColorMode) -> Unit,
+    onThemeDisplayedPosition: (Float) -> Unit,
     onSetDuration: (Int) -> Unit,
     onStartFocus: () -> Unit,
     onTogglePause: () -> Unit,
@@ -89,7 +98,11 @@ fun ControlDeckFocusContent(
                 verticalGap,
             ),
         ) {
-            X3ImageField(colorMode = colorMode)
+            X3ImageField(
+                colorMode = colorMode,
+                onSetColorMode = onSetColorMode,
+                onDisplayedPosition = onThemeDisplayedPosition,
+            )
             DurationControlDeck(
                 focus = focus,
                 onSetDuration = onSetDuration,
@@ -108,28 +121,55 @@ fun ControlDeckFocusContent(
 }
 
 @Composable
-private fun X3ImageField(colorMode: CompanionColorMode) {
+private fun X3ImageField(
+    colorMode: CompanionColorMode,
+    onSetColorMode: (CompanionColorMode) -> Unit,
+    onDisplayedPosition: (Float) -> Unit,
+) {
     val description = stringResource(R.string.x3_preview_description)
-    val artwork = sceneArtworkFor(colorMode).phonePreview
-    val frameColor = if (colorMode == CompanionColorMode.Dark) Color.White
-    else MaterialTheme.colorScheme.secondaryContainer
-    Surface(
+    val modes = CompanionColorMode.entries
+    val pagerState = rememberPagerState(colorMode.ordinal) { modes.size }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(colorMode) {
+        if (!pagerState.isScrollInProgress && pagerState.settledPage != colorMode.ordinal) {
+            pagerState.scrollToPage(colorMode.ordinal)
+        }
+    }
+    LaunchedEffect(pagerState.settledPage) {
+        companionColorModeForSettledPage(pagerState.settledPage)
+            .takeIf { it != colorMode }
+            ?.let(onSetColorMode)
+    }
+    MagneticHorizontalPager(
+        state = pagerState,
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+        pageSpacing = 12.dp,
+        colors = MagneticPagerColors(
+            restingContainer = MaterialTheme.colorScheme.surfaceContainerLow,
+            selectedContainer = MaterialTheme.colorScheme.secondaryContainer,
+            restingContent = MaterialTheme.colorScheme.onSurfaceVariant,
+            selectedContent = MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(1.60f)
-            .semantics { contentDescription = description },
-        color = frameColor,
-        shape = MaterialTheme.shapes.medium,
-    ) {
-        Column(
-            modifier = Modifier.padding(10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+            .selectableGroup(),
+        onDisplayedPosition = { onDisplayedPosition(it.coerceIn(0f, 1f)) },
+    ) { page, containerColor, _ ->
+        val mode = modes[page]
+        val artwork = sceneArtworkFor(mode).phonePreview
+        Surface(
+            modifier = Modifier.fillMaxSize().semantics {
+                contentDescription = "$description ${if (mode == CompanionColorMode.Light) "Light" else "Dark"}"
+            }.selectable(
+                selected = pagerState.settledPage == page,
+                onClick = { scope.launch { pagerState.animateScrollToPage(page) } },
+            ),
+            color = if (mode == CompanionColorMode.Dark) Color.White else containerColor,
+            shape = MaterialTheme.shapes.medium,
         ) {
             Surface(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
+                modifier = Modifier.fillMaxSize().padding(10.dp),
                 color = Color.White,
                 shape = RoundedCornerShape(14.dp),
             ) {
