@@ -27,13 +27,16 @@ internal fun PersistedFocusSession.restoreAt(nowEpochMs: Long): FocusUiState {
     val secondsLeft = ((millisecondsLeft + 999L) / 1_000L)
         .coerceAtMost((boundedMinutes * 60).toLong())
         .toInt()
-    return FocusUiState(
+    val restored = FocusUiState(
         task = task.take(80),
         selectedMinutes = boundedMinutes,
         remainingSeconds = secondsLeft,
         phase = if (secondsLeft == 0) FocusPhase.Setup else FocusPhase.Running,
         pendingAction = pendingAction,
-    ).readyAfterCompletion()
+    )
+    return if (secondsLeft == 0) {
+        restored.copy(remainingSeconds = boundedMinutes * 60, pendingAction = null)
+    } else restored
 }
 
 /** Phone completion is locally ready for a new session; X3 owns its separate Done screen. */
