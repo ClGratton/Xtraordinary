@@ -1,5 +1,9 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-24 ADB identity recovery boundary
+
+The one permitted reconnect to the saved current endpoint `192.168.1.61:36221` recovered exactly one authenticated Pixel 10; no second transport identity is present. `adb mdns services` remains empty, but the endpoint is valid. Timeout was restored immediately and verified at `1800000` ms. Canonical phone resolution now passes. PnP has no VID:303A:1001 X3 target and Pixel USB remains host-only/disconnected (`connected=false`, `configured=false`, `kernel_state=DISCONNECTED`), so no USB/stub/otadata/flash/reset or X3 state mutation ran.
+
 ## 2026-08-24 bounded target-discovery retry
 
 From `e41f838`, the timeout lifecycle started, then the canonical resolver failed closed because two Pixel identities were online (the pinned endpoint and its current mDNS alias). The prescribed normal-user repository ADB restart left `adb mdns services` empty and no authenticated Pixel. No X3 VID:303A:1001 target appeared, and no USB/stub upload, otadata read, flash, reset, or X3 state mutation ran. Timeout restore was attempted with the pinned serial but could not reach the phone; the saved state still records original `1800000` ms. Restore and verification are required when the current mDNS endpoint returns.

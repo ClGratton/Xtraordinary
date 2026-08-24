@@ -1,5 +1,10 @@
 # Codex usage ledger
 
+## 2026-08-24 - ADB identity recovery and clean phone boundary
+
+- The saved current endpoint `192.168.1.61:36221` was retried once after normal-user ADB restart; it recovered exactly one Pixel 10. mDNS remains empty, but canonical phone resolution passes. Timeout was restored immediately and verified at `1800000` ms.
+- No PnP VID:303A:1001 X3 target is present; Pixel dumpsys USB remains host-only/disconnected. No USB/stub/otadata/flash/reset or X3 mutation ran. Stop at the external physical-target boundary.
+
 ## 2026-08-24 - Bounded target-discovery retry stopped at ADB identity blocker
 
 - Timeout lifecycle began from `e41f838`, but the canonical resolver rejected two simultaneous Pixel identities (pinned `192.168.1.61:36221` plus mDNS alias). A normal-user repository ADB restart was performed; `adb mdns services` is now empty and no authenticated Pixel remains. No X3 VID:303A:1001 target appeared, and no USB/stub/otadata/flash/reset or X3 data mutation occurred.
