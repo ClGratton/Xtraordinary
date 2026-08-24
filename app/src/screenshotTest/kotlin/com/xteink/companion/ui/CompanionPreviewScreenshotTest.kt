@@ -625,7 +625,7 @@ fun deviceModelPickerScreenshot() {
 @PreviewTest
 @Preview(name = "Firmware dual-route acceptance", widthDp = 412, heightDp = 915, showBackground = true)
 @Composable
-fun firmwareDualRouteAcceptanceScreenshot() {
+fun firmwareWakeGuidanceScreenshot() {
     DeviceSheetScreenshot(
         step = DeviceSetupStep.FirmwareDefault,
         hasManagedDevice = true,
