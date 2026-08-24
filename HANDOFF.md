@@ -1,5 +1,11 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-24 managed Install availability correction and retry boundary
+
+Pushed `2c78ddd`/`34a3551`: the reusable `firmwareInstallAvailable` policy now enables the existing managed BLE firmware path when fresh Capabilities advertise firmware updates, even without USB; focused policy tests passed. The focused canonical Android wrapper passed protocol tests, both flavor unit tests/lint, and both APK assemblies. Retained-data Community install succeeded for dev49, 86,486,189 bytes, SHA-256 `9903D9F11E955CD54DF90AC5D797FF8AB3C976F26D2E7B257638427977FC3B26`.
+
+Fresh BLE evidence after install included dev37 Capabilities, StatusChanged, four revisioned LibraryPage pages, matching policy ACKs, and interactive-lease ACKs. The Install surface showed the verified dev38 artifact (`E0E8FA4E3347BB4533CAF34E8CCF7CC25A4306E5988A7CBA64204190A0F389FE`) and became enabled while the link was ready. The link then ended before the final actionable tap; tapping after disconnect correctly failed closed to the guarded no-OTA-slot notice. No `BEGIN_FIRMWARE`, chunks, commit/apply, reboot, raw flash, reset, pairing, bond/app-data, NVS/SD/book mutation occurred. Pixel timeout was restored and verified at `1800000` ms. Screenshots/UI verification remain explicitly skipped. Remaining proof is a stable managed BLE link held through BEGIN/Confirm, then fresh post-reboot Capabilities, StatusChanged, revisioned LibraryPage, and policy ACKs.
+
 ## 2026-08-24 managed BLE routing build checkpoint
 
 Pushed `e6c5562` fixes usage-audit binding: an unbound worker now reports `not-applicable`/`routingDecision=unbound-worker` without attributing another task. The canonical focused Android build passed protocol tests, both flavor unit tests/lint, and both APK assemblies after a syntax-correct invocation. Retained-data Community install succeeded: 85,932,100 bytes, SHA-256 `843305CE1D9BF290A88772FE5DB49B2454A42B2C8DFE9CA8CDF9562426BB1180`. Fresh BLE dev37 Capabilities and lease ACKs were observed, but the autonomous managed Install attempt emitted no BEGIN/chunks and returned to the Install surface; no OTA/reboot/device mutation occurred. Timeout restored to `1800000` ms; screenshots remain skipped.

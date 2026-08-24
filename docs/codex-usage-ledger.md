@@ -1,5 +1,12 @@
 # Codex usage ledger
 
+## 2026-08-24 - Managed BLE availability and retry checkpoint
+
+- Source: pushed `2c78ddd`/`34a3551` centralizes BLE-vs-USB firmware-install availability and adds focused tests. The canonical focused Android wrapper passed protocol tests, both flavor unit tests/lint, and both APK assemblies.
+- Artifact/install: retained-data Community dev49 APK installed successfully; 86,486,189 bytes; SHA-256 `9903D9F11E955CD54DF90AC5D797FF8AB3C976F26D2E7B257638427977FC3B26`. The selected dev38 firmware remained verified at SHA-256 `E0E8FA4E3347BB4533CAF34E8CCF7CC25A4306E5988A7CBA64204190A0F389FE`.
+- Device evidence: fresh dev37 Capabilities, StatusChanged, revisioned LibraryPage, policy ACKs, and interactive-lease ACKs arrived. The BLE link ended before the final Install tap; the guarded fallback showed the no-OTA-slot notice. No `BEGIN_FIRMWARE`, transfer, reboot, flash, reset, bond/app-data/NVS/SD/book mutation occurred. Pixel timeout was restored and verified at `1800000` ms.
+- Explicit limitation: screenshot/UI verification was skipped by user instruction. Remaining proof is stable managed BLE through BEGIN/Confirm and fresh post-reboot protocol acceptance.
+
 ## 2026-08-24 - Selected-slot Android screenshot checkpoint
 
 - Task: `01a03418-5baa-70e0-bf5f-14f9670160e5`. Entry passed at 27% of the 10,080-minute signed-in window with 0-point task growth. Compiler entry passed at 28% and 1-point growth. The post-build audit passed at 29% and 2-point growth, resetting at Unix `1788169810`, with no replay/budget violation.
