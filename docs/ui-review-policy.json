@@ -216,6 +216,7 @@
         "app/src/test/java/com/xteink/companion/ui/ConnectionPolicyTest.kt",
         "app/src/test/java/com/xteink/companion/ui/FirmwareInstallAvailabilityPolicyTest.kt",
         "app/src/test/java/com/xteink/companion/ui/FirmwareInstallPendingTest.kt",
+        "app/src/test/java/com/xteink/companion/ui/FirmwareInstallVerificationPolicyTest.kt",
         "app/src/test/java/com/xteink/companion/ui/FirmwareVersionPolicyTest.kt",
         "app/src/test/java/com/xteink/companion/ui/FocusFormattingTest.kt",
         "app/src/test/java/com/xteink/companion/ui/FocusSessionStoreTest.kt",
