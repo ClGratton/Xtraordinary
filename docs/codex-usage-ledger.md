@@ -365,3 +365,8 @@
 
 - Source inspection confirms the existing BLE `BEGIN_FIRMWARE`/chunk/commit/apply path is inactive-slot-safe: firmware stores and hashes the SD image, validates it, selects `esp_ota_get_next_update_partition(nullptr)`, and calls `ota_boot::switchTo`; it does not require an Android address or rewrite raw otadata. Dev37 Capabilities advertises firmware update support.
 - The same source requires `MappedInputManager::Button::Confirm` physically pressed when `BEGIN_FIRMWARE` arrives. No unauthorized transfer was attempted. Minimum physical action is pressing/holding Confirm while launching the existing in-app install; then accept only fresh post-reboot Capabilities, StatusChanged, revisioned LibraryPage, and matching ACKs. Pixel timeout restoration was run at the boundary.
+
+## 2026-08-24 - Managed dev38 attempt stopped before authorization
+
+- Pixel Downloads received the canonical firmware; the app verified version `xtraordinary-v0.2.6-dev38-selected-slot-local` and SHA-256 `E0E8FA4E3347BB4533CAF34E8CCF7CC25A4306E5988A7CBA64204190A0F389FE`.
+- The existing managed BLE install was prepared, but no `BEGIN_FIRMWARE` was sent: BLE had no advertisement and Pixel USB was `connected=false/configured=false`. Confirm was not consumed; no transfer/commit/apply/reboot or device-state mutation occurred.

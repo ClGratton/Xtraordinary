@@ -128,6 +128,8 @@ This is the actionable backlog. Older unchecked items in `docs/x3-takeover-track
 
 ## Workflow and continuity requirements
 
+- [!] 2026-08-24 managed dev38 attempt stopped before BEGIN: app verified the Pixel-copied artifact (`xtraordinary-v0.2.6-dev38-selected-slot-local`, SHA-256 `E0E8FA4E...389FE`), but BLE produced no advertisement and Pixel USB was `connected=false/configured=false`. No Confirm authorization was consumed and no transfer/reboot/device mutation occurred.
+
 - [!] 2026-08-24 selected-slot deployment remains protected-blocked: fresh BLE Capabilities reports `xtraordinary-v0.2.6-dev37-book-reconciliation-local` and the fresh StatusChanged/LibraryPage/ACK chain is stable, but Pixel-host `READ_X3_DIAGNOSTICS` cannot currently complete (`Timed out reading X3 diagnostic command`) and no `RUNTIME_TRACE_OTA` proves running == next boot. Do not flash or infer a slot; retry only after live USB transport returns.
 - [!] Managed BLE OTA is source-supported and selects the inactive slot through `esp_ota_get_next_update_partition`/`ota_boot::switchTo`, but dev37 requires the physical Confirm button to be pressed for `BEGIN_FIRMWARE`; no transfer was attempted. Minimum physical action: press/hold X3 Confirm while starting the existing in-app firmware install, then release when the app acknowledges Begin.
 
