@@ -16,6 +16,8 @@ import com.xteink.companion.data.BookUploadPersistence
 import com.xteink.companion.data.FirmwareRelease
 import com.xteink.companion.data.FirmwareReleaseRepository
 import com.xteink.companion.data.FirmwareSource
+import com.xteink.companion.data.FirmwareTransport
+import com.xteink.companion.data.selectFirmwareTransport
 import com.xteink.companion.data.FlightBarcodeFormat
 import com.xteink.companion.data.FlightIdentity
 import com.xteink.companion.data.FlightStatusRefreshPolicy
@@ -953,6 +955,32 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         if (pendingFirmwareInstall?.let { FirmwareInstallPendingPolicy.isSame(it, pending) } != true) {
             pendingFirmwareInstall = pending
             persistPendingFirmwareInstall()
+        }
+        val link = companionClient.state.value
+        val transport = selectFirmwareTransport(
+            usbConnected = _uiState.value.device.usbConnected,
+            bleConnected = _uiState.value.isX3TransportConnected && link.phase == LinkPhase.Connected,
+            bleSupportsFirmwareUpdate = link.capabilities?.supportsFirmwareUpdate == true,
+        )
+        if (transport == FirmwareTransport.GuardedUsb) {
+            viewModelScope.launch {
+                val result = runCatching {
+                    val file = firmwareReleases.downloadVerified(release)
+                    _uiState.update { it.copy(device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Transferring)) }
+                    withExclusiveUsbMaintenance { usbFlasher.flash(file) }
+                }
+                if (result.isSuccess) {
+                    pendingFirmwareInstall = null
+                    persistPendingFirmwareInstall()
+                    _uiState.update { it.copy(device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Complete)) }
+                    delay(7_000)
+                    intentionalTransportIdle = false
+                    ensureTransportConnected()
+                } else {
+                    result.exceptionOrNull()?.let(::reportDeviceError)
+                }
+            }
+            return
         }
         intentionalTransportIdle = false
         _uiState.update {
