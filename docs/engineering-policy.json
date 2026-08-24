@@ -528,6 +528,27 @@
       "message": "History-free bounded workers must remain internal and must not create or select a user-visible Codex task."
     },
     {
+      "id": "worker-supervision-requires-real-progress-evidence",
+      "type": "required_pattern",
+      "path": "docs/codex-usage-workflow.md",
+      "pattern": "Every worker wait is bounded to at most ten minutes[\\s\\S]*?exactly one compact progress health check[\\s\\S]*?new commit or working-tree change[\\s\\S]*?active build/deploy/device process[\\s\\S]*?Agent status `running` by itself is not evidence of progress[\\s\\S]*?interrupt the worker and recover[\\s\\S]*?Do not repeatedly poll",
+      "message": "Worker supervision must use bounded waits and one evidence-based health check instead of liveness-only polling."
+    },
+    {
+      "id": "workflow-mistakes-require-durable-self-correction",
+      "type": "required_pattern",
+      "path": "docs/codex-usage-workflow.md",
+      "pattern": "An acknowledged workflow mistake is a defect in the durable process[\\s\\S]*?same checkpoint[\\s\\S]*?machine-checkable policy rule or focused fixture[\\s\\S]*?usage-ledger\\.md[\\s\\S]*?chat apology or promise is not a correction[\\s\\S]*?failing to document an acknowledged workflow mistake is itself a workflow mistake",
+      "message": "Acknowledged workflow mistakes must produce durable guidance, enforcement, and ledger evidence rather than chat-only promises."
+    },
+    {
+      "id": "agents-own-safe-execution-management",
+      "type": "required_pattern",
+      "path": "docs/codex-usage-workflow.md",
+      "pattern": "Execution management belongs to the agents[\\s\\S]*?Model selection and escalation[\\s\\S]*?context compaction[\\s\\S]*?known path/toolchain recovery[\\s\\S]*?evidence-based retry[\\s\\S]*?build sequencing[\\s\\S]*?must not be delegated to the user[\\s\\S]*?unauthorized destructive action[\\s\\S]*?genuinely product-changing choice",
+      "message": "Agents must own safe in-scope execution management and ask the user only for decisions requiring new authority."
+    },
+    {
       "id": "substantial-milestones-use-one-cost-routed-owner",
       "type": "required_pattern",
       "path": "docs/codex-usage-workflow.md",

@@ -108,6 +108,14 @@ At each milestone, the visible coordinator publishes a plain-language product st
 
 Fresh bounded workers created with `fork_turns: "none"` remain internal execution contexts. They do not create user-visible tasks and do not change which task the user sees.
 
+## Worker supervision and durable self-correction
+
+Every worker wait is bounded to at most ten minutes. On timeout, the coordinator performs exactly one compact progress health check. That check must inspect real progress evidence: a new commit or working-tree change, an active build/deploy/device process, or a concrete worker checkpoint. Agent status `running` by itself is not evidence of progress. If the check proves a stall, interrupt the worker and recover the bounded task; otherwise start one new bounded wait. Do not repeatedly poll, send status nudges, or spend coordinator calls without a new event.
+
+An acknowledged workflow mistake is a defect in the durable process. Correct it in the same checkpoint by updating this workflow or the applicable repository guidance, adding a machine-checkable policy rule or focused fixture when practical, and recording the cause and correction in `docs/codex-usage-ledger.md`. A chat apology or promise is not a correction. This rule is recursive: failing to document an acknowledged workflow mistake is itself a workflow mistake and triggers the same durable correction.
+
+Execution management belongs to the agents. Model selection and escalation, context compaction, known path/toolchain recovery, evidence-based retry, build sequencing, and safe in-scope recovery must not be delegated to the user. User input is reserved for unauthorized destructive action, unresolved irreversible target ambiguity, external credentials or coordination, meaningful scope expansion, or a genuinely product-changing choice.
+
 ## Build budget
 
 - Batch source corrections before compiling.
