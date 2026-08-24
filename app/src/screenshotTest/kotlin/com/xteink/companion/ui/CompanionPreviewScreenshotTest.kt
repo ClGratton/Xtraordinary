@@ -626,20 +626,51 @@ fun deviceModelPickerScreenshot() {
 @Preview(name = "Firmware dual-route acceptance", widthDp = 412, heightDp = 915, showBackground = true)
 @Composable
 fun firmwareWakeGuidanceScreenshot() {
+    FirmwareDualRouteScreenshot()
+}
+
+@PreviewTest
+@Preview(name = "Firmware dual-route acceptance 1.3x", widthDp = 412, heightDp = 915, fontScale = 1.3f, showBackground = true)
+@Composable
+fun firmwareDualRouteAcceptanceLargeTextScreenshot() {
+    FirmwareDualRouteScreenshot()
+}
+
+@PreviewTest
+@Preview(name = "Firmware dual-route acceptance 2.0x", widthDp = 412, heightDp = 915, fontScale = 2f, showBackground = true)
+@Composable
+fun firmwareDualRouteAcceptanceHugeTextScreenshot() {
+    FirmwareDualRouteScreenshot()
+}
+
+@PreviewTest
+@Preview(name = "Quiet firmware dual-route acceptance", widthDp = 412, heightDp = 915, showBackground = true)
+@Composable
+fun quietFirmwareDualRouteAcceptanceScreenshot() {
+    FirmwareDualRouteScreenshot(visualTheme = CompanionVisualTheme.Minimal)
+}
+
+@Composable
+private fun FirmwareDualRouteScreenshot(
+    visualTheme: CompanionVisualTheme = CompanionVisualTheme.Expressive,
+) {
     DeviceSheetScreenshot(
         step = DeviceSetupStep.FirmwareDefault,
         hasManagedDevice = true,
         managedDeviceModel = "X3",
-        device = DeviceUiState(
-            firmwareVersion = "xtraordinary-v0.2.6-dev51",
-            firmwareCheckPhase = FirmwareCheckPhase.Available,
-            latestFirmwareVersion = "xtraordinary-v0.2.6-dev52",
-            firmwareCandidateIsInstallable = true,
-            usbConnected = false,
-            managedBleFirmwareReady = false,
-        ),
+        device = firmwareDualRouteDeviceState(),
+        visualTheme = visualTheme,
     )
 }
+
+private fun firmwareDualRouteDeviceState() = DeviceUiState(
+    firmwareVersion = "xtraordinary-v0.2.6-dev51",
+    firmwareCheckPhase = FirmwareCheckPhase.Available,
+    latestFirmwareVersion = "xtraordinary-v0.2.6-dev52",
+    firmwareCandidateIsInstallable = true,
+    usbConnected = false,
+    managedBleFirmwareReady = false,
+)
 
 @Composable
 private fun DeviceSheetScreenshot(
@@ -647,8 +678,9 @@ private fun DeviceSheetScreenshot(
     device: DeviceUiState = DeviceUiState(),
     hasManagedDevice: Boolean = false,
     managedDeviceModel: String? = null,
+    visualTheme: CompanionVisualTheme = CompanionVisualTheme.Expressive,
 ) {
-    X3CompanionTheme(visualTheme = CompanionVisualTheme.Expressive, useDynamicColor = false) {
+    X3CompanionTheme(visualTheme = visualTheme, useDynamicColor = false) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.BottomCenter,

@@ -223,7 +223,8 @@
         "app/src/test/java/com/xteink/companion/ui/RadioPolicyOptionsTest.kt",
         "app/src/test/java/com/xteink/companion/ui/theme/ThemeColorContractTest.kt",
         "app/src/test/java/com/xteink/companion/ui/components/SetupActionLayoutPolicyTest.kt",
-        "app/src/test/java/com/xteink/companion/ui/components/AdaptiveViewportLayoutPolicyTest.kt"
+        "app/src/test/java/com/xteink/companion/ui/components/AdaptiveViewportLayoutPolicyTest.kt",
+        "app/src/test/java/com/xteink/companion/ui/components/FirmwareTransportLayoutPolicyTest.kt"
       ],
       "excludeGlobs": [
         "app/src/main/java/com/xteink/companion/ui/components/TicketContent.kt",
@@ -255,6 +256,10 @@
         "app/src/test/java/com/xteink/companion/ui/ConnectionPolicyTest.kt",
         "app/src/test/java/com/xteink/companion/ui/components/SetupActionLayoutPolicyTest.kt",
         "app/src/test/java/com/xteink/companion/ui/components/AdaptiveViewportLayoutPolicyTest.kt",
+        "app/src/test/java/com/xteink/companion/ui/components/FirmwareTransportLayoutPolicyTest.kt",
+        "app/src/screenshotTest/kotlin/com/xteink/companion/ui/CompanionPreviewScreenshotTest.kt",
+        "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/firmwareWakeGuidanceScreenshot_Firmware wake guidance_d62e05c2_0.png",
+        "app/src/screenshotTestPlayDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/firmwareWakeGuidanceScreenshot_Firmware wake guidance_d62e05c2_0.png",
         "app/src/screenshotTest/kotlin/com/xteink/companion/ui/CompanionPreviewScreenshotTest.kt",
         "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/settingsThemesScreenshot_Settings themes_a8a8a3e5_0.png",
         "app/src/screenshotTestCommunityDebug/reference/com/xteink/companion/ui/CompanionPreviewScreenshotTestKt/setupLibraryScreenshot_Setup library_b04839c0_0.png",

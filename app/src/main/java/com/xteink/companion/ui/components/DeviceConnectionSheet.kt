@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -57,6 +58,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -272,9 +274,15 @@ private fun SheetHeader(
         if (step == DeviceSetupStep.Devices) {
             Text(stringResource(R.string.devices_title), style = MaterialTheme.typography.headlineMedium)
         } else {
-            TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
+            TextButton(
+                onClick = onBack,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+            ) { Text(stringResource(R.string.back)) }
         }
-        TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
+        TextButton(
+            onClick = onDismiss,
+            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+        ) { Text(stringResource(R.string.close)) }
     }
 }
 
@@ -659,7 +667,11 @@ private fun DefaultFirmwarePage(
             onFlashFirmwareManagedBle = onFlashFirmwareManagedBle,
         )
         Spacer(Modifier.height(8.dp))
-        TextButton(onClick = onChooseAlternative, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+        TextButton(
+            onClick = onChooseAlternative,
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+        ) {
             Text(stringResource(R.string.choose_another_firmware))
         }
     }
@@ -906,7 +918,6 @@ private fun FirmwareInstallAction(
                 Text(
                     device.message ?: stringResource(R.string.firmware_verifying),
                     textAlign = TextAlign.Center,
-                    maxLines = 2,
                 )
             }
             FirmwareCheckPhase.Complete -> Surface(
@@ -958,6 +969,7 @@ private fun FirmwareTransportChoice(
     onFlashFirmware: () -> Unit,
     onFlashFirmwareManagedBle: () -> Unit,
 ) {
+    val optionHeight = FirmwareTransportLayoutPolicy.optionHeight(LocalDensity.current.fontScale)
     val choices = buildList {
         if (FirmwareInstallRoute.ManagedBle in routes) {
             add(
@@ -983,7 +995,7 @@ private fun FirmwareTransportChoice(
         choices = choices,
         selectedKey = selectedRouteName,
         onSelect = onSelectRoute,
-        optionHeight = 190.dp,
+        optionHeight = optionHeight,
         selectedContainer = MaterialTheme.colorScheme.primaryContainer,
         selectedContent = MaterialTheme.colorScheme.onPrimaryContainer,
     ) { key ->
@@ -994,7 +1006,7 @@ private fun FirmwareTransportChoice(
             ) {
                 Text(stringResource(R.string.install_firmware_ota), textAlign = TextAlign.Center)
             }
-            FirmwareInstallRoute.GuardedUsb.name -> OutlinedButton(
+            FirmwareInstallRoute.GuardedUsb.name -> Button(
                 onClick = onFlashFirmware,
                 enabled = usbConnected,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp),
