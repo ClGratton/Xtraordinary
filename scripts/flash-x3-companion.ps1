@@ -11,8 +11,10 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 . (Join-Path $PSScriptRoot "use-toolchains.ps1")
 . (Join-Path $PSScriptRoot "resolve-xtraordinary-deployment-targets.ps1")
+. (Join-Path $PSScriptRoot "x3-ota-slot-policy.ps1")
 
 $ResolvedFirmware = (Resolve-Path (Join-Path $ProjectRoot $FirmwarePath)).Path
+$FlashLayout = Get-X3OtaFlashLayout -PartitionTablePath (Join-Path $ProjectRoot 'firmware\partitions.csv')
 $X3UsbTarget = Get-XtraordinaryX3UsbTarget
 if ($null -eq $X3UsbTarget) {
     throw 'No present X3 USB/JTAG composite or serial interface with VID_303A:1001 was found. Do not infer absence from serial ports alone.'
@@ -74,7 +76,16 @@ if (-not $SkipAndroidRelease) {
     Start-Sleep -Seconds 1
 }
 
-Write-Host "Flashing only the X3 application partition on $Port..."
+$SelectedSlot = Read-X3SelectedOtaSlot -Port $Port -Python $Python -Esptool $Esptool -Layout $FlashLayout
+if ($Artifact.Length -gt $SelectedSlot.Size) {
+    throw "Firmware image is $($Artifact.Length) bytes, larger than selected $($SelectedSlot.Label) partition size $($SelectedSlot.Size)."
+}
+$SelectedOffset = '0x{0:X}' -f $SelectedSlot.Offset
+Write-Host (
+    "Selected boot target: $($SelectedSlot.Label) ($($SelectedSlot.Subtype)) at $SelectedOffset " +
+    "from CRC-valid otadata entry $($SelectedSlot.Entry), sequence $($SelectedSlot.Sequence)."
+)
+Write-Host "Flashing only the selected X3 application partition on $Port..."
 & $Python $Esptool `
     --chip esp32c3 `
     --port $Port `
@@ -83,7 +94,7 @@ Write-Host "Flashing only the X3 application partition on $Port..."
     --flash-mode dio `
     --flash-freq 80m `
     --flash-size 16MB `
-    0x10000 $ResolvedFirmware
+    $SelectedOffset $ResolvedFirmware
 if ($LASTEXITCODE -ne 0) {
     throw "esptool failed with exit code $LASTEXITCODE. Do not treat this flash as successful."
 }

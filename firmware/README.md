@@ -105,13 +105,13 @@ pip install esptool
 log stream --predicate 'subsystem == "com.apple.iokit"' --info
 ```
 
-5. Flash:
+5. Do not issue a fixed-offset `write_flash` command. X3 uses two OTA application slots, so a raw write to `0x10000` may update an unselected partition. Use the repository's guarded workflow, which reads and validates `otadata`, selects `app0` or `app1`, and fails before writing when the boot target cannot be proven. On Windows:
 
-```bash
-esptool.py --chip esp32c3 --port /dev/ttyACM0 --baud 921600 write_flash 0x10000 /path/to/firmware.bin
+```powershell
+& .\scripts\flash-x3-companion.ps1 -Port COM7 -FirmwarePath C:\path\to\firmware.bin
 ```
 
-Adjust `/dev/ttyACM0` to match your system.
+Use the associated `VID_303A:1001` serial interface for the explicit operation. Do not open a port merely to probe the device.
 
 ### Manual
 

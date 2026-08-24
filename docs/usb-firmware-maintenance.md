@@ -28,25 +28,29 @@ Pinned XTEINK X3 stock release:
 The phone recognizes the ESP32-C3 USB/JTAG serial interface as USB VID/PID `303A:1001`. A firmware operation follows one shared lifecycle:
 
 1. Detect the USB/JTAG interface and request Android USB permission when required.
-2. Enter the ROM bootloader and synchronize.
-3. Disable the USB watchdogs and configure flash access.
-4. Erase and write one explicitly bounded flash region.
-5. Verify the written region with the ROM MD5 command.
-6. Hard-reset the X3.
-7. If the USB/JTAG interface disappears, preserve `ReconnectRequired` and show **Disconnect and reconnect X3 USB to continue** until it re-enumerates.
+2. Before changing reset lines, request the live `RUNTIME_TRACE_OTA` record and require identical running and next-boot OTA partitions. Firmware without this evidence fails closed and must be bootstrapped through the guarded Windows path.
+3. Enter the ROM bootloader and synchronize. The guarded Windows path reads `otadata` before any application write and resolves the same selected slot from a CRC-valid, bootable sequence entry.
+4. Disable the USB watchdogs and configure flash access.
+5. Erase and write only the proven selected application region.
+6. Verify the written region with the ROM MD5 command.
+7. Hard-reset the X3.
+8. If the USB/JTAG interface disappears, preserve `ReconnectRequired` and show **Disconnect and reconnect X3 USB to continue** until it re-enumerates.
 
-Do not replace step 7 with a generic disconnected state. OEM firmware may stop exposing USB/JTAG after boot even while the cable remains physically attached. The instruction tells the user which physical action is required and prevents a successful flash from looking like an unexplained failure.
+Do not replace step 8 with a generic disconnected state. OEM firmware may stop exposing USB/JTAG after boot even while the cable remains physically attached. The instruction tells the user which physical action is required and prevents a successful flash from looking like an unexplained failure.
 
 On Windows, preflight the same identity through `scripts/resolve-xtraordinary-deployment-targets.ps1`: inspect present `VID_303A:1001` composite/interface PnP records before selecting the associated serial interface. A ports-only scan is not evidence that X3 is absent, and discovery must not open the serial port.
 
-### Application firmware region
+### Application firmware regions
 
-- Offset: `0x10000`
-- Maximum size: `0x640000`
+- `app0` / `ota_0`: offset `0x10000`, maximum size `0x640000`.
+- `app1` / `ota_1`: offset `0x650000`, maximum size `0x640000`.
+- `otadata`: offset `0xE000`, size `0x2000`; this region is read to select the application target and is never rewritten by the raw application-only workflow.
 - Input must be a non-empty ESP32-C3 application image beginning with byte `0xE9`.
 - The downloaded length and SHA-256 must match the selected release before flashing.
 
-An application-only flash does not erase NVS, Android's bond, app data, or SD-card files.
+Never assume `app0`. The reusable selected-slot policy must prove the current running/next-boot pair before Android flashing, or decode the two CRC-checked `otadata` entries before a guarded Windows flash. A missing, corrupt, invalid, aborted, unsupported, or contradictory selection blocks the write. `otadata` is selected-boot evidence, not proof of the partition that actually ran after fallback; final firmware truth still comes from fresh BLE `Capabilities` after reboot.
+
+An application-only flash to either selected OTA application partition does not erase NVS, Android's bond, app data, `otadata`, or SD-card files.
 
 ### Reset X3 setup
 

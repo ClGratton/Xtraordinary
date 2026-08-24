@@ -3,6 +3,7 @@
 #ifdef ENABLE_X3_COMPANION
 
 #include <esp_attr.h>
+#include <esp_ota_ops.h>
 #include <esp_system.h>
 
 #include <cstring>
@@ -82,6 +83,18 @@ void printSnapshot(Print& output, const char* label, const Snapshot& snapshot) {
       static_cast<unsigned>(snapshot.releasedEvents), static_cast<unsigned long>(snapshot.powerHeldMs));
 }
 
+void printOtaSelection(Print& output) {
+  const esp_partition_t* running = esp_ota_get_running_partition();
+  const esp_partition_t* boot = esp_ota_get_boot_partition();
+  if (!running || !boot) {
+    output.println("RUNTIME_TRACE_OTA unavailable");
+    return;
+  }
+  output.printf("RUNTIME_TRACE_OTA running_label=%s running_offset=0x%08lX boot_label=%s boot_offset=0x%08lX\n",
+                running->label, static_cast<unsigned long>(running->address), boot->label,
+                static_cast<unsigned long>(boot->address));
+}
+
 }  // namespace
 
 void begin() {
@@ -126,6 +139,10 @@ void dump(Print& output) {
     output.println("RUNTIME_TRACE_UNAVAILABLE");
     return;
   }
+  // Emit OTA evidence before ACTIVE: the Android reader completes when it sees
+  // the ACTIVE snapshot, so every completed response from this firmware also
+  // contains the read-only running/next-boot partition observation.
+  printOtaSelection(output);
   printSnapshot(output, "PREVIOUS", trace.previous);
   printSnapshot(output, "ACTIVE", trace.active);
 }

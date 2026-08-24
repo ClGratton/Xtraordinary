@@ -135,6 +135,52 @@
       "message": "Guarded X3 flashing must check the present VID_303A:1001 composite/interface target before relying on a serial-port list."
     },
     {
+      "id": "windows-x3-flash-resolves-selected-ota-slot",
+      "type": "required_pattern",
+      "path": "scripts/flash-x3-companion.ps1",
+      "pattern": "x3-ota-slot-policy\\.ps1[\\s\\S]*?Get-X3OtaFlashLayout[\\s\\S]*?Read-X3SelectedOtaSlot[\\s\\S]*?\\$SelectedOffset \\$ResolvedFirmware",
+      "message": "Guarded Windows flashing must read otadata and target the proven selected OTA application slot instead of a fixed app0 offset."
+    },
+    {
+      "id": "windows-x3-selected-slot-policy-tested",
+      "type": "required_file",
+      "path": "scripts/test-x3-ota-slot-policy.ps1",
+      "message": "The Windows selected-slot decoder needs focused CRC, state, and app0/app1 fixtures."
+    },
+    {
+      "id": "windows-x3-selected-slot-policy-exists",
+      "type": "required_file",
+      "path": "scripts/x3-ota-slot-policy.ps1",
+      "message": "The guarded Windows flasher needs the centralized selected-slot decoder."
+    },
+    {
+      "id": "android-x3-flash-requires-live-slot-evidence",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/data/UsbEspFlasher.kt",
+      "pattern": "prepareSerial\\(\\)[\\s\\S]*?X3OtaSlotPolicy\\.parseRuntimeTrace\\(connection\\.requestRuntimeTrace[\\s\\S]*?requireSelectedFlashOffset[\\s\\S]*?flashBegin\\(image\\.size, selectedOffset\\)[\\s\\S]*?verifyMd5\\(image, selectedOffset\\)",
+      "message": "Android application flashing must fail closed unless live runtime evidence proves the selected OTA slot."
+    },
+    {
+      "id": "firmware-runtime-trace-reports-ota-selection",
+      "type": "required_pattern",
+      "path": "firmware/src/RuntimeTrace.cpp",
+      "pattern": "esp_ota_get_running_partition\\(\\)[\\s\\S]*?esp_ota_get_boot_partition\\(\\)[\\s\\S]*?RUNTIME_TRACE_OTA[\\s\\S]*?running_offset[\\s\\S]*?boot_offset",
+      "message": "Read-only runtime diagnostics must expose both the running and next-boot OTA application partitions."
+    },
+    {
+      "id": "android-x3-selected-slot-policy-tested",
+      "type": "required_file",
+      "path": "app/src/test/java/com/xteink/companion/data/X3OtaSlotPolicyTest.kt",
+      "message": "Android selected-slot evidence parsing and fail-closed behavior need focused tests."
+    },
+    {
+      "id": "agents-require-selected-ota-slot-before-flash",
+      "type": "required_pattern",
+      "path": "AGENTS.md",
+      "pattern": "Before any X3 application flash[\\s\\S]*?RUNTIME_TRACE_OTA[\\s\\S]*?CRC-validate `otadata`[\\s\\S]*?Never assume `app0`/`0x10000`[\\s\\S]*?fresh BLE `Capabilities`",
+      "message": "Agents must resolve the selected OTA slot before any application flash and must not confuse otadata with running-firmware acceptance."
+    },
+    {
       "id": "android-wrapper-runs-policy-gate",
       "type": "required_pattern",
       "path": "scripts/build-xtraordinary-app.ps1",
@@ -210,11 +256,11 @@
       "message": "Firmware must clear an interactive lease when its GATT owner disconnects."
     },
     {
-      "id": "flash-preserves-app-offset",
+      "id": "firmware-build-retains-app0-default-offset",
       "type": "required_pattern",
       "path": "firmware/platformio.ini",
       "pattern": "(?m)^board_upload\\.offset_address\\s*=\\s*0x10000\\s*$",
-      "message": "Application-only firmware output must retain the 0x10000 app offset."
+      "message": "The build remains based at app0 for direct artifact compatibility; guarded flashers must resolve the selected OTA slot independently."
     },
     {
       "id": "firmware-wrapper-does-not-erase-bonds",

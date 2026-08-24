@@ -18,14 +18,15 @@ class EspRomProtocolTest {
     }
 
     @Test
-    fun flashBeginTargetsFirstX3ApplicationSlot() {
+    fun flashBeginTargetsSelectedX3ApplicationSlot() {
         val size = 5_416_128
-        val payload = ByteBuffer.wrap(EspRomProtocol.flashBeginPayload(size)).order(ByteOrder.LITTLE_ENDIAN)
+        val payload = ByteBuffer.wrap(EspRomProtocol.flashBeginPayload(size, EspRomProtocol.App1Offset))
+            .order(ByteOrder.LITTLE_ENDIAN)
 
         assertEquals(size, payload.int)
         assertEquals((size + 0x3FF) / 0x400, payload.int)
         assertEquals(0x400, payload.int)
-        assertEquals(0x10000, payload.int)
+        assertEquals(0x650000, payload.int)
         assertEquals(0, payload.int)
     }
 

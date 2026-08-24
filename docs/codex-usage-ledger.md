@@ -1,5 +1,11 @@
 # Codex usage ledger
 
+## 2026-08-24 - Selected-slot guard source checkpoint
+
+- Task: `01a033fe-a8b8-7200-a375-13182ed695b7`. Entry `-EnforceStageGate` returned `within-budget` at 16% weekly use, 0-point task-local growth, one 27,017-token input (90.02% cached), and no replay/budget signal. The checkpoint audit returned `compaction-required` at 21% weekly use, 5-point task-local growth, 140,931 replay median, 214,417 latest input, and 562% recent growth; no later protected stage is authorized in this task.
+- Source result from pushed base `a67371a`: firmware now exposes running and next-boot OTA partitions in the live runtime trace; Android requires matching known-slot evidence before reset; Windows reads and CRC-validates `otadata`, resolves app0/app1 through the checked-in partition table, and uses the selected offset instead of fixed app0. The raw workflow never rewrites `otadata`, and all records preserve the distinction between selected boot target and running-firmware acceptance.
+- Verification/evidence boundary: focused PowerShell fixtures passed, and the 165-rule `FirmwareRelease` static gate plus 25-file notice pack passed. No compiler, ADB, COM, device read, install, flash, reset, pair/re-pair, bond/app-data/timeout change, NVS/SD/book write, setting edit, or BLE acceptance ran. Neither dev33 nor dev37 is accepted as running; resume from a fresh passing audit and require selected-slot evidence plus the complete fresh BLE protocol-ready chain.
+
 ## 2026-08-24 - Protected discovery workflow checkpoint
 
 - Task: `01a033f6-ba01-7e91-8ab7-f20f325c48ab`. Entry `-EnforceStageGate` returned `within-budget`: 14% used in the 10,080-minute signed-in window, 0-point task-local weekly growth, one 31,211-token call (77.92% cached), no compactions, and no replay/budget signal.

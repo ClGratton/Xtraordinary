@@ -126,6 +126,12 @@ class UsbEspFlasher(context: Context) : Closeable {
         )
         runCatching {
             RomConnection.open(usbManager, device).use { connection ->
+                // Query the running application before touching reset lines.
+                // Old firmware without this evidence fails closed and must be
+                // bootstrapped through the guarded Windows selected-slot path.
+                connection.prepareSerial()
+                val otaSelection = X3OtaSlotPolicy.parseRuntimeTrace(connection.requestRuntimeTrace(8_000))
+                val selectedOffset = otaSelection.requireSelectedFlashOffset()
                 connection.resetToBootloader()
                 _state.value = _state.value.copy(
                     phase = UsbFlashPhase.EnteringBootloader,
@@ -138,7 +144,7 @@ class UsbEspFlasher(context: Context) : Closeable {
                     phase = UsbFlashPhase.Erasing,
                     message = "Preparing the X3 flash…",
                 )
-                connection.flashBegin(image.size, EspRomProtocol.FlashOffset)
+                connection.flashBegin(image.size, selectedOffset)
                 _state.value = _state.value.copy(
                     phase = UsbFlashPhase.Writing,
                     message = "Installing firmware from this phone…",
@@ -151,7 +157,7 @@ class UsbEspFlasher(context: Context) : Closeable {
                     progress = 1f,
                     message = "Verifying firmware on the X3…",
                 )
-                connection.verifyMd5(image, EspRomProtocol.FlashOffset)
+                connection.verifyMd5(image, selectedOffset)
                 _state.value = _state.value.copy(
                     phase = UsbFlashPhase.Restarting,
                     message = "Firmware verified · restarting X3…",

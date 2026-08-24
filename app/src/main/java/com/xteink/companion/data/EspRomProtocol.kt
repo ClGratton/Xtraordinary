@@ -5,7 +5,8 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 internal object EspRomProtocol {
-    const val FlashOffset = 0x10000
+    const val App0Offset = 0x10000
+    const val App1Offset = 0x650000
     const val MaxAppSize = 0x640000
     const val FlashBlockSize = 0x400
 
@@ -30,7 +31,7 @@ internal object EspRomProtocol {
 
     fun syncPayload(): ByteArray = byteArrayOf(0x07, 0x07, 0x12, 0x20) + ByteArray(32) { 0x55 }
 
-    fun flashBeginPayload(size: Int, offset: Int = FlashOffset): ByteArray {
+    fun flashBeginPayload(size: Int, offset: Int): ByteArray {
         require(size > 0 && offset >= 0 && offset.toLong() + size <= FlashSize) {
             "Flash region is outside the X3 flash"
         }
@@ -43,7 +44,7 @@ internal object EspRomProtocol {
         return littleEndianInts(block.size, sequence, 0, 0) + block
     }
 
-    fun flashMd5Payload(size: Int, offset: Int = FlashOffset): ByteArray =
+    fun flashMd5Payload(size: Int, offset: Int): ByteArray =
         littleEndianInts(offset, size, 0, 0)
 
     fun readRegisterPayload(address: Int): ByteArray = littleEndianInts(address)
