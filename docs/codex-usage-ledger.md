@@ -1,5 +1,11 @@
 # Codex usage ledger
 
+## 2026-08-24 - Canonical MCU target evidence
+
+- Cause: the coordinator incorrectly questioned the bundled ESP32-C3 flasher stub as if X3 used ESP32-S3, based on an unverified family assumption after seeing the USB target boundary.
+- Evidence: `firmware/platformio.ini` selects `esp32-c3-devkitm-1`; the canonical wrapper verifies the ESP32-C3 RV32IMC multilib; the existing guarded PC scripts use `--chip esp32c3`; repository architecture and USB-maintenance policies consistently identify ESP32-C3. The C3 stub is therefore the correct asset.
+- Durable correction: agents must establish MCU/board/stub compatibility from canonical board and toolchain evidence before declaring a mismatch. A generic ESP32 name or USB VID/PID is not enough. No source artifact, Pixel, or X3 device state changed during this correction.
+
 ## 2026-08-24 - Dev50 USB selected-slot artifact and target boundary
 
 - Pushed source `382438b` contains the canonical Espressif ESP32-C3 v2 stub asset (SHA-256 `47FD549A9746E6ACD3BE7C9F56BA71A02D9DAB9FF380501C4F71C79F762ABEF4`) and read-only MEM_BEGIN/DATA/END plus READ_FLASH framing. Otadata is read-only and selection remains the existing CRC/sequence/state parser; no otadata write command exists.

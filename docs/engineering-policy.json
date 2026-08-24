@@ -591,6 +591,13 @@
       "message": "Repository agents must use TODO.md as the durable milestone entrypoint and update it at checkpoint."
     },
     {
+      "id": "agents-prove-mcu-target-before-architecture-verdict",
+      "type": "required_pattern",
+      "path": "AGENTS.md",
+      "pattern": "Before declaring an MCU, board, flasher-stub, or instruction-set mismatch[\\s\\S]*?canonical firmware board configuration and build/toolchain evidence[\\s\\S]*?USB VID/PID is not sufficient architecture evidence[\\s\\S]*?ESP32-C3/RV32IMC[\\s\\S]*?do not substitute ESP32-S3 assumptions",
+      "message": "Hardware architecture verdicts must come from canonical board/toolchain evidence rather than an inferred ESP32 variant."
+    },
+    {
       "id": "milestones-audit-regression-impact-and-handoff-visibly",
       "type": "required_pattern",
       "path": "docs/codex-usage-workflow.md",
