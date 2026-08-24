@@ -1,5 +1,13 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-25 OTA/USB route and pending-state checkpoint
+
+Current pushed head is `ac74f362e0a37984c26e76c62fbaca4c38b2112b`. The old Pixel screen was an earlier installed APK, not a harness failure. The corrected source now presents OTA and USB as the established expanding choice row; OTA remains visible for a known paired Xtraordinary device while GATT is idle and acquires the reusable transport lease before requiring fresh capability evidence. USB stays an explicit setup/recovery route. The default older catalog cannot become an install action. Managed replay is reconstructed only from persisted `PendingFirmwareInstall`, source navigation is hidden in Downloading/Transferring/Verifying, and transfer/apply ACK remains nonterminal until fresh exact-version Capabilities completes verification.
+
+Community dev51 APK SHA-256 `73E7F148F1152C065FF2BE394D34C701A3CAC5B4C9FB33B0B076E074677F8BB2` was assembled and retained-data installed on Pixel; package truth is versionCode 52/versionName 0.2.0-dev51, and the live home screenshot shows `X3 Paired` with battery 98%. Existing firmware SHA-256 `465C5FB999B9B7E63926B0B91BAF895CFFFE843E0A31C130E8ACFB169708CB18` was staged at `/sdcard/Download/xtraordinary-v0.2.6-dev51.bin`. This is the same dev51 already physically accepted on X3, so no redundant firmware write/reboot occurred. Bond, app data, X3 NVS/SD/books were not reset. Pixel timeout was restored to its measured pre-test value `2147483647`.
+
+The weekly meter reached 98%; the canonical Community assembly used the already-documented explicit weekly-reserve and UI-review-debt flags. The gate reported only 46 stale/missing `passes`/`android-ui` Terra receipts. Per the final user instruction, no further reviewer agents were run. Remaining physical acceptance is deliberately narrow: open the installed firmware sheet and capture both expanding routes; prove an OTA tap can reacquire the idle paired link; then build a genuinely newer firmware revision before transferring it. Do not call a same-version staged file an update, and do not reflash dev51 merely to manufacture evidence.
+
 ## 2026-08-24 dev51 acceptance and capability-bound OTA/theme checkpoint
 
 Root's pushed `7f93110` completed the guarded Pixel-host USB/ROM deployment: selected app0 `0x10000` was resolved from read-only otadata, the exact dev51 firmware SHA `465C5FB999B9B7E63926B0B91BAF895CFFFE843E0A31C130E8ACFB169708CB18` was written and ROM-MD5 verified, and hard reset succeeded. Fresh BLE evidence accepted exact dev51 Capabilities, StatusChanged, revisioned LibraryPage pages, SetRadioPolicy ACK, and SetReaderPolicy ACK. Bluetooth bond, Pixel app data, X3 NVS/SD/books were preserved.
