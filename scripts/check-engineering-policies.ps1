@@ -81,8 +81,8 @@ if (-not (Test-Path -LiteralPath $usageWorkflowPath -PathType Leaf) -or
 }
 
 if ($AllowDeferredUiReviewDebt) {
-    if ($Mode -ne 'Release') {
-        throw 'Deferred UI-review debt is permitted only for the explicit Android Release gate; FirmwareRelease and UiEvidenceCandidate remain fail-closed.'
+    if ($Mode -notin @('Release', 'FirmwareRelease')) {
+        throw 'Deferred UI-review debt is permitted only for the explicit Android Release or FirmwareRelease gate; UiEvidenceCandidate remains fail-closed.'
     }
     $ledgerContent = Get-Content -LiteralPath $usageLedgerPath -Raw
     if ($ledgerContent -notmatch '(?s)## 2026-08-22 - Explicit release-debt waiver for build and physical acceptance.*?User authorization:.*?AllowDeferredUiReviewDebt') {

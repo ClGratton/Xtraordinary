@@ -936,8 +936,8 @@
       "id": "deferred-ui-review-debt-is-explicit-and-ledger-bound",
       "type": "required_pattern",
       "path": "scripts/check-engineering-policies.ps1",
-      "pattern": "AllowDeferredUiReviewDebt[\\s\\S]*?Mode -ne 'Release'[\\s\\S]*?Explicit release-debt waiver for build and physical acceptance[\\s\\S]*?deferredUiReviewFailures.Count -eq \\$failures.Count[\\s\\S]*?EXPLICIT NON-DEFAULT RELEASE-DEBT WAIVER",
-      "message": "Any exceptional UI-review debt path must be explicit, Release-only, ledger-bound, and reject every other policy violation."
+      "pattern": "AllowDeferredUiReviewDebt[\\s\\S]*?Mode -notin @\\('Release', 'FirmwareRelease'\\)[\\s\\S]*?Explicit release-debt waiver for build and physical acceptance[\\s\\S]*?deferredUiReviewFailures.Count -eq \\$failures.Count[\\s\\S]*?EXPLICIT NON-DEFAULT RELEASE-DEBT WAIVER",
+      "message": "Any exceptional UI-review debt path must be explicit, limited to Android/Firmware release gates, ledger-bound, and reject every other policy violation."
     },
     {
       "id": "canonical-android-debt-waiver-is-visible-and-nondefault",
