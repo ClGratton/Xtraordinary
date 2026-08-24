@@ -950,7 +950,7 @@ private fun FirmwareTransportChoice(
             add(
                 ExpandingChoice(
                     key = FirmwareInstallRoute.ManagedBle.name,
-                    title = stringResource(R.string.install_firmware_ota),
+                    title = stringResource(R.string.install_firmware_ota_choice),
                     body = stringResource(R.string.install_firmware_ota_body),
                 ),
             )
@@ -959,7 +959,7 @@ private fun FirmwareTransportChoice(
             add(
                 ExpandingChoice(
                     key = FirmwareInstallRoute.GuardedUsb.name,
-                    title = stringResource(R.string.install_firmware_usb),
+                    title = stringResource(R.string.install_firmware_usb_choice),
                     body = stringResource(R.string.install_firmware_usb_body),
                 ),
             )

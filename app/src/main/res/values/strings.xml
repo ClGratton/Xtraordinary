@@ -49,10 +49,12 @@
     <string name="firmware_not_available">Firmware not available for this model yet</string>
     <string name="firmware_update_available">Update available</string>
     <string name="install_firmware">Install</string>
+    <string name="install_firmware_ota_choice">OTA</string>
     <string name="install_firmware_ota">Install over BLE</string>
-    <string name="install_firmware_ota_body">Use the paired X3 after a fresh update link is ready.</string>
+    <string name="install_firmware_ota_body">Wakes the paired X3 and verifies support.</string>
+    <string name="install_firmware_usb_choice">USB</string>
     <string name="install_firmware_usb">Install by USB</string>
-    <string name="install_firmware_usb_body">Use a cable for initial setup, recovery, or a separate USB reinstall.</string>
+    <string name="install_firmware_usb_body">For initial setup, recovery, or reinstall.</string>
     <string name="connect_usb_for_firmware">Connect USB</string>
     <string name="install_firmware_title">Install firmware</string>
     <string name="install_firmware_body">Choose the firmware to install on your %1$s from this phone.</string>
