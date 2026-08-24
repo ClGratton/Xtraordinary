@@ -2,8 +2,8 @@ package com.xteink.companion.data
 
 import java.io.ByteArrayOutputStream
 import java.util.ArrayDeque
-import kotlin.test.Test
-import kotlin.test.assertEquals
+import org.junit.Assert.assertEquals
+import org.junit.Test
 
 class UsbEspFlasherBufferTest {
     @Test
