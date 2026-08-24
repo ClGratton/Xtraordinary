@@ -1,5 +1,11 @@
 # Codex usage ledger
 
+## 2026-08-24 - Bounded device-deployment checkpoint
+
+- Task: `01a033d7-8315-7c83-a1fd-646fa27f147c`. The entry/pre-deployment `-EnforceStageGate` audit returned `within-budget`: 9% used in the 10,080-minute signed-in window, 0-point task-local weekly growth, one model call with 26,813 input tokens (86.88% cached), no compactions, and no replay or weekly-reserve violation.
+- Evidence-only deployment result: X3 USB/JTAG discovery found no present `VID_303A&PID_1001` device or associated serial port; the normal-user repository ADB daemon restart found no mDNS services and `adb devices -l` was empty. There was no current TLS endpoint to connect.
+- Durable decision: do not invoke a raw/esptool or `-SkipAndroidRelease` flash, remembered ADB port, pairing/reset, timeout change, or compiler. No phone/X3 state changed; retain the exact dev49/dev37 artifact hashes in `HANDOFF.md` and resume only from a fresh physical X3 target plus current authenticated ADB endpoint.
+
 ## 2026-08-24 - Canonical build/deploy retry checkpoint
 
 - Task: `01a033c5-0656-7f81-9b5d-48c1c63862fe`. Entry and protected-stage `-EnforceStageGate` audits returned `within-budget`; the signed-in weekly meter was 6% with 0-point task-local weekly growth. No weekly-reserve override was accepted.
