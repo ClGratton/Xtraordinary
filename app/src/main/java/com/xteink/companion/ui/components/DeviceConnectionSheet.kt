@@ -749,6 +749,7 @@ private fun FirmwareSourceCard(
     selected: Boolean,
     onSelect: (() -> Unit)?,
     onFlashFirmware: () -> Unit,
+    onFlashFirmwareManagedBle: () -> Unit,
 ) {
     val sourcePhase = if (device.firmwareSource == source) device.firmwareCheckPhase else FirmwareCheckPhase.Idle
     Surface(
