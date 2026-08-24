@@ -1,5 +1,11 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-24 persistent managed-install lifecycle checkpoint
+
+Pushed `c96d547`, `c30cfd7`, and `8e4a9bf`. The managed firmware Install action now writes a durable pending transaction containing model/version/size/SHA/source and local artifact URL, keeps it across transient disconnects, requests persistent transport, awaits the interactive-lease ACK, and drains automatically on fresh Capabilities with `supportsFirmwareUpdate` without another tap. The existing guarded USB branch remains exclusive and policy-compliant. Focused tests cover disconnect after selection, disconnect after lease ACK, duplicate identity/replay, and one bounded physical-Confirm NACK retry.
+
+The canonical focused Android wrapper passed protocol tests, both Community/Play unit suites, lint, and assemblies. Retained-data Community dev49 installation succeeded: 86,486,189 bytes, SHA-256 `1F236E157974C37520FF7380241FD4457969B8BD217CC5FA939E73B99183C573`. A bounded post-install reconnect saw X3 advertising at RSSI -36, but Android API 37 GATT produced no callback; the presence probe then found no advertisement and classified the link unavailable. No pending install was created in this attempt, so no BEGIN_FIRMWARE, transfer, commit/apply, reboot, flash, reset, pairing, bond/app-data, NVS/SD/book mutation occurred. Pixel timeout restored and verified at `1800000` ms. Screenshots/UI verification remain explicitly skipped. Next proof is transport recovery, one artifact selection, automatic pending replay through BEGIN/Confirm, and fresh post-reboot Capabilities, StatusChanged, revisioned LibraryPage, and policy ACKs.
+
 ## 2026-08-24 managed Install availability correction and retry boundary
 
 Pushed `2c78ddd`/`34a3551`: the reusable `firmwareInstallAvailable` policy now enables the existing managed BLE firmware path when fresh Capabilities advertise firmware updates, even without USB; focused policy tests passed. The focused canonical Android wrapper passed protocol tests, both flavor unit tests/lint, and both APK assemblies. Retained-data Community install succeeded for dev49, 86,486,189 bytes, SHA-256 `9903D9F11E955CD54DF90AC5D797FF8AB3C976F26D2E7B257638427977FC3B26`.

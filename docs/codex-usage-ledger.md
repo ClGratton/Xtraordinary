@@ -1,5 +1,12 @@
 # Codex usage ledger
 
+## 2026-08-24 - Persistent managed-install lifecycle checkpoint
+
+- Source: pushed `c96d547`, `c30cfd7`, and `8e4a9bf`. The reusable pending firmware transaction persists artifact identity/hash/source, retains intent through disconnects, awaits the interactive-lease ACK, and automatically replays on fresh protocol-ready Capabilities; focused lifecycle tests passed in the canonical wrapper.
+- Build/install: protocol tests, both flavor unit tests, lint, and Community/Play assemblies passed. Retained-data Community dev49 APK installed successfully; 86,486,189 bytes; SHA-256 `1F236E157974C37520FF7380241FD4457969B8BD217CC5FA939E73B99183C573`.
+- Device boundary: a bounded reconnect saw X3 RSSI -36, then API 37 GATT produced no callback and the presence probe found no advertisement. No pending install was triggered; no BEGIN_FIRMWARE, transfer, reboot, flash, reset, bond/app-data/NVS/SD/book mutation occurred. Pixel timeout restored and verified at `1800000` ms.
+- Explicit limitation: screenshot/UI verification remains skipped by user instruction. Remaining proof is transport recovery, automatic managed BEGIN/Confirm replay, and fresh post-reboot protocol acceptance.
+
 ## 2026-08-24 - Managed BLE availability and retry checkpoint
 
 - Source: pushed `2c78ddd`/`34a3551` centralizes BLE-vs-USB firmware-install availability and adds focused tests. The canonical focused Android wrapper passed protocol tests, both flavor unit tests/lint, and both APK assemblies.
