@@ -1,5 +1,10 @@
 # Codex usage ledger
 
+## 2026-08-24 - Automatic Confirm-window retry boundary
+
+- Repository-resolved ADB relaunched the retained-data app; fresh dev37 Capabilities, StatusChanged, revisioned LibraryPage, policy ACKs, and lease ACK arrived. The pending dev38 transaction automatically emitted BEGIN at 19:39:24.794 and 19:39:30.242; X3 returned NACK at 19:39:25.023 and 19:39:30.485 before chunks, matching the physical Confirm guard. No transfer, reboot, flash, reset, pairing, or data mutation occurred.
+- The running APK predated `ed45ec0` and was stopped after the bounded retry evidence. Pixel timeout was restored and verified at `1800000` ms. Source-matching build/install remains required before another physical Confirm window.
+
 ## 2026-08-24 - Persistent managed-install live acceptance boundary
 
 - Live evidence: retained dev38 pending identity was verified in the app's repository-resolved preferences. Fresh dev37 Capabilities, StatusChanged, revisioned LibraryPage, policy ACKs, and interactive-lease ACK arrived; the persistent lifecycle automatically emitted `BeginFirmware` without another tap. X3 returned NACK before any FirmwareChunk, matching the firmware Confirm guard. No transfer, reboot, flash, reset, pairing, or data mutation occurred.

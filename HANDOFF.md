@@ -6,6 +6,8 @@ The installed persistent-intent APK retained the exact dev38 transaction in `xtr
 
 Pushed `ed45ec0` to bound `CompanionCommandRejectedException` retries to the tested two-attempt physical-Confirm window and clear the pending transaction with an explicit prompt only after that bound. This source correction was not included in the preceding passing APK, so it requires the next canonical build/install. The running candidate was stopped to halt retries; Pixel timeout restored and verified at `1800000` ms. The only remaining physical action is holding Confirm while the next installed candidate automatically emits BEGIN; no chat synchronization is required.
 
+The immediate automatic retry was launched while Confirm was held. Fresh dev37 Capabilities and lease ACK were followed by BEGIN at 19:39:24.794 and 19:39:30.242; X3 NACKed at 19:39:25.023 and 19:39:30.485 before any FirmwareChunk. This is the expected physical-Confirm guard boundary. The APK running for this attempt predates `ed45ec0`; it was stopped, no device mutation occurred, and timeout was restored to `1800000` ms.
+
 ## 2026-08-24 persistent managed-install lifecycle checkpoint
 
 Pushed `c96d547`, `c30cfd7`, and `8e4a9bf`. The managed firmware Install action now writes a durable pending transaction containing model/version/size/SHA/source and local artifact URL, keeps it across transient disconnects, requests persistent transport, awaits the interactive-lease ACK, and drains automatically on fresh Capabilities with `supportsFirmwareUpdate` without another tap. The existing guarded USB branch remains exclusive and policy-compliant. Focused tests cover disconnect after selection, disconnect after lease ACK, duplicate identity/replay, and one bounded physical-Confirm NACK retry.
