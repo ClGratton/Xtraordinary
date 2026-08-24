@@ -1,5 +1,11 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-24 canonical Android build compile blocker
+
+The one authorized `scripts/build-xtraordinary-app.ps1 -AllowDeferredUiReviewDebt` invocation reached Gradle after the bound usage, pushed-source, firmware/Android notice, artwork inventory, and 156-rule engineering-policy gates passed (46 explicitly deferred UI-receipt findings only). Both CommunityDebug and PlayDebug then failed before APK creation at `app/src/main/java/com/xteink/companion/ui/CompanionViewModel.kt:1210`: `finalSnapshot` is the `Unit` result of the earlier input-digest `use` block (lines 1166-1175), but the code dereferences it as a revisioned library snapshot. The later upload result is discarded at lines 1177-1203. The failing line is from `e743bc88`.
+
+No APK exists and no ADB/mDNS discovery, install, firmware comparison/build/flash, handshake, Pixel setting/data/bond change, or X3 NVS/SD/book/bond mutation started. Stop this deployment milestone. A narrowly owned source correction must retain the final revisioned BLE `LibraryPage` reconciliation contract (and USB's later BLE reconciliation) before it is committed/pushed and a new authorized canonical build is attempted.
+
 ## 2026-08-24 deployment-resume audit checkpoint
 
 The earlier `01a02a88-cd91-7361-a6e3-1941183387f4` task did fail closed on its own 145,461-token replay input; that is retained as historical evidence below, not a result of this deployment owner. This fresh deployment task (`01a033be-a4a5-71e3-a5d7-1d813a0828d0`) passed `scripts/audit-codex-task-usage.ps1 -EnforceStageGate`: signed-in weekly use 4%, task-local weekly growth 0 points, replay median 30,915, latest input 41,093, and recent growth 10%. No weekly-reserve override is required or accepted.

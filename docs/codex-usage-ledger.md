@@ -1,5 +1,11 @@
 # Codex usage ledger
 
+## 2026-08-24 - Canonical Android build compile blocker
+
+- Task: `01a033be-a4a5-71e3-a5d7-1d813a0828d0`. The pre-compiler re-audit remained `within-budget` at 5% of the 10,080-minute signed-in window, 1-point task-local growth, 46,582 replay median, and 51,530 latest input. No weekly override was used.
+- One and only one `scripts/build-xtraordinary-app.ps1 -AllowDeferredUiReviewDebt` invocation ran. Provenance, licence/notice, artwork, and engineering policy gates passed; the explicit deferral covered the documented 46 UI-review findings only.
+- Gradle failed before artifact creation for both CommunityDebug and PlayDebug because `CompanionViewModel.kt:1210` treats `finalSnapshot` as a revisioned library snapshot although its assignment at lines 1166-1175 is the `Unit` digest pass. No ADB/mDNS, install, firmware work, handshake, or phone/X3 mutation began. Do not retry this build in this milestone; require a source correction, commit/push, and a fresh authorized build task.
+
 ## 2026-08-24 - Fresh deployment task audit
 
 - Historical correction: the `compaction-required` result (3% weekly use, 1-point task growth, 145,461 latest input) belongs to task `01a02a88-cd91-7361-a6e3-1941183387f4`; it remains valid history and is not attributed to this fresh owner.
