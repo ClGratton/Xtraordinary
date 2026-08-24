@@ -1,5 +1,11 @@
 # Codex usage ledger
 
+## 2026-08-24 - Canonical build/deploy retry checkpoint
+
+- Task: `01a033c5-0656-7f81-9b5d-48c1c63862fe`. Entry and protected-stage `-EnforceStageGate` audits returned `within-budget`; the signed-in weekly meter was 6% with 0-point task-local weekly growth. No weekly-reserve override was accepted.
+- One permitted Android wrapper invocation from clean pushed `23acfd8` used only `-AllowDeferredUiReviewDebt`, passed provenance/notices/artwork/156-rule policy gates, and completed both debug artifact pipelines. One non-overlapping canonical firmware wrapper invocation then passed provenance, 25 firmware notice files, and the same policy gate, producing the source-bound dev37 artifact and release record.
+- Device result: repository ADB restart and fresh mDNS found only the current TLS endpoint `192.168.1.61:42795`; two current-endpoint connection attempts failed and `adb devices -l` remained empty. No install, timeout change, bond change, flash, NVS/SD/book mutation, or handshake occurred. Stop this checkpoint at the authenticated-device boundary; do not retry a compiler or use remembered ADB ports.
+
 ## 2026-08-24 - Canonical Android build compile blocker
 
 - Task: `01a033be-a4a5-71e3-a5d7-1d813a0828d0`. The pre-compiler re-audit remained `within-budget` at 5% of the 10,080-minute signed-in window, 1-point task-local growth, 46,582 replay median, and 51,530 latest input. No weekly override was used.
