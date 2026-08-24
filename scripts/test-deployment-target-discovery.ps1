@@ -25,4 +25,23 @@ if ($null -ne (Get-X3UsbTargetFromPnpRecords -PnpRecords @())) {
     throw 'Absent X3 PnP records must remain absent.'
 }
 
+$hostDump = @(
+    '  host_manager={',
+    '    devices={',
+    '      name=/dev/bus/usb/001/002',
+    '      vendor_id=12346',
+    '      product_id=4097',
+    '      manufacturer_name=Espressif',
+    '    }',
+    '  }',
+    '  connected=false'
+)
+$hostTarget = Get-X3AndroidHostTargetFromUsbDump -DumpLines $hostDump
+if ($null -eq $hostTarget -or $hostTarget.Path -ne '/dev/bus/usb/001/002') {
+    throw 'Pixel host_manager X3 inventory fixture did not resolve the Android USB target.'
+}
+if ($null -ne (Get-X3AndroidHostTargetFromUsbDump -DumpLines @('connected=false', 'configured=false'))) {
+    throw 'Pixel gadget disconnected state must not invent a host X3 target.'
+}
+
 Write-Host 'Deployment target discovery fixtures passed.'

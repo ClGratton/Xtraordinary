@@ -1,5 +1,9 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-24 Pixel-host USB inventory correction
+
+Fresh repository-ADB `dumpsys usb` shows `host_manager.devices` at `/dev/bus/usb/001/002`, vendor `12346`, product `4097`, manufacturer Espressif. The earlier `connected=false` observation was Pixel gadget state, not host inventory. Target discovery now parses this host-manager record with a focused fixture and does not let gadget state negate a present host X3. No build or device mutation occurred during the correction. Continue with the existing guarded production USB path using the already-built dev51 artifact, then require fresh Capabilities, StatusChanged, revisioned LibraryPage, and policy ACKs.
+
 ## 2026-08-24 dev51 integrated build/install/evidence checkpoint
 
 From pushed `98fd922`, the canonical Android wrapper passed protocol tests, both Community/Play unit suites, lint, and assemblies with only the explicit deferred UI-review debt waiver. Community dev51/versionCode 52 is installed with retained app data and bond: 85,799,358 bytes, SHA-256 `CC5C8DC66C98597ADD0AF71AF3922D851386FD3A8AE68C11834C5BA4DA42B692`; direct on-device base.apk SHA/version matched. Fresh real Pixel evidence (`build/evidence/pixel-dev51-focus.png`/XML and `pixel-dev51-passes.png`/XML) shows Focus's nonzero timer, Start focus, and responsive slider, and Passes' full AHO→VCE card plus Static/Live chooser and Start & send action above bottom navigation. The test duration was finally restored to the measured pre-test 25:00 state, verified by `pixel-dev51-focus-final-25.xml` and `.png`. This does not claim Terra/UI-review acceptance; screenshot-baseline/reviewer verification remains deferred by explicit user instruction.

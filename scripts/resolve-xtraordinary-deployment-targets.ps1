@@ -46,6 +46,37 @@ function Get-XtraordinaryX3UsbTarget {
     return Get-X3UsbTargetFromPnpRecords -PnpRecords $records
 }
 
+function Get-X3AndroidHostTargetFromUsbDump {
+    param([string[]]$DumpLines)
+
+    $inHostManager = $false
+    $name = $null
+    $vendor = $null
+    $product = $null
+    foreach ($line in $DumpLines) {
+        if ($line -match '^\s*host_manager=') { $inHostManager = $true; continue }
+        if (-not $inHostManager) { continue }
+        if ($line -match '^\s*name=(?<name>/dev/bus/usb/\S+)') {
+            $name = $Matches.name; $vendor = $null; $product = $null; continue
+        }
+        if ($null -ne $name -and $line -match '^\s*vendor_id=(?<vendor>\d+)') { $vendor = [int]$Matches.vendor; continue }
+        if ($null -ne $name -and $line -match '^\s*product_id=(?<product>\d+)') {
+            $product = [int]$Matches.product
+            if ($vendor -eq 12346 -and $product -eq 4097) {
+                return [pscustomobject]@{ Path = $name; VendorId = $vendor; ProductId = $product }
+            }
+        }
+        if ($line -match '^\s*}\s*$') { $name = $null; $vendor = $null; $product = $null }
+    }
+    return $null
+}
+
+function Get-XtraordinaryAndroidHostX3Target {
+    param([Parameter(Mandatory)][string]$Adb, [Parameter(Mandatory)][string]$Serial)
+    $dump = @(& $Adb -s $Serial shell dumpsys usb)
+    return Get-X3AndroidHostTargetFromUsbDump -DumpLines $dump
+}
+
 function Get-XtraordinaryAdbDevice {
     param([Parameter(Mandatory)][string]$Adb)
 
@@ -83,7 +114,18 @@ if ($RequireAdbDevice) {
 if ($RequireX3Usb) {
     $x3Target = Get-XtraordinaryX3UsbTarget
     if ($null -eq $x3Target) {
-        throw 'No present X3 USB/JTAG composite or serial interface with VID_303A:1001 was found. Do not report X3 absent from ports alone; verify the present PnP interfaces first.'
+        if (-not [string]::IsNullOrWhiteSpace($AdbPath)) {
+            $adbDevices = @(Get-XtraordinaryAdbDevice -Adb $AdbPath)
+            if ($adbDevices.Count -eq 1) {
+                $serial = ($adbDevices[0].ToString() -split '\s+')[0]
+                $hostTarget = Get-XtraordinaryAndroidHostX3Target -Adb $AdbPath -Serial $serial
+                if ($null -ne $hostTarget) {
+                    Write-Host "X3 Android host USB target: $($hostTarget.Path) (vendor=$($hostTarget.VendorId), product=$($hostTarget.ProductId))"
+                    return
+                }
+            }
+        }
+        throw 'No present X3 USB/JTAG composite or Android Pixel-host USB target was found. Gadget connected=false is not evidence against host_manager inventory.'
     }
     Write-Host "X3 USB/JTAG target: $($x3Target.Port) ($($x3Target.SerialInstanceId))"
 }

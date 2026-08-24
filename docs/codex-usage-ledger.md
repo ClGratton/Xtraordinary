@@ -1,5 +1,9 @@
 # Codex usage ledger
 
+## 2026-08-24 - Pixel-host USB inventory correction
+
+- Coordinator mistake: `device_manager.connected=false` was incorrectly treated as absence of an X3 attached to the Pixel host. Fresh repository-ADB `dumpsys usb` evidence shows `host_manager.devices` `/dev/bus/usb/001/002`, vendor `12346`, product `4097` (Espressif X3). The shared resolver now parses host-manager inventory and its fixture, while gadget state remains independent. No compiler or device mutation occurred during this correction; the existing dev51 artifact remains source-matched.
+
 ## 2026-08-24 - Dev51 integrated build/install/evidence checkpoint
 
 - Canonical Android wrapper from pushed `98fd922` passed protocol tests, both Community/Play unit suites, lint, and assemblies with only the explicit `AllowDeferredUiReviewDebt` receipt waiver. Retained-data Community dev51/versionCode 52 install succeeded; APK is 85,799,358 bytes, SHA-256 `CC5C8DC66C98597ADD0AF71AF3922D851386FD3A8AE68C11834C5BA4DA42B692`, and repository ADB verified matching on-device base.apk hash/version.
