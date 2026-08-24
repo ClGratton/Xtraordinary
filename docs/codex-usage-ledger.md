@@ -317,3 +317,14 @@
 - Android outputs present from the canonical wrapper were recorded and both post-build notice verifiers passed: Community 85,609,521 bytes, SHA-256 `09234D1766650323894660CF1135CB5765B8DE753B5125D4D3171722A81820FF`; Play 90,183,253 bytes, SHA-256 `53685BC241A1084CCEA3AF68D40AE0B71926F937080FA41FE8A6EDA77C4BC416`.
 - The ten cross-flavor screenshot drifts remain explicitly deferred per user instruction; no UI acceptance claim was made.
 - Sequential firmware wrapper `xtraordinary-v0.2.6-dev38-selected-slot-local`, Jobs 2, stopped before PlatformIO at the FirmwareRelease policy gate: `weekly-reserve-override-is-ledger-bound-and-narrow`. No firmware artifact, deployment discovery, install, flash, live-slot read, BLE chain, or phone/X3 mutation occurred. Preserve app data, timeout `1800000`, bond, NVS, SD, and books; resolve the protected-stage policy blocker before retrying.
+
+## 2026-08-24 - Worker supervision and recursive workflow correction
+
+- Cause: the coordinator repeatedly checked a healthy worker and then treated `running` as sufficient proof of progress. This spent coordinator calls without product evidence and later missed a real stall: the worktree remained clean at `e4aaa58` and no build, deploy, flash, or device process was active.
+- Durable correction: worker waits are capped at ten minutes and followed by exactly one compact check of real progress evidence. A liveness label alone is insufficient; a proven stall is interrupted and recovered, while genuine progress receives one new bounded wait without polling or nudges.
+- Recursive correction: every acknowledged workflow mistake must update durable guidance plus a machine-checkable rule or focused fixture when practical in the same checkpoint. A chat promise is not remediation, and failing to document the mistake is itself governed by the same rule.
+- Authority boundary: agents retain model routing, compaction, known toolchain/path recovery, evidence-based retry, build sequencing, and safe in-scope recovery. These execution decisions are not delegated to the user. No phone or X3 operation occurred while making this policy correction.
+## 2026-08-24 - Selected-slot firmware/install blocker
+
+- Policy correction `e4aaa58` enabled the canonical firmware build: `xtraordinary-v0.2.6-dev38-selected-slot-local`, 5,456,368 bytes, SHA-256 `E0E8FA4E3347BB4533CAF34E8CCF7CC25A4306E5988A7CBA64204190A0F389FE`, source-bound release record present.
+- Current mDNS Pixel endpoint `192.168.1.61:36221` resolved and guarded retained-data Community installation completed (`0.2.0-dev49`, APK SHA-256 `09234D1766650323894660CF1135CB5765B8DE753B5125D4D3171722A81820FF`). Fresh BLE bootstrap then crashed with `Invalid UTF-8 field length` in `PayloadCodec.decodeCapabilities` (`Payloads.kt:287`, `BluetoothCompanionClient.kt:895`). No X3 flash/live-slot read/BLE acceptance/reset or bond, app-data, timeout, NVS, SD, or book mutation occurred.

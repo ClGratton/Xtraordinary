@@ -1,5 +1,9 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-24 selected-slot firmware/install blocker
+
+After policy correction `e4aaa58`, canonical firmware `xtraordinary-v0.2.6-dev38-selected-slot-local` built successfully: 5,456,368 bytes, SHA-256 `E0E8FA4E3347BB4533CAF34E8CCF7CC25A4306E5988A7CBA64204190A0F389FE`, with source-bound release record. Current Pixel mDNS endpoint `192.168.1.61:36221` resolved and guarded retained-data Community installation completed (`0.2.0-dev49`, APK SHA-256 `09234D1766650323894660CF1135CB5765B8DE753B5125D4D3171722A81820FF`). Before X3 mutation, fresh BLE bootstrap crashed repeatedly at `PayloadCodec.decodeCapabilities` with `IllegalArgumentException: Invalid UTF-8 field length` (`Payloads.kt:287`, `BluetoothCompanionClient.kt:895`). No flash, live-slot read, BLE acceptance, reset, bond/data/NVS/SD/book, or timeout mutation occurred. Preserve all device state; fresh protocol proof remains outstanding.
+
 ## 2026-08-24 Codex overhead and model-routing correction
 
 The repository workflow no longer reacts to high replay or five-point task growth by repeatedly creating fresh visible tasks, rerunning entry gates, and rereading the same policy set. One visible coordinator now owns related milestones. A single internal history-free worker is optional only when its compact packet is cheaper than continuing; sequential worker chains and duplicate coordinator inspection are prohibited. Usage is observed once at task entry and enforced once before a compiler or device stage. Replay, growth, and task consumption remain reported optimization evidence, while only the signed-in 95% weekly protected-stage floor is fail-closed without the documented user override. Ordinary inspection, editing, focused tests, documentation, and correction of pre-build blockers remain locally actionable.
