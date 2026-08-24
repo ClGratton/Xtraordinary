@@ -8,6 +8,12 @@ Model routing is now Luna-medium-first for bounded discovery, logs, documentatio
 
 This governance-only milestone did not compile, install, flash, discover, connect, reset, pair, or change the Pixel or X3. Continue from the selected-slot Android screenshot checkpoint below; the next product outcome remains classification/correction of the deterministic cross-flavor screenshot evidence drift before any accepted install.
 
+## 2026-08-24 selected-slot Android/firmware protected-stage checkpoint
+
+The canonical Android outputs already present in this worktree were recorded and their post-build notice checks passed. Community debug APK: 85,609,521 bytes, SHA-256 `09234D1766650323894660CF1135CB5765B8DE753B5125D4D3171722A81820FF`; Play debug APK: 90,183,253 bytes, SHA-256 `53685BC241A1084CCEA3AF68D40AE0B71926F937080FA41FE8A6EDA77C4BC416`. The ten screenshot cases intentionally deferred by user direction remain unaccepted UI evidence; this checkpoint does not claim UI acceptance.
+
+The required sequential `scripts/build-x3-firmware.ps1 -Version xtraordinary-v0.2.6-dev38-selected-slot-local -Jobs 2` invocation passed usage, pushed-source, and notice checks but stopped before PlatformIO because `scripts/check-engineering-policies.ps1 -Mode FirmwareRelease` reported `weekly-reserve-override-is-ledger-bound-and-narrow`. No firmware binary/release record, target resolution, ADB install, selected-slot read/flash, BLE handshake, or Pixel/X3 mutation occurred. Phone app data, timeout `1800000`, bond, and X3 NVS/SD/books remain unchanged prior truth. A fresh protected-stage audit and policy resolution are required before any deployment mutation.
+
 ## 2026-08-24 selected-slot Android screenshot checkpoint
 
 This fresh task attached exact source checkpoint `beca301a018f02169364abbd6002441621292e75` (which contains the deterministic-BOM fix `e32529b9a18ffd2aec6d60d6ca820db62881f05e`) to clean pushed branch `codex/x3-selected-slot-acceptance`. The ignored `.tools` junction now points to the established `C:\Users\cla20\Documents\Xteink\.tools`; Gradle 9.5.0 and PlatformIO 6.1.19 were present. The bounded regression audit found no conflict with the selected-slot, application-only, retained-bond/data/NVS/SD, fresh-capabilities, revisioned-library, or matching-policy-ACK contracts. Legal status remains not release-cleared.
