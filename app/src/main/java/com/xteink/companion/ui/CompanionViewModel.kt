@@ -866,7 +866,8 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             delay(BackgroundDisconnectGraceMs)
             val state = _uiState.value
             val firmwareInProgress = state.device.firmwareCheckPhase == FirmwareCheckPhase.Downloading ||
-                state.device.firmwareCheckPhase == FirmwareCheckPhase.Transferring
+                state.device.firmwareCheckPhase == FirmwareCheckPhase.Transferring ||
+                state.device.firmwareCheckPhase == FirmwareCheckPhase.Verifying
             if (!firmwareInProgress && !requiresPersistentTransport()) {
                 intentionalTransportIdle = true
                 reconnectJob?.cancel()
@@ -1376,7 +1377,17 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 companionClient.flashFirmware(release, file)
             }
             if (result.isSuccess) {
-                _uiState.update { it.copy(device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Complete, message = "Device is restarting")) }
+                // The transfer/apply ACK is not device-version evidence. Keep the
+                // durable transaction pending until a fresh capabilities report
+                // confirms the exact target firmware after restart.
+                _uiState.update {
+                    it.copy(
+                        device = it.device.copy(
+                            firmwareCheckPhase = FirmwareCheckPhase.Verifying,
+                            message = "Restarting X3 · verifying firmware",
+                        ),
+                    )
+                }
                 delay(12_000)
                 ensureTransportConnected()
             } else {
@@ -1409,12 +1420,20 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun maybeCompletePendingFirmwareInstall(capabilities: DeviceCapabilities?) {
         val pending = pendingFirmwareInstall ?: return
-        if (_uiState.value.device.firmwareCheckPhase != FirmwareCheckPhase.Complete ||
-            capabilities?.firmwareVersion != pending.version
-        ) return
+        val nextPhase = firmwareVerificationPhaseAfterCapabilities(
+            phase = _uiState.value.device.firmwareCheckPhase,
+            pendingVersion = pending.version,
+            capabilitiesVersion = capabilities?.firmwareVersion,
+        )
+        if (nextPhase != FirmwareCheckPhase.Complete) return
         pendingFirmwareInstall = null
         persistPendingFirmwareInstall()
-        _uiState.update { it.copy(notice = null, device = it.device.copy(message = null)) }
+        _uiState.update {
+            it.copy(
+                notice = null,
+                device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Complete, message = null),
+            )
+        }
     }
 
     private fun decodePendingFirmwareInstall(): PendingFirmwareInstall? = runCatching {
@@ -1880,7 +1899,8 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     private fun requiresPersistentTransport(): Boolean {
         val state = _uiState.value
         val firmwareNeedsLink = state.device.firmwareCheckPhase == FirmwareCheckPhase.Downloading ||
-            state.device.firmwareCheckPhase == FirmwareCheckPhase.Transferring
+            state.device.firmwareCheckPhase == FirmwareCheckPhase.Transferring ||
+            state.device.firmwareCheckPhase == FirmwareCheckPhase.Verifying
         val bluetoothBookUpload = pendingBookUploadMethod == BookTransferMethod.Bluetooth &&
             (pendingBookUploadIds.isNotEmpty() || bookUploadJob?.isActive == true)
         return interactiveTransport.isActive || radioPolicySyncPending || pendingTicketPayload != null || ticketSendJob?.isActive == true || pendingFirmwareInstall != null || firmwareNeedsLink || pendingFocusSync || bluetoothBookUpload ||

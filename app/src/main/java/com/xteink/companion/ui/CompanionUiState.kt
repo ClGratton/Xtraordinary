@@ -223,7 +223,7 @@ data class ReadUiState(
     val folderLinked: Boolean = false,
 )
 
-enum class FirmwareCheckPhase { Idle, Checking, Available, UpToDate, Downloading, Transferring, Complete, Error }
+enum class FirmwareCheckPhase { Idle, Checking, Available, UpToDate, Downloading, Transferring, Verifying, Complete, Error }
 
 data class DeviceUiState(
     val linkPhase: String = "Disconnected",

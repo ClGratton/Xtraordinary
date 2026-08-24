@@ -146,6 +146,7 @@ fun X3CompanionApp(
         state.device.firmwareCheckPhase in setOf(
             FirmwareCheckPhase.Downloading,
             FirmwareCheckPhase.Transferring,
+            FirmwareCheckPhase.Verifying,
         )
 
     LaunchedEffect(noticeText) {

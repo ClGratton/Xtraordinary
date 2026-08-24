@@ -896,6 +896,19 @@ private fun FirmwareInstallAction(
                     maxLines = 2,
                 )
             }
+            FirmwareCheckPhase.Verifying -> FilledTonalButton(
+                onClick = {},
+                enabled = false,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 68.dp),
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.size(10.dp))
+                Text(
+                    device.message ?: stringResource(R.string.firmware_verifying),
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                )
+            }
             FirmwareCheckPhase.Complete -> Surface(
                 color = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
