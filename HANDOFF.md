@@ -1,5 +1,9 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-24 bounded target-discovery retry
+
+From `e41f838`, the timeout lifecycle started, then the canonical resolver failed closed because two Pixel identities were online (the pinned endpoint and its current mDNS alias). The prescribed normal-user repository ADB restart left `adb mdns services` empty and no authenticated Pixel. No X3 VID:303A:1001 target appeared, and no USB/stub upload, otadata read, flash, reset, or X3 state mutation ran. Timeout restore was attempted with the pinned serial but could not reach the phone; the saved state still records original `1800000` ms. Restore and verification are required when the current mDNS endpoint returns.
+
 ## 2026-08-24 dev50 USB selected-slot checkpoint
 
 The pushed source `382438b` bundles the upstream Espressif ESP32-C3 v2 stub asset (SHA-256 `47FD549A9746E6ACD3BE7C9F56BA71A02D9DAB9FF380501C4F71C79F762ABEF4`) with provenance preserved. Android uploads the stub through existing MEM_BEGIN/DATA/END, performs read-only READ_FLASH of otadata, and passes bytes through the tested CRC/sequence/state selector before writing only the selected application partition; no otadata write path is present. The focused Android wrapper passed protocol/unit/lint/assembly tasks with the explicit stale UI-review debt waiver; screenshots and UI acceptance remain skipped.

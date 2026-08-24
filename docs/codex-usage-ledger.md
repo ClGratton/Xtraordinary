@@ -1,5 +1,10 @@
 # Codex usage ledger
 
+## 2026-08-24 - Bounded target-discovery retry stopped at ADB identity blocker
+
+- Timeout lifecycle began from `e41f838`, but the canonical resolver rejected two simultaneous Pixel identities (pinned `192.168.1.61:36221` plus mDNS alias). A normal-user repository ADB restart was performed; `adb mdns services` is now empty and no authenticated Pixel remains. No X3 VID:303A:1001 target appeared, and no USB/stub/otadata/flash/reset or X3 data mutation occurred.
+- Timeout restore was attempted with the pinned serial and failed closed because the Pixel is no longer authenticated. The saved timeout state retains original `1800000` ms; restore and verification remain the next device-bound action when a current mDNS endpoint is available. Do not use the remembered port for reconnection.
+
 ## 2026-08-24 - Canonical MCU target evidence
 
 - Cause: the coordinator incorrectly questioned the bundled ESP32-C3 flasher stub as if X3 used ESP32-S3, based on an unverified family assumption after seeing the USB target boundary.
