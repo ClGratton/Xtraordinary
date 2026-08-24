@@ -344,3 +344,8 @@
 
 - Canonical target resolution retained Pixel `192.168.1.61:36221`. Repository-resolved `adb shell dumpsys usb` showed `host_connected=true`, `source_power=true`, `connected=false`, `configured=false`; no current host device or permission entry exists. Historical Espressif manufacturer/product records (`12346`/`4097`) are Aug 22 only, while the Aug 24 event log ends in USB removal.
 - Guarded USB discovery (`UsbEspFlasher.refresh/findDevice`, VID_303A:1001) therefore had no present device to wake/query. No USB command, reset, flash, slot read, or state mutation occurred. Fresh BLE acceptance remains blocked; preserve bond/app data/timeout/NVS/SD/books.
+
+## 2026-08-24 - Fresh BLE chain and OTA-proof blocker
+
+- Fresh BLE matched X3 `7C:E8:B1:71:13:3E` at RSSI -41, opened GATT, discovered 3 services, negotiated MTU 256, subscribed notifications, and received Capabilities, two StatusChanged, four LibraryPage messages, and ACK traffic without a crash.
+- Guarded diagnostics returned active `RUNTIME_TRACE_ACTIVE boot=13 reset=8 ...` but no `RUNTIME_TRACE_OTA`; `dev33` is retained crash-report content only. Selected-slot dev38 deployment remained blocked before mutation; no reset, slot write, flash, bond/app-data/timeout/NVS/SD/book mutation occurred.
