@@ -69,7 +69,6 @@ import com.xteink.companion.data.UsbFlashPhase
 import com.xteink.companion.ui.DeviceUiState
 import com.xteink.companion.ui.DevicePresence
 import com.xteink.companion.ui.FirmwareCheckPhase
-import com.xteink.companion.ui.firmwareInstallAvailable
 import com.xteink.companion.ui.firmwareInstallRoutes
 import com.xteink.companion.ui.FirmwareInstallRoute
 import com.xteink.companion.ui.devicePresence
@@ -232,6 +231,7 @@ fun DeviceConnectionSheetContent(
             DeviceSetupStep.FirmwareDefault -> DefaultFirmwarePage(
                 model = selectedModel,
                 device = device,
+                managedDeviceKnown = hasManagedDevice,
                 onCheckFirmware = { onCheckFirmware(selectedModel.label, FirmwareSource.Xtraordinary) },
                 onFlashFirmware = onFlashFirmware,
                 onFlashFirmwareManagedBle = onFlashFirmwareManagedBle,
@@ -244,6 +244,7 @@ fun DeviceConnectionSheetContent(
             DeviceSetupStep.FirmwareSources -> FirmwareSourcePicker(
                 model = selectedModel,
                 device = device,
+                managedDeviceKnown = hasManagedDevice,
                 selectedSource = firmwareSource,
                 onSelectSource = { source ->
                     firmwareSourceName = source.name
@@ -631,6 +632,7 @@ private fun DiscoveryHandoff(
 private fun DefaultFirmwarePage(
     model: XteinkModel,
     device: DeviceUiState,
+    managedDeviceKnown: Boolean,
     onCheckFirmware: () -> Unit,
     onFlashFirmware: () -> Unit,
     onFlashFirmwareManagedBle: () -> Unit,
@@ -650,6 +652,7 @@ private fun DefaultFirmwarePage(
         FirmwareSourceCard(
             source = FirmwareSource.Xtraordinary,
             device = device,
+            managedDeviceKnown = managedDeviceKnown,
             selected = true,
             onSelect = null,
             onFlashFirmware = onFlashFirmware,
@@ -666,6 +669,7 @@ private fun DefaultFirmwarePage(
 private fun FirmwareSourcePicker(
     model: XteinkModel,
     device: DeviceUiState,
+    managedDeviceKnown: Boolean,
     selectedSource: FirmwareSource,
     onSelectSource: (FirmwareSource) -> Unit,
     onFlashFirmware: () -> Unit,
@@ -691,6 +695,7 @@ private fun FirmwareSourcePicker(
             FirmwareSourceCard(
                 source = source,
                 device = device,
+                managedDeviceKnown = managedDeviceKnown,
                 selected = source == selectedSource,
                 onSelect = if (source == selectedSource) {
                     null
@@ -698,6 +703,7 @@ private fun FirmwareSourcePicker(
                     { onSelectSource(source) }
                 },
                 onFlashFirmware = onFlashFirmware,
+                onFlashFirmwareManagedBle = onFlashFirmwareManagedBle,
             )
             if (index != alternatives.lastIndex) Spacer(Modifier.height(12.dp))
         }
@@ -746,6 +752,7 @@ private fun FirmwareSourcePicker(
 private fun FirmwareSourceCard(
     source: FirmwareSource,
     device: DeviceUiState,
+    managedDeviceKnown: Boolean,
     selected: Boolean,
     onSelect: (() -> Unit)?,
     onFlashFirmware: () -> Unit,
@@ -815,6 +822,7 @@ private fun FirmwareSourceCard(
                     FirmwareInstallAction(
                         phase = sourcePhase,
                         device = device,
+                        managedDeviceKnown = managedDeviceKnown,
                         onFlashFirmware = onFlashFirmware,
                         onFlashFirmwareManagedBle = onFlashFirmwareManagedBle,
                     )
@@ -828,21 +836,28 @@ private fun FirmwareSourceCard(
 private fun FirmwareInstallAction(
     phase: FirmwareCheckPhase,
     device: DeviceUiState,
+    managedDeviceKnown: Boolean,
     onFlashFirmware: () -> Unit,
     onFlashFirmwareManagedBle: () -> Unit,
 ) {
-    val canFlash = firmwareInstallAvailable(
-        phase = phase,
-        usbConnected = device.usbConnected,
-        managedBleFirmwareReady = device.managedBleFirmwareReady,
-    )
     val routes = firmwareInstallRoutes(
         phase = phase,
         source = device.firmwareSource,
         usbConnected = device.usbConnected,
         managedBleFirmwareReady = device.managedBleFirmwareReady,
         selectedVersion = device.latestFirmwareVersion,
+        managedDeviceKnown = managedDeviceKnown,
     )
+    var selectedRouteName by rememberSaveable { mutableStateOf(FirmwareInstallRoute.ManagedBle.name) }
+    LaunchedEffect(routes) {
+        if (selectedRouteName !in routes.map { it.name }) {
+            selectedRouteName = when {
+                FirmwareInstallRoute.ManagedBle in routes -> FirmwareInstallRoute.ManagedBle.name
+                FirmwareInstallRoute.GuardedUsb in routes -> FirmwareInstallRoute.GuardedUsb.name
+                else -> FirmwareInstallRoute.ManagedBle.name
+            }
+        }
+    }
     AnimatedContent(
         targetState = phase,
         transitionSpec = {
@@ -853,39 +868,14 @@ private fun FirmwareInstallAction(
     ) { currentPhase ->
         when (currentPhase) {
             FirmwareCheckPhase.Available, FirmwareCheckPhase.UpToDate -> Column {
-                if (FirmwareInstallRoute.ManagedBle in routes) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Button(
-                            onClick = onFlashFirmwareManagedBle,
-                            enabled = canFlash,
-                            modifier = Modifier.weight(1f).heightIn(min = 58.dp),
-                        ) { Text(stringResource(R.string.install_firmware_ota), textAlign = TextAlign.Center) }
-                        OutlinedButton(
-                            onClick = onFlashFirmware,
-                            enabled = FirmwareInstallRoute.GuardedUsb in routes,
-                            modifier = Modifier.weight(1f).heightIn(min = 58.dp),
-                        ) { Text(stringResource(if (FirmwareInstallRoute.GuardedUsb in routes) R.string.install_firmware_usb else R.string.connect_usb_for_firmware), textAlign = TextAlign.Center) }
-                    }
-                } else {
-                    Button(
-                        onClick = onFlashFirmware,
-                        enabled = canFlash,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp),
-                    ) {
-                        Text(
-                            stringResource(if (canFlash) R.string.install_firmware else R.string.wake_x3_to_flash),
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                }
-                if (!canFlash && routes.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.wake_x3_to_flash_help),
-                        style = MaterialTheme.typography.bodySmall,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                    )
-                }
+                FirmwareTransportChoice(
+                    routes = routes,
+                    selectedRouteName = selectedRouteName,
+                    onSelectRoute = { selectedRouteName = it },
+                    usbConnected = device.usbConnected,
+                    onFlashFirmware = onFlashFirmware,
+                    onFlashFirmwareManagedBle = onFlashFirmwareManagedBle,
+                )
             }
             FirmwareCheckPhase.Downloading, FirmwareCheckPhase.Transferring -> FilledTonalButton(
                 onClick = {},
@@ -935,6 +925,68 @@ private fun FirmwareInstallAction(
                 CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.size(10.dp))
                 Text(stringResource(R.string.finding_latest_firmware))
+            }
+        }
+    }
+}
+
+@Composable
+private fun FirmwareTransportChoice(
+    routes: Set<FirmwareInstallRoute>,
+    selectedRouteName: String,
+    onSelectRoute: (String) -> Unit,
+    usbConnected: Boolean,
+    onFlashFirmware: () -> Unit,
+    onFlashFirmwareManagedBle: () -> Unit,
+) {
+    val choices = buildList {
+        if (FirmwareInstallRoute.ManagedBle in routes) {
+            add(
+                ExpandingChoice(
+                    key = FirmwareInstallRoute.ManagedBle.name,
+                    title = stringResource(R.string.install_firmware_ota),
+                    body = stringResource(R.string.install_firmware_ota_body),
+                ),
+            )
+        }
+        if (FirmwareInstallRoute.GuardedUsb in routes) {
+            add(
+                ExpandingChoice(
+                    key = FirmwareInstallRoute.GuardedUsb.name,
+                    title = stringResource(R.string.install_firmware_usb),
+                    body = stringResource(R.string.install_firmware_usb_body),
+                ),
+            )
+        }
+    }
+    if (choices.isEmpty()) return
+    ExpandingChoiceRow(
+        choices = choices,
+        selectedKey = selectedRouteName,
+        onSelect = onSelectRoute,
+        optionHeight = 190.dp,
+        selectedContainer = MaterialTheme.colorScheme.primaryContainer,
+        selectedContent = MaterialTheme.colorScheme.onPrimaryContainer,
+    ) { key ->
+        when (key) {
+            FirmwareInstallRoute.ManagedBle.name -> Button(
+                onClick = onFlashFirmwareManagedBle,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp),
+            ) {
+                Text(stringResource(R.string.install_firmware_ota), textAlign = TextAlign.Center)
+            }
+            FirmwareInstallRoute.GuardedUsb.name -> OutlinedButton(
+                onClick = onFlashFirmware,
+                enabled = usbConnected,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp),
+            ) {
+                Text(
+                    stringResource(
+                        if (usbConnected) R.string.install_firmware_usb
+                        else R.string.connect_usb_for_firmware,
+                    ),
+                    textAlign = TextAlign.Center,
+                )
             }
         }
     }

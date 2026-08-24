@@ -26,6 +26,19 @@ class FirmwareInstallAvailabilityPolicyTest {
         assertTrue(FirmwareInstallRoute.GuardedUsb in routes)
     }
 
+    @Test fun pairedCompanionKeepsBleRouteVisibleWhileTransportIsIdle() {
+        val routes = firmwareInstallRoutes(
+            FirmwareCheckPhase.Available,
+            FirmwareSource.Xtraordinary,
+            usbConnected = false,
+            managedBleFirmwareReady = false,
+            selectedVersion = "xtraordinary-v0.2.6-dev51",
+            managedDeviceKnown = true,
+        )
+        assertTrue(FirmwareInstallRoute.ManagedBle in routes)
+        assertTrue(FirmwareInstallRoute.GuardedUsb in routes)
+    }
+
     @Test fun stockUpdateNeverExposesManagedBleRoute() = assertFalse(
         FirmwareInstallRoute.ManagedBle in firmwareInstallRoutes(
             FirmwareCheckPhase.Available,
@@ -33,6 +46,30 @@ class FirmwareInstallAvailabilityPolicyTest {
             usbConnected = true,
             managedBleFirmwareReady = true,
             selectedVersion = "XT-V5.1.6",
+        ),
+    )
+
+    @Test fun nonCompanionLocalSelectionRemainsUsbOnly() {
+        val routes = firmwareInstallRoutes(
+            FirmwareCheckPhase.Available,
+            FirmwareSource.LocalFile,
+            usbConnected = false,
+            managedBleFirmwareReady = true,
+            selectedVersion = "XT-V5.1.6",
+            managedDeviceKnown = true,
+        )
+        assertFalse(FirmwareInstallRoute.ManagedBle in routes)
+        assertTrue(FirmwareInstallRoute.GuardedUsb in routes)
+    }
+
+    @Test fun crossPointUpdateNeverExposesManagedBleRoute() = assertFalse(
+        FirmwareInstallRoute.ManagedBle in firmwareInstallRoutes(
+            FirmwareCheckPhase.Available,
+            FirmwareSource.CrossPoint,
+            usbConnected = false,
+            managedBleFirmwareReady = true,
+            selectedVersion = "v1.2.3",
+            managedDeviceKnown = true,
         ),
     )
 }

@@ -933,11 +933,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                     val currentVersion = _uiState.value.device.firmwareVersion
                     _uiState.update {
                         it.copy(device = it.device.copy(
-                            firmwareCheckPhase = if (currentVersion == release.version) {
-                                FirmwareCheckPhase.UpToDate
-                            } else {
-                                FirmwareCheckPhase.Available
-                            },
+                            firmwareCheckPhase = firmwareCheckPhaseFor(currentVersion, release.version),
                             firmwareSource = release.source,
                             latestFirmwareVersion = release.version,
                         ))
@@ -965,7 +961,10 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         val useManagedBle = companionFamily &&
             _uiState.value.isX3TransportConnected && link.phase == LinkPhase.Connected &&
             link.capabilities?.supportsFirmwareUpdate == true
-        if (!useUsb && !useManagedBle) {
+        val managedDeviceKnown = companionFamily &&
+            _uiState.value.isX3Connected && managedDeviceModel() != null
+        val waitingForManagedBle = forceManagedBle && managedDeviceKnown && !useManagedBle
+        if (!useUsb && !useManagedBle && !waitingForManagedBle) {
             _uiState.update {
                 it.copy(notice = UiNotice.DeviceMessage(
                     if (companionFamily)
@@ -975,6 +974,25 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 ))
             }
             return
+        }
+        if (waitingForManagedBle) {
+            when {
+                !companionClient.hasPermissions() -> {
+                    reportDeviceError(IllegalStateException("Allow Nearby devices permission before managed BLE firmware installation"))
+                    return
+                }
+                _uiState.value.device.requiresBluetoothReset -> {
+                    reportDeviceError(IllegalStateException("Reset the Bluetooth connection before managed BLE firmware installation"))
+                    return
+                }
+                link.blocker != null -> {
+                    reportDeviceError(IllegalStateException(link.message ?: "Managed BLE is unavailable: ${link.blocker}"))
+                    return
+                }
+            }
+            // Keep the existing bounded lease alive while the idle paired
+            // device reconnects and publishes fresh capabilities.
+            acquireInteractiveTransport(FirmwareTransferOwner)
         }
         if (useUsb) {
             // A USB selection owns this transaction; do not let a stale managed

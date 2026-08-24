@@ -40,8 +40,6 @@
     <string name="x3_connected_usb">X3 connected by USB</string>
     <string name="check_github_firmware">Check GitHub for update</string>
     <string name="flash_latest_firmware">Flash latest firmware</string>
-    <string name="wake_x3_to_flash">Turn on or wake X3</string>
-    <string name="wake_x3_to_flash_help">Keep USB connected. If X3 is already awake, reconnect the cable.</string>
     <string name="reconnect_x3_usb">Disconnect and reconnect X3 USB to continue</string>
     <string name="preparing_firmware">Installing firmware…</string>
     <string name="firmware_restart_message">Firmware verified and installed. The X3 is restarting.</string>
@@ -52,7 +50,9 @@
     <string name="firmware_update_available">Update available</string>
     <string name="install_firmware">Install</string>
     <string name="install_firmware_ota">Install over BLE</string>
+    <string name="install_firmware_ota_body">Use the paired X3 after a fresh update link is ready.</string>
     <string name="install_firmware_usb">Install by USB</string>
+    <string name="install_firmware_usb_body">Use a cable for initial setup, recovery, or a separate USB reinstall.</string>
     <string name="connect_usb_for_firmware">Connect USB</string>
     <string name="install_firmware_title">Install firmware</string>
     <string name="install_firmware_body">Choose the firmware to install on your %1$s from this phone.</string>
