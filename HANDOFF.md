@@ -8,6 +8,12 @@ The focused canonical Android wrapper (protocol tests, both flavor unit tests/li
 
 Diagnostic correction: one attempted bare `adb` command failed PATH lookup; subsequent device work used the repository-resolved Android SDK executable through `use-toolchains.ps1` and the canonical target resolver. Never infer device state from bare PATH tooling.
 
+## 2026-08-24 observed Capabilities wire correction and transport blocker
+
+After a bounded standby-discovery wait, the app connected and received a 66-byte Capabilities envelope. The bounded rejection log recorded prefix `020058333300787472616f7264696e61`: length 2, model `X3`, then version length `0x0033` (51 bytes), followed by the version bytes. This exactly explains the prior `Invalid UTF-8 field length`: Android enforced 48 bytes while the current firmware emits 51. Pushed `7b0d855` raises only this length-prefixed Capabilities bound to 64 bytes and adds a 51-byte round-trip test; no speculative legacy parser was introduced.
+
+The resulting focused canonical Android build passed and retained-data Community reinstall completed (`EEC00C70851B9AEE8A2A40F623ED6D4CFEED354BC9DF093119B4C830B09567B5`). Subsequent bounded relaunch and device-card reconnect attempts logged only `connect requested model=X3 phase=Disconnected`; no GATT connection or notification arrived across the configured standby interval. The parser fix is source/test-proven but not yet fresh-runtime accepted. Do not flash or infer from retained Paired/100%; require fresh Capabilities, StatusChanged, revisioned LibraryPage, policy ACKs, and RUNTIME_TRACE_OTA running==next boot.
+
 ## 2026-08-24 selected-slot firmware/install blocker
 
 After policy correction `e4aaa58`, canonical firmware `xtraordinary-v0.2.6-dev38-selected-slot-local` built successfully: 5,456,368 bytes, SHA-256 `E0E8FA4E3347BB4533CAF34E8CCF7CC25A4306E5988A7CBA64204190A0F389FE`, with source-bound release record. Current Pixel mDNS endpoint `192.168.1.61:36221` resolved and guarded retained-data Community installation completed (`0.2.0-dev49`, APK SHA-256 `09234D1766650323894660CF1135CB5765B8DE753B5125D4D3171722A81820FF`). Before X3 mutation, fresh BLE bootstrap crashed repeatedly at `PayloadCodec.decodeCapabilities` with `IllegalArgumentException: Invalid UTF-8 field length` (`Payloads.kt:287`, `BluetoothCompanionClient.kt:895`). No flash, live-slot read, BLE acceptance, reset, bond/data/NVS/SD/book, or timeout mutation occurred. Preserve all device state; fresh protocol proof remains outstanding.
