@@ -1053,7 +1053,7 @@
       "id": "appearance-color-mode-uses-scene-carousel",
       "type": "required_pattern",
       "path": "app/src/main/java/com/xteink/companion/ui/components/ControlDeckFocusContent.kt",
-      "pattern": "X3ImageField[\\s\\S]*?MagneticHorizontalPager\\([\\s\\S]*?onDisplayedPosition[\\s\\S]*?sceneArtworkFor\\(mode\\)[\\s\\S]*?LaunchedEffect\\(pagerState\\.settledPage\\)[\\s\\S]*?companionColorModeForSettledPage[\\s\\S]*?onSetColorMode",
+      "pattern": "X3ImageField[\\s\\S]*?LaunchedEffect\\(pagerState\\.settledPage\\)[\\s\\S]*?companionColorModeForSettledPage[\\s\\S]*?onSetColorMode[\\s\\S]*?MagneticHorizontalPager\\([\\s\\S]*?onDisplayedPosition[\\s\\S]*?sceneArtworkFor\\(mode\\)",
       "message": "The Focus artwork field must be the shared magnetic sea/astronaut Light/Dark carousel, emit its displayed position, and persist only a settled page."
     },
     {
