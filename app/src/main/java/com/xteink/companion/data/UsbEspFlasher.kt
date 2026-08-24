@@ -468,6 +468,11 @@ class UsbEspFlasher(context: Context) : Closeable {
         fun readSerialText(durationMs: Long): String {
             val deadline = System.currentTimeMillis() + durationMs
             val bytes = ByteArrayOutputStream()
+            // readSlipPacket may receive the ROM ACK and the stub's startup
+            // banner in one bulk transfer. It deliberately leaves bytes after
+            // the first SLIP frame in receivedBytes; consume those bytes before
+            // issuing another USB read or the OHAI banner is lost.
+            consumePendingUsbText(receivedBytes, bytes)
             val buffer = ByteArray(input.maxPacketSize.coerceAtLeast(64))
             while (System.currentTimeMillis() < deadline) {
                 val count = connection.bulkTransfer(input, buffer, buffer.size, 250)
@@ -721,6 +726,11 @@ class UsbEspFlasher(context: Context) : Closeable {
             UsbFlashPhase.Restarting,
         )
     }
+}
+
+/** Drains bytes already received with a preceding SLIP frame into serial text. */
+internal fun consumePendingUsbText(queue: ArrayDeque<Int>, output: ByteArrayOutputStream) {
+    while (queue.isNotEmpty()) output.write(queue.removeFirst())
 }
 
 private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
