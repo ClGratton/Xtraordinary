@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.xteink.companion.BuildConfig
 import com.xteink.companion.data.BluetoothCompanionClient
+import com.xteink.companion.data.CompanionCommandRejectedException
 import com.xteink.companion.data.BarcodeRasterizer
 import com.xteink.companion.data.BookLibraryRepository
 import com.xteink.companion.data.BookTransferForegroundService
@@ -1304,6 +1305,24 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                 // A disconnect or missed physical Confirm is retryable. Keep the
                 // identity/hash durable and let the next protocol-ready session
                 // replay the transaction without another UI tap.
+                if (result.exceptionOrNull() is CompanionCommandRejectedException) {
+                    val retry = FirmwareInstallPendingPolicy.afterNack(pending)
+                    pendingFirmwareInstall = retry
+                    persistPendingFirmwareInstall()
+                    if (retry == null) {
+                        _uiState.update {
+                            it.copy(
+                                device = it.device.copy(
+                                    firmwareCheckPhase = FirmwareCheckPhase.Error,
+                                    message = "X3 did not receive the physical Confirm gesture",
+                                ),
+                                notice = UiNotice.DeviceMessage("Hold Confirm on X3 while firmware installation starts"),
+                            )
+                        }
+                        firmwareInstallJob = null
+                        return@launch
+                    }
+                }
                 _uiState.update { it.copy(device = it.device.copy(firmwareCheckPhase = FirmwareCheckPhase.Downloading, message = "Waiting for X3 to resume firmware installation")) }
                 handleDeferredTransportFailure(result.exceptionOrNull())
             }
