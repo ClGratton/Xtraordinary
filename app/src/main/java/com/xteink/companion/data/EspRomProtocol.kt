@@ -21,7 +21,7 @@ internal object EspRomProtocol {
     const val MemBegin = 0x05
     const val MemEnd = 0x06
     const val MemData = 0x07
-    const val ReadFlash = 0x0E
+    const val ReadFlashSlow = 0x0E
 
     private const val DirectionRequest = 0x00
     private const val DirectionResponse = 0x01
@@ -66,8 +66,8 @@ internal object EspRomProtocol {
 
     fun memEndPayload(entry: Int): ByteArray = littleEndianInts(0, entry)
 
-    fun readFlashPayload(offset: Int, length: Int): ByteArray =
-        littleEndianInts(offset, length, 0x1000, 64)
+    fun readFlashSlowPayload(offset: Int, length: Int): ByteArray =
+        littleEndianInts(offset, length)
 
     fun spiSetParametersPayload(): ByteArray = littleEndianInts(
         0,

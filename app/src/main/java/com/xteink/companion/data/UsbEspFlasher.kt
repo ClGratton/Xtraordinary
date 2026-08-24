@@ -11,6 +11,7 @@ import android.hardware.usb.UsbDeviceConnection
 import android.hardware.usb.UsbEndpoint
 import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
+import android.util.Log
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -22,8 +23,6 @@ import kotlinx.coroutines.withTimeout
 import java.io.ByteArrayOutputStream
 import java.io.Closeable
 import java.io.File
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.security.MessageDigest
 import java.util.ArrayDeque
 
@@ -131,11 +130,13 @@ class UsbEspFlasher(context: Context) : Closeable {
                 connection.prepareSerial()
                 connection.resetToBootloader()
                 connection.syncAndPrepare()
-                val stub = Esp32C3StubAsset.load(appContext)
-                connection.uploadReadStub(stub)
-                val otaData = connection.readFlashReadOnly(0xE000, 0x2000)
+                connection.disableUsbWatchdogs()
+                connection.attachAndConfigureFlash()
+                Log.i(LogTag, "ROM synchronized; reading otadata without writing flash")
+                val otaData = connection.readFlashSlowReadOnly(0xE000, 0x2000)
                 val otaSelection = X3OtaSlotPolicy.parseOtadata(otaData)
                 val selectedOffset = otaSelection.requireSelectedFlashOffset()
+                Log.i(LogTag, "Selected application slot offset=0x${selectedOffset.toString(16)}")
                 // Restart into the ROM loader for the application-only write;
                 // otadata has been read but is never written by this flow.
                 connection.resetToBootloader()
@@ -164,6 +165,7 @@ class UsbEspFlasher(context: Context) : Closeable {
                     message = "Verifying firmware on the X3…",
                 )
                 connection.verifyMd5(image, selectedOffset)
+                Log.i(LogTag, "Application write passed ROM MD5 verification")
                 _state.value = _state.value.copy(
                     phase = UsbFlashPhase.Restarting,
                     message = "Firmware verified · restarting X3…",
@@ -173,6 +175,7 @@ class UsbEspFlasher(context: Context) : Closeable {
         }.onSuccess {
             _state.value = completedState("Firmware installed · X3 is restarting")
         }.onFailure { error ->
+            Log.e(LogTag, "Guarded USB firmware installation failed", error)
             _state.value = UsbFlashState(
                 phase = UsbFlashPhase.Error,
                 deviceDetected = findDevice() != null,
@@ -354,50 +357,19 @@ class UsbEspFlasher(context: Context) : Closeable {
             )
         }
 
-        fun uploadReadStub(stub: Esp32StubImage) {
-            val blockSize = 0x400
-            val blocks = (stub.text.size + blockSize - 1) / blockSize
-            command(
-                EspRomProtocol.MemBegin,
-                EspRomProtocol.memBeginPayload(stub.text.size, blocks, blockSize, stub.textStart),
-                timeoutMs = 5_000,
-            )
-            repeat(blocks) { sequence ->
-                val start = sequence * blockSize
-                val end = minOf(start + blockSize, stub.text.size)
-                val block = stub.text.copyOfRange(start, end)
-                command(
-                    EspRomProtocol.MemData,
-                    EspRomProtocol.memDataPayload(block, sequence),
-                    EspRomProtocol.checksum(block),
-                    timeoutMs = 5_000,
-                )
-            }
-            command(EspRomProtocol.MemEnd, EspRomProtocol.memEndPayload(stub.entry), timeoutMs = 5_000)
-            require(readSerialText(1_000).contains("OHAI")) { "ESP flasher stub did not start" }
-            syncAndPrepare()
-        }
-
-        fun readFlashReadOnly(offset: Int, length: Int): ByteArray {
-            require(length > 0 && length % 0x1000 == 0) { "Stub flash reads must be sector aligned" }
-            val response = command(
-                EspRomProtocol.ReadFlash,
-                EspRomProtocol.readFlashPayload(offset, length),
-                timeoutMs = 5_000,
-            )
-            require(response.data.size >= 2) { "Missing read-flash acknowledgement" }
+        fun readFlashSlowReadOnly(offset: Int, length: Int): ByteArray {
+            require(offset >= 0 && length > 0) { "ROM flash read requires a valid range" }
             val bytes = ByteArrayOutputStream(length)
             while (bytes.size() < length) {
-                val frame = readSlipPacket(3_000)
-                require(frame.isNotEmpty() && frame.size <= 0x1000) { "Invalid stub flash-read frame" }
-                bytes.write(frame)
-                val count = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(bytes.size()).array()
-                writeAll(count)
+                val blockLength = minOf(RomReadBlockSize, length - bytes.size())
+                val response = command(
+                    EspRomProtocol.ReadFlashSlow,
+                    EspRomProtocol.readFlashSlowPayload(offset + bytes.size(), blockLength),
+                    responseDataBytes = RomReadBlockSize,
+                    timeoutMs = 3_000,
+                )
+                bytes.write(response.data, 0, blockLength)
             }
-            val digestFrame = readSlipPacket(3_000)
-            require(digestFrame.size == 16) { "Missing stub flash-read MD5" }
-            val actual = MessageDigest.getInstance("MD5").digest(bytes.toByteArray())
-            require(actual.contentEquals(digestFrame)) { "Stub flash-read MD5 mismatch" }
             return bytes.toByteArray()
         }
 
@@ -468,11 +440,6 @@ class UsbEspFlasher(context: Context) : Closeable {
         fun readSerialText(durationMs: Long): String {
             val deadline = System.currentTimeMillis() + durationMs
             val bytes = ByteArrayOutputStream()
-            // readSlipPacket may receive the ROM ACK and the stub's startup
-            // banner in one bulk transfer. It deliberately leaves bytes after
-            // the first SLIP frame in receivedBytes; consume those bytes before
-            // issuing another USB read or the OHAI banner is lost.
-            consumePendingUsbText(receivedBytes, bytes)
             val buffer = ByteArray(input.maxPacketSize.coerceAtLeast(64))
             while (System.currentTimeMillis() < deadline) {
                 val count = connection.bulkTransfer(input, buffer, buffer.size, 250)
@@ -669,6 +636,7 @@ class UsbEspFlasher(context: Context) : Closeable {
             private const val SwdWriteProtectKey = 0x8F1D312A.toInt()
             private const val SwdAutoFeedEnable = 1 shl 31
             private const val EraseTimeoutMs = 360_000
+            private const val RomReadBlockSize = 64
             private const val MaxCrashReportBytes = 64 * 1024
             private const val MaxRuntimeTraceBytes = 4 * 1024
             private const val CrashReportStart = "CRASH_REPORT_START"
@@ -717,6 +685,7 @@ class UsbEspFlasher(context: Context) : Closeable {
         private const val NvsOffset = 0x9000
         private const val NvsSize = 0x5000
         private const val ReconnectUsbMessage = "Disconnect and reconnect X3 USB to continue"
+        private const val LogTag = "XteinkUsbFlash"
         private val ActivePhases = setOf(
             UsbFlashPhase.EnteringBootloader,
             UsbFlashPhase.ResettingSetup,
@@ -726,11 +695,6 @@ class UsbEspFlasher(context: Context) : Closeable {
             UsbFlashPhase.Restarting,
         )
     }
-}
-
-/** Drains bytes already received with a preceding SLIP frame into serial text. */
-internal fun consumePendingUsbText(queue: ArrayDeque<Int>, output: ByteArrayOutputStream) {
-    while (queue.isNotEmpty()) output.write(queue.removeFirst())
 }
 
 private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }

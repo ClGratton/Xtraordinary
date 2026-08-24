@@ -76,20 +76,11 @@ class EspRomProtocolTest {
     }
 
     @Test
-    fun stubReadFramingUsesReadOnlyCommandAndSectorGeometry() {
-        val begin = ByteBuffer.wrap(EspRomProtocol.memBeginPayload(1536, 2, 1024, 0x40380000))
-            .order(ByteOrder.LITTLE_ENDIAN)
-        assertEquals(1536, begin.int)
-        assertEquals(2, begin.int)
-        assertEquals(1024, begin.int)
-        assertEquals(0x40380000, begin.int)
-
-        val read = ByteBuffer.wrap(EspRomProtocol.readFlashPayload(0xE000, 0x2000))
+    fun romSlowReadUsesReadOnlyCommandAndExactRange() {
+        val read = ByteBuffer.wrap(EspRomProtocol.readFlashSlowPayload(0xE000, 64))
             .order(ByteOrder.LITTLE_ENDIAN)
         assertEquals(0xE000, read.int)
-        assertEquals(0x2000, read.int)
-        assertEquals(0x1000, read.int)
         assertEquals(64, read.int)
-        assertEquals(0x0E, EspRomProtocol.ReadFlash)
+        assertEquals(0x0E, EspRomProtocol.ReadFlashSlow)
     }
 }

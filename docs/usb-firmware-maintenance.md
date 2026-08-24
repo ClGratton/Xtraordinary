@@ -30,9 +30,9 @@ Pinned XTEINK X3 stock release:
 The phone recognizes the ESP32-C3 USB/JTAG serial interface as USB VID/PID `303A:1001`. A firmware operation follows one shared lifecycle:
 
 1. Detect the USB/JTAG interface and request Android USB permission when required.
-2. Before changing reset lines, request the live `RUNTIME_TRACE_OTA` record and require identical running and next-boot OTA partitions. Firmware without this evidence fails closed and must be bootstrapped through the guarded Windows path.
-3. Enter the ROM bootloader and synchronize. The guarded Windows path reads `otadata` before any application write and resolves the same selected slot from a CRC-valid, bootable sequence entry.
-4. Disable the USB watchdogs and configure flash access.
+2. Enter the ROM bootloader, synchronize, disable the USB watchdogs, and configure flash access.
+3. Before any write, read the complete `otadata` region with the ESP32-C3 ROM's read-only `READ_FLASH_SLOW` command in 64-byte blocks. Resolve the selected application slot only from a CRC-valid, bootable sequence entry.
+4. Reset and synchronize the ROM loader again for the bounded application write.
 5. Erase and write only the proven selected application region.
 6. Verify the written region with the ROM MD5 command.
 7. Hard-reset the X3.
@@ -41,8 +41,14 @@ The phone recognizes the ESP32-C3 USB/JTAG serial interface as USB VID/PID `303A
 Releasing Bluetooth/GATT before step 2 is preparation only. The app must say that
 USB maintenance is being prepared; it must not say flashed, installed, verified,
 ready to reboot, or restarting until the corresponding write, ROM MD5 verification,
-and hard-reset phase has actually succeeded. A failure during stub upload or slot
-selection therefore remains a pre-write failure in both protocol state and user copy.
+and hard-reset phase has actually succeeded. A failure during ROM `otadata` read or
+slot selection therefore remains a pre-write failure in both protocol state and user copy.
+
+Do not upload an esptool flasher stub merely to read `otadata`. Espressif's
+`stub_flasher/2` ESP32-C3 payload is not the full flasher stub and does not provide
+the `OHAI` startup contract or stub read framing. The ROM slow-read command is the
+smaller, read-only maintenance primitive required here; its request contains only
+the flash offset and a block length of at most 64 bytes.
 
 Do not replace step 8 with a generic disconnected state. OEM firmware may stop exposing USB/JTAG after boot even while the cable remains physically attached. The instruction tells the user which physical action is required and prevents a successful flash from looking like an unexplained failure.
 
