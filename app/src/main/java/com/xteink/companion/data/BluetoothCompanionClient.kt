@@ -881,7 +881,11 @@ class BluetoothCompanionClient(private val context: Context) {
     }
 
     private fun handleEnvelope(bytes: ByteArray) {
-        runCatching { EnvelopeCodec.decode(bytes) }.onSuccess { envelope ->
+        val envelope = runCatching { EnvelopeCodec.decode(bytes) }.getOrElse {
+            failLink("Invalid companion response: ${it.message}")
+            return
+        }
+        runCatching {
             Log.i(LogTag, "received type=${envelope.messageType} id=${envelope.messageId} bytes=${bytes.size}")
             when (envelope.messageType) {
                 MessageType.Ack -> pendingAcks.remove(PayloadCodec.decodeAck(envelope.payload))?.complete(Unit)
@@ -920,8 +924,19 @@ class BluetoothCompanionClient(private val context: Context) {
                 )
                 else -> Unit
             }
-        }.onFailure { failLink("Invalid companion response: ${it.message}") }
+        }.onFailure {
+            Log.w(
+                LogTag,
+                "rejected payload type=${envelope.messageType} id=${envelope.messageId} " +
+                    "bytes=${envelope.payload.size} prefix=${envelope.payload.toHexPrefix()}",
+                it,
+            )
+            failLink("Invalid companion response: ${it.message}")
+        }
     }
+
+    private fun ByteArray.toHexPrefix(limit: Int = 16): String =
+        take(limit).joinToString(separator = "") { "%02x".format(it.toInt() and 0xff) }
 
     @SuppressLint("MissingPermission")
     private fun stopScan() {
