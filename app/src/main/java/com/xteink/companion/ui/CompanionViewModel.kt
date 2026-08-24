@@ -1163,7 +1163,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                     val resolver = getApplication<Application>().contentResolver
                     val digest = MessageDigest.getInstance("SHA-256")
                     var size = 0L
-                    val finalSnapshot = resolver.openInputStream(uri)?.use { input ->
+                    resolver.openInputStream(uri)?.use { input ->
                         val buffer = ByteArray(16 * 1024)
                         while (true) {
                             val count = input.read(buffer)
@@ -1174,7 +1174,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                         }
                     } ?: error("${book.title} is no longer available on this phone")
                     check(size > 0) { "${book.title} is empty" }
-                    resolver.openInputStream(uri)?.use { input ->
+                    val finalSnapshot = resolver.openInputStream(uri)?.use { input ->
                         val progress: (Float) -> Unit = { bookProgress ->
                             val overall = (index + bookProgress) / books.size.toFloat()
                             _uiState.update { state ->
