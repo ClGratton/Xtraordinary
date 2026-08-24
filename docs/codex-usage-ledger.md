@@ -379,3 +379,7 @@
 
 - Repository ADB proved Bluetooth enabled, companion process alive, and `BLUETOOTH_SCAN`/`CONNECT` granted. Force-stop/relaunch retained data and started one fresh connect request; no scan callback/failure, GATT, notification, or USB event arrived through the bounded standby interval.
 - `BluetoothCompanionClient.connect()` already performs idempotent disconnect/stopScan before each low-latency scan. No stale scan job/backoff/cancellation defect is evidenced; no speculative source fix, Bluetooth cycle, pairing reset, or OTA mutation was performed.
+
+## 2026-08-24 - Durable diagnostic-order correction
+
+- Coordinator correction: simultaneous BLE and USB absence must first be classified as X3 powered-off/sleep or physical transport absence; only after wake and reusable fast-lease evidence may Android scan/reconnect lifecycle be blamed. Added this required pattern to AGENTS, USB maintenance workflow, and `docs/engineering-policy.json`.

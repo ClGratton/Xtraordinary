@@ -23,6 +23,13 @@
       "message": "USB commands must restore full-speed processing and keep the shared inactivity and companion-advertising deadlines synchronized."
     },
     {
+      "id": "power-presence-before-ble-lifecycle-diagnosis",
+      "type": "required_pattern",
+      "path": "docs/usb-firmware-maintenance.md",
+      "pattern": "Before diagnosing Android BLE lifecycle[\\s\\S]*?BLE advertisement/GATT presence[\\s\\S]*?USB `connected/configured`[\\s\\S]*?powered-off/sleep",
+      "message": "Agents must establish X3 power and transport presence before attributing simultaneous BLE and USB absence to Android scan lifecycle."
+    },
+    {
       "id": "sleep-final-sync-is-power-interruptible",
       "type": "required_pattern",
       "path": "firmware/src/companion/CompanionService.cpp",

@@ -2,6 +2,8 @@
 
 This is the authoritative maintenance contract for firmware selection, application-only flashing, and targeted setup reset from the Android app. `HANDOFF.md` records the current execution state; this document defines the reusable behavior.
 
+Before diagnosing Android BLE lifecycle behavior, first check whether the X3 is powered and observable: inspect current BLE advertisement/GATT presence and Pixel USB `connected/configured` state after the configured standby interval. Simultaneous absence indicates powered-off/sleep or physical transport absence; wake/power the X3 and reacquire the existing interactive/fast communication lease before attributing the result to scan lifecycle.
+
 ## Firmware sources
 
 The firmware picker must keep these sources distinct:
