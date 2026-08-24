@@ -1,5 +1,9 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-24 managed BLE routing build checkpoint
+
+Pushed `e6c5562` fixes usage-audit binding: an unbound worker now reports `not-applicable`/`routingDecision=unbound-worker` without attributing another task. The canonical focused Android build passed protocol tests, both flavor unit tests/lint, and both APK assemblies after a syntax-correct invocation. Retained-data Community install succeeded: 85,932,100 bytes, SHA-256 `843305CE1D9BF290A88772FE5DB49B2454A42B2C8DFE9CA8CDF9562426BB1180`. Fresh BLE dev37 Capabilities and lease ACKs were observed, but the autonomous managed Install attempt emitted no BEGIN/chunks and returned to the Install surface; no OTA/reboot/device mutation occurred. Timeout restored to `1800000` ms; screenshots remain skipped.
+
 ## 2026-08-24 managed BLE routing correction
 
 Source tracing showed the prepared Install callback entered `CompanionViewModel.flashLatestFirmware()`, which rejected LocalFile unless USB was connected and otherwise routed Xtraordinary through USB whenever present. The existing `BluetoothCompanionClient.flashFirmware()` already sends managed BLE `BEGIN_FIRMWARE`, chunks, commit, and apply. Pushed `20d639b` adds a reusable transport selector and tests: fresh BLE Capabilities with `supportsFirmwareUpdate` takes managed BLE; guarded USB remains separate. The focused canonical wrapper stopped before Gradle because its task-bound usage audit resolved a rollout belonging to another thread. No APK install, OTA, or device mutation occurred.

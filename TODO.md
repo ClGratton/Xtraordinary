@@ -1,5 +1,7 @@
 # Xtraordinary authoritative TODO
 
+- [~] 2026-08-24 managed-BLE routing build checkpoint: audit binding fix `e6c5562` reports unbound worker identity without cross-task attribution; focused Community/Play unit/lint/assemble build passed from pushed source and retained-data Community reinstall succeeded (85,932,100 bytes, SHA-256 `843305CE1D9BF290A88772FE5DB49B2454A42B2C8DFE9CA8CDF9562426BB1180`). The managed BLE selector is present, but the autonomous Install attempt emitted no BEGIN/chunks and the app returned to Install; no OTA/device mutation. Timeout restored to `1800000` ms.
+
 - [~] 2026-08-24 managed BLE routing correction: `flashLatestFirmware()` previously rejected LocalFile over BLE and selected guarded USB whenever USB was present, despite the existing `BluetoothCompanionClient.flashFirmware()` BEGIN/chunk/commit/apply path. Pushed `20d639b` adds a reusable selector preferring BLE when fresh Capabilities advertise firmware updates, with focused tests; canonical focused Android build was attempted once but stopped before Gradle because the task-bound usage audit resolved another thread's rollout. No install or device mutation.
 
 **Updated:** 2026-08-24
