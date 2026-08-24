@@ -3,6 +3,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $generator = Join-Path $PSScriptRoot 'generate-android-release-notices.ps1'
 $sourcePack = Join-Path $repoRoot 'release-notices\android'
+$generatedRoot = Join-Path $repoRoot 'app\build\legal\runtime-dependencies'
 $fixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("xtraordinary-android-notices-{0}" -f [Guid]::NewGuid())
 $fixturePack = Join-Path $fixtureRoot 'android'
 
@@ -23,6 +24,17 @@ try {
     [System.IO.File]::WriteAllBytes($fixtureNotice, $crlfBytes.ToArray())
     & $generator -Check -NoticeRoot $fixturePack
 
+    foreach ($name in @('communityReleaseRuntimeLicenses.tsv', 'playReleaseRuntimeLicenses.tsv')) {
+        $generated = Join-Path $generatedRoot $name
+        $bytes = [System.IO.File]::ReadAllBytes($generated)
+        if ($bytes.Length -lt 3 -or
+            $bytes[0] -ne 0xef -or
+            $bytes[1] -ne 0xbb -or
+            $bytes[2] -ne 0xbf) {
+            throw "Generated Android license inventory is not deterministic UTF-8 with BOM: $name"
+        }
+    }
+
     [System.IO.File]::AppendAllText($fixtureNotice, "`nchanged fixture content`n", [System.Text.UTF8Encoding]::new($false))
     $contentMismatchRejected = $false
     try {
@@ -37,7 +49,7 @@ try {
         throw 'Changed Android notice fixture unexpectedly passed verification.'
     }
 
-    Write-Host 'Android notice verifier regression checks passed (CRLF equivalence and content mismatch rejection).'
+    Write-Host 'Android notice verifier regression checks passed (deterministic UTF-8 BOM, CRLF equivalence, and content mismatch rejection).'
 } finally {
     if (Test-Path -LiteralPath $fixtureRoot) {
         Remove-Item -LiteralPath $fixtureRoot -Recurse -Force
