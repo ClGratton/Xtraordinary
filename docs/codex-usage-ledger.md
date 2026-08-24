@@ -5,6 +5,11 @@
 - Source correction: USB is restored as the primary LocalFile/stock/CrossPoint takeover and recovery route; managed BLE is restricted to fresh Xtraordinary-to-Xtraordinary Capabilities with explicit update support. The firmware BEGIN physical-Confirm guard was removed; SHA-256, ACK, commit, and apply checks remain.
 - Safety evidence: Android now has pure otadata CRC/sequence/state parsing fixtures, but its current ROM protocol has no flash-read/stub primitive. USB therefore remains fail-closed before writing when `RUNTIME_TRACE_OTA` is absent; it never assumes `0x10000` or rewrites otadata. Candidate version is dev50/versionCode 51. No device mutation.
 
+## 2026-08-24 - Dev50 readiness and protected firmware gate boundary
+
+- Readiness receipt: pushed source `bfb088d` produced Community dev50/versionCode 51 APK, 85,625,905 bytes, SHA-256 `A5E21CD2A865A319791CC3C57531160152B1D4B5804A7F1ABA3F3E2317323D35`; retained-data installer succeeded and `dumpsys` plus on-device `base.apk` SHA matched. Pixel timeout verified at `1800000` ms.
+- Android wrapper completed compile/unit/lint/assembly but failed only on the known deferred screenshot validations (32/32 per flavor); no screenshot baseline or reviewer work was performed. Sequential firmware wrapper stopped before compiler because the Release policy gate reported 9 UI-review violations. No firmware artifact, USB read/write, flash, reboot, or X3 mutation occurred. Deployment remains blocked until the protected gate and Android otadata read primitive are resolved.
+
 ## 2026-08-24 - Automatic Confirm-window retry boundary
 
 - Repository-resolved ADB relaunched the retained-data app; fresh dev37 Capabilities, StatusChanged, revisioned LibraryPage, policy ACKs, and lease ACK arrived. The pending dev38 transaction automatically emitted BEGIN at 19:39:24.794 and 19:39:30.242; X3 returned NACK at 19:39:25.023 and 19:39:30.485 before chunks, matching the physical Confirm guard. No transfer, reboot, flash, reset, pairing, or data mutation occurred.
