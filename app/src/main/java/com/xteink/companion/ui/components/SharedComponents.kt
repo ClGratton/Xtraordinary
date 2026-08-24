@@ -86,6 +86,7 @@ fun CompanionTopBar(
     requiresBluetoothReset: Boolean,
     transportBlocker: com.xteink.companion.data.LinkBlocker?,
     connectedDeviceModel: String?,
+    firmwareUpdateAvailable: Boolean = false,
     batteryPercentage: Int?,
     charging: Boolean,
     onShowDevices: () -> Unit,
@@ -161,6 +162,13 @@ fun CompanionTopBar(
                             MaterialTheme.colorScheme.onSurfaceVariant
                         },
                     )
+                    if (firmwareUpdateAvailable) {
+                        Text(
+                            text = stringResource(R.string.firmware_update_available),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
                 batteryPercentage?.let {
                     X3BatteryIndicator(percentage = it, charging = charging)

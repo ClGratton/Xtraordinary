@@ -29,6 +29,10 @@ data class FirmwareRelease(
     val sha256: String,
 )
 
+/** Local artifacts are OTA-eligible only when their embedded identity is our companion family. */
+internal fun isXtraordinaryCompanionFirmware(release: FirmwareRelease): Boolean =
+    release.version.startsWith("xtraordinary-", ignoreCase = true)
+
 class FirmwareReleaseRepository(private val context: Context) {
     suspend fun latestFor(
         model: String,

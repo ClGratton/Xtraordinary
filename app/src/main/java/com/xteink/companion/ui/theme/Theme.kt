@@ -22,8 +22,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
+import kotlin.math.pow
 import com.xteink.companion.ui.CompanionVisualTheme
 import com.xteink.companion.ui.CompanionColorMode
+import com.xteink.companion.ui.CompanionColorModeBoundary
 
 private val ExpressiveColors = lightColorScheme(
     primary = ExpressivePrimary,
@@ -178,7 +180,12 @@ fun X3CompanionTheme(
     val dynamicColorAvailable = useDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val lightScheme = if (dynamicColorAvailable) dynamicLightColorScheme(context) else ExpressiveColors
     val darkScheme = if (dynamicColorAvailable) dynamicDarkColorScheme(context) else QuietColors
-    val colorScheme = interpolateColorScheme(lightScheme, darkScheme, colorModeProgress)
+    val colorScheme = interpolateColorScheme(
+        lightScheme,
+        darkScheme,
+        colorModeProgress,
+        CompanionColorModeBoundary.modeForDisplayedPosition(colorMode, colorModeProgress),
+    )
 
     CompositionLocalProvider(LocalCompanionVisualTheme provides visualTheme) {
         MaterialTheme(
@@ -191,10 +198,19 @@ fun X3CompanionTheme(
 }
 
 /** Keeps the app palette in lockstep with the focused artwork pager. */
-internal fun interpolateColorScheme(light: ColorScheme, dark: ColorScheme, progress: Float): ColorScheme {
+internal fun interpolateColorScheme(
+    light: ColorScheme,
+    dark: ColorScheme,
+    progress: Float,
+    contentMode: CompanionColorMode = if (progress < 0.5f) CompanionColorMode.Light else CompanionColorMode.Dark,
+): ColorScheme {
     val p = progress.coerceIn(0f, 1f)
     fun role(from: Color, to: Color) = lerp(from, to, p)
-    fun on(background: Color) = if (background.luminance() > 0.18f) Color.Black else Color.White
+    fun on(background: Color): Color {
+        val preferred = if (contentMode == CompanionColorMode.Light) Color.Black else Color.White
+        val fallback = if (preferred == Color.Black) Color.White else Color.Black
+        return if (contrastRatio(background, preferred) >= 4.5f) preferred else fallback
+    }
     val primary = role(light.primary, dark.primary)
     val primaryContainer = role(light.primaryContainer, dark.primaryContainer)
     val secondary = role(light.secondary, dark.secondary)
@@ -226,4 +242,12 @@ internal fun interpolateColorScheme(light: ColorScheme, dark: ColorScheme, progr
         surfaceContainerHigh = role(light.surfaceContainerHigh, dark.surfaceContainerHigh),
         surfaceContainerHighest = role(light.surfaceContainerHighest, dark.surfaceContainerHighest),
     )
+}
+
+private fun contrastRatio(first: Color, second: Color): Float {
+    fun channel(value: Float) = if (value <= 0.03928f) value / 12.92f else ((value + 0.055f) / 1.055f).toDouble().pow(2.4).toFloat()
+    fun luminance(color: Color) = 0.2126f * channel(color.red) + 0.7152f * channel(color.green) + 0.0722f * channel(color.blue)
+    val a = luminance(first)
+    val b = luminance(second)
+    return (maxOf(a, b) + 0.05f) / (minOf(a, b) + 0.05f)
 }

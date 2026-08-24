@@ -216,6 +216,7 @@ fun X3CompanionApp(
                 requiresBluetoothReset = state.device.requiresBluetoothReset,
                 transportBlocker = state.device.transportBlocker,
                 connectedDeviceModel = state.connectedDeviceModel,
+                firmwareUpdateAvailable = state.device.firmwareCheckPhase == FirmwareCheckPhase.Available,
                 batteryPercentage = state.device.batteryPercentage,
                 charging = state.device.charging,
                 onShowDevices = { devicesVisible = true },

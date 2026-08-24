@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import com.xteink.companion.ui.CompanionColorMode
+import com.xteink.companion.ui.CompanionColorModeBoundary
 import com.xteink.companion.ui.companionColorModeForSettledPage
 import com.xteink.companion.ui.components.DefaultMagneticSwipe
 import org.junit.Assert.assertTrue
@@ -38,6 +39,14 @@ class ThemeColorContractTest {
         assertTrue(companionColorModeForSettledPage(1) == CompanionColorMode.Dark)
         assertTrue(companionColorModeForSettledPage(-1) == CompanionColorMode.Light)
         assertTrue(companionColorModeForSettledPage(9) == CompanionColorMode.Dark)
+    }
+
+    @Test
+    fun contentPolarityUsesTheSameHystereticBoundaryInBothDirections() {
+        assertTrue(CompanionColorModeBoundary.modeForDisplayedPosition(CompanionColorMode.Light, 0.61f) == CompanionColorMode.Light)
+        assertTrue(CompanionColorModeBoundary.modeForDisplayedPosition(CompanionColorMode.Light, 0.62f) == CompanionColorMode.Dark)
+        assertTrue(CompanionColorModeBoundary.modeForDisplayedPosition(CompanionColorMode.Dark, 0.39f) == CompanionColorMode.Dark)
+        assertTrue(CompanionColorModeBoundary.modeForDisplayedPosition(CompanionColorMode.Dark, 0.38f) == CompanionColorMode.Light)
     }
 
     @Test

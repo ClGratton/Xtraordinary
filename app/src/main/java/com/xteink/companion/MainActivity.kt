@@ -43,6 +43,7 @@ import com.google.android.gms.common.api.CommonStatusCodes
 import com.google.android.gms.common.api.Scope
 import com.xteink.companion.ui.CompanionViewModel
 import com.xteink.companion.ui.CompanionColorMode
+import com.xteink.companion.ui.CompanionColorModeBoundary
 import com.xteink.companion.ui.X3CompanionApp
 import com.xteink.companion.ui.components.SetupScreen
 import com.xteink.companion.ui.theme.X3CompanionTheme
@@ -235,7 +236,10 @@ class MainActivity : ComponentActivity() {
                 themeDisplayedPosition = state.colorMode.ordinal.toFloat()
             }
             SideEffect {
-                val lightSystemBars = themeDisplayedPosition < 0.5f
+                val lightSystemBars = CompanionColorModeBoundary.modeForDisplayedPosition(
+                    state.colorMode,
+                    themeDisplayedPosition,
+                ) == CompanionColorMode.Light
                 WindowCompat.getInsetsController(window, window.decorView).apply {
                     isAppearanceLightStatusBars = lightSystemBars
                     isAppearanceLightNavigationBars = lightSystemBars

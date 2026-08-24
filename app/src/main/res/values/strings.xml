@@ -49,6 +49,7 @@
     <string name="firmware_installed_short">Installed · restarting X3</string>
     <string name="firmware_up_to_date_short">Latest firmware installed</string>
     <string name="firmware_not_available">Firmware not available for this model yet</string>
+    <string name="firmware_update_available">Update available</string>
     <string name="install_firmware">Install</string>
     <string name="install_firmware_title">Install firmware</string>
     <string name="install_firmware_body">Choose the firmware to install on your %1$s from this phone.</string>

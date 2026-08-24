@@ -17,6 +17,7 @@ import com.xteink.companion.data.BookUploadPersistence
 import com.xteink.companion.data.FirmwareRelease
 import com.xteink.companion.data.FirmwareReleaseRepository
 import com.xteink.companion.data.FirmwareSource
+import com.xteink.companion.data.isXtraordinaryCompanionFirmware
 import com.xteink.companion.data.FlightBarcodeFormat
 import com.xteink.companion.data.FlightIdentity
 import com.xteink.companion.data.FlightStatusRefreshPolicy
@@ -951,13 +952,15 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         // silent replacement for LocalFile/stock/CrossPoint upload.
         val useUsb = _uiState.value.device.usbConnected
         val link = companionClient.state.value
-        val useManagedBle = !useUsb && release.source == FirmwareSource.Xtraordinary &&
+        val companionFamily = release.source == FirmwareSource.Xtraordinary ||
+            (release.source == FirmwareSource.LocalFile && isXtraordinaryCompanionFirmware(release))
+        val useManagedBle = !useUsb && companionFamily &&
             _uiState.value.isX3TransportConnected && link.phase == LinkPhase.Connected &&
             link.capabilities?.supportsFirmwareUpdate == true
         if (!useUsb && !useManagedBle) {
             _uiState.update {
                 it.copy(notice = UiNotice.DeviceMessage(
-                    if (release.source == FirmwareSource.Xtraordinary)
+                    if (companionFamily)
                         "Connect X3 by USB or establish a fresh managed-update link"
                     else
                         "Connect the X3 to this phone by USB before flashing",
@@ -1306,7 +1309,8 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     /** Drains durable work whenever the shared USB-availability lifecycle permits it. */
     private fun drainPendingFirmwareInstall() {
         val pending = pendingFirmwareInstall ?: return
-        if (pending.source != FirmwareSource.Xtraordinary) return
+        if (pending.source != FirmwareSource.Xtraordinary &&
+            !(pending.source == FirmwareSource.LocalFile && pending.version.startsWith("xtraordinary-", ignoreCase = true))) return
         val link = companionClient.state.value
         if (firmwareInstallJob?.isActive == true ||
             !FirmwareInstallPendingPolicy.shouldReplay(
