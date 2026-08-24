@@ -204,7 +204,7 @@ private fun DurationControlDeck(
     onSetDuration: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val editable = focus.phase == FocusPhase.Setup
+    val editable = focus.phase == FocusPhase.Setup || focus.phase == FocusPhase.Review
     val haptics = LocalHapticFeedback.current
     var lastHapticMinute by remember { mutableIntStateOf(focus.selectedMinutes) }
     Surface(
@@ -230,10 +230,8 @@ private fun DurationControlDeck(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = when (focus.phase) {
-                                FocusPhase.Setup -> stringResource(R.string.duration_format, focus.selectedMinutes)
-                                else -> formatSeconds(focus.remainingSeconds)
-                            },
+                            text = if (editable) stringResource(R.string.duration_format, focus.selectedMinutes)
+                            else formatSeconds(focus.remainingSeconds),
                             fontSize = timerFontSize,
                             lineHeight = timerFontSize,
                             fontWeight = FontWeight.Black,
@@ -346,7 +344,7 @@ private fun FocusDeckActions(
                 when (phase) {
                     FocusPhase.Setup -> onStartFocus
                     FocusPhase.Running, FocusPhase.Paused -> onTogglePause
-                    FocusPhase.Review -> onResetFocus
+                    FocusPhase.Review -> onStartFocus
                 }.invoke()
             },
             modifier = Modifier
@@ -367,12 +365,7 @@ private fun FocusDeckActions(
                 FocusPhase.Paused -> PlayTriangleIcon(modifier = Modifier.padding(end = 7.dp))
             }
             Text(
-                text = when (phase) {
-                    FocusPhase.Setup -> stringResource(R.string.start_focus)
-                    FocusPhase.Running -> stringResource(R.string.pause_focus)
-                    FocusPhase.Paused -> stringResource(R.string.resume_focus)
-                    FocusPhase.Review -> stringResource(R.string.start_another)
-                },
+                text = stringResource(focusPrimaryActionLabel(phase)),
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 1,
             )
@@ -403,6 +396,12 @@ private fun FocusDeckActions(
             }
         }
     }
+}
+
+internal fun focusPrimaryActionLabel(phase: FocusPhase): Int = when (phase) {
+    FocusPhase.Setup, FocusPhase.Review -> R.string.start_focus
+    FocusPhase.Running -> R.string.pause_focus
+    FocusPhase.Paused -> R.string.resume_focus
 }
 
 @Composable

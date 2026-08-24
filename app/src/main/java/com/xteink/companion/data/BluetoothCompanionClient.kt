@@ -577,7 +577,9 @@ class BluetoothCompanionClient(private val context: Context) {
             ),
         )
     suspend fun acquireInteractiveLease(seconds: Int = InteractiveTransportContract.LeaseSeconds) {
-        requestTransferConnectionPriority(high = true)
+        // Interactive commands need bounded responsive exchange, not the
+        // high-throughput priority reserved for book and firmware transfers.
+        requestBalancedConnectionPriority()
         sendAwaitingAck(
             MessageType.AcquireInteractiveLease,
             PayloadCodec.encodeInteractiveLease(seconds),
@@ -723,6 +725,13 @@ class BluetoothCompanionClient(private val context: Context) {
         }
         Log.i(LogTag, "request connection priority=${if (high) "high" else "balanced"}")
         currentGatt.requestConnectionPriority(priority)
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun requestBalancedConnectionPriority() {
+        val currentGatt = gatt ?: return
+        Log.i(LogTag, "request connection priority=balanced")
+        currentGatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_BALANCED)
     }
 
     private fun send(type: MessageType, payload: ByteArray, awaitAck: Boolean): CompletableDeferred<Unit>? {

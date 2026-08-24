@@ -93,7 +93,7 @@ Configurable app choices:
 ## Reusable interactive transport lease
 
 - Any workflow that knows it will exchange data in both directions acquires an opaque owner from the shared `InteractiveTransportCoordinator`; the coordinator contains no Passes, ticket, Focus, Settings, firmware, or navigation rules.
-- The first owner keeps/reconnects GATT, requests the fast connection policy, and starts one shared watchdog renewal. Additional owners reuse it. The last owner stops renewal, requests balanced/slow parameters, and permits an idle disconnect.
+- The first owner keeps/reconnects GATT, requests the bounded interactive lease at balanced/intermediate connection priority, and starts one shared watchdog renewal. Additional owners reuse it. High-throughput priority is reserved for bulk book/firmware transfer. The last owner stops renewal, keeps balanced parameters, and permits an idle disconnect.
 - The X3 watchdog is 120 seconds and Android renews it every 90 seconds only while at least one owner exists. This is not four-second polling: it is one control message before expiry, while actual data remains event driven.
 - A new capabilities sequence means a new protocol session, so Android replays the lease once after reconnect. Firmware clears the previous session's lease on disconnect.
 - A bounded transaction acquires a scoped owner and reasserts the lease immediately before its first command. Ticket transfer uses this generic boundary, so a Passes screen left open longer than the watchdog cannot begin on the configured 1/2/4-second interval.
@@ -179,7 +179,8 @@ Reader cleanup now has a dedicated `displayReaderCleanup()` path. It uses the X3
 
 ## Focus/Pomodoro
 
-- Start, pause, resume, and stop are each durable desired-state changes and clear only after an ACK. Start sends a complete deadline/duration/title snapshot. Pause reasserts that snapshot and then sends `PauseSession`; resume reasserts a running `StartSession` snapshot with the frozen remaining time rather than depending on the X3 having retained an incremental pause token across disconnect. Stop sends `StopSession`.
+- Start, pause, resume, and stop are each durable desired-state changes and clear only after an ACK. Start sends a complete deadline/duration/title snapshot through the bounded balanced interactive lease, so a zero-minute fast-discovery setting uses the normal pending-work reconnect path rather than slow standby or high-throughput transfer priority. Pause reasserts that snapshot and then sends `PauseSession`; resume reasserts a running `StartSession` snapshot with the frozen remaining time rather than depending on the X3 having retained an incremental pause token across disconnect. Stop sends `StopSession`.
+- On natural completion the phone immediately returns to its normal Setup composition with the existing **Start focus** action and a full selected duration. It neither sends an exit command nor retains/polls GATT for completion; X3 independently keeps its Done screen until device input exits it.
 - Active or paused Focus prevents X3 inactivity sleep and keeps the configured slow BLE link available. This prevents deep sleep without falsely counting every loop as user input, so the CPU can settle to the BLE-safe 80 MHz floor.
 - A dropped link enters **Reconnecting…** rather than pretending to be Connected.
 - Reading-to-Focus is treated as pending work: Android waits for X3 to advertise, sends the desired session, and X3 switches to the Focus activity.

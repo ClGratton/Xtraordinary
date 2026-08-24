@@ -11,9 +11,20 @@ class RadioPolicyOptionsTest {
 
     @Test
     fun fastChoiceMustOccurStrictlyBeforeSleep() {
+        assertTrue(isFastWindowChoiceEnabled(0, 5))
         assertTrue(isFastWindowChoiceEnabled(1, 5))
         assertFalse(isFastWindowChoiceEnabled(5, 5))
         assertFalse(isFastWindowChoiceEnabled(10, 5))
+    }
+
+    @Test
+    fun zeroMinuteFastWindowRemainsCompatibleWithStandbyReconnect() {
+        val policy = RadioPolicyUiState(fastWindowMinutes = 5, sleepAfterMinutes = 10)
+
+        assertEquals(
+            RadioPolicyUiState(fastWindowMinutes = 0, sleepAfterMinutes = 10),
+            selectFastWindow(policy, fastWindowMinutes = 0, sleepChoicesMinutes = sleepChoices),
+        )
     }
 
     @Test

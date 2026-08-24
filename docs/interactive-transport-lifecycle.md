@@ -21,7 +21,7 @@ The app therefore distinguishes:
 | First owner acquired | Keep/recover GATT, apply the interactive lease, and start the shared renewal watchdog. |
 | Additional owner acquired | Reuse the same session; do not create another renewal loop. |
 | Fresh capabilities sequence | Replay the lease once because this is a new protocol session. |
-| Bounded transaction begins | Acquire a scoped owner and force one lease reassertion before the first transaction command. |
+| Bounded transaction begins | Acquire a scoped owner and force one bounded balanced/intermediate lease reassertion before the first transaction command; bulk-transfer priority remains exclusive to bulk payloads. |
 | One of several owners released | Keep the shared session for remaining owners. |
 | Last owner released | Stop renewal, request balanced/slow connection parameters, then release GATT if no durable work needs it. |
 | GATT disconnects | Firmware clears the session lease. Android replays it only if an owner still exists after reconnect. |

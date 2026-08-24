@@ -358,18 +358,20 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             while (isActive) {
                 delay(1_000)
                 usbFlasher.refresh()
+                var focusCompleted = false
                 _uiState.update { state ->
                     if (state.focus.phase != FocusPhase.Running) return@update state
                     val nextRemaining = (state.focus.remainingSeconds - 1).coerceAtLeast(0)
+                    focusCompleted = nextRemaining == 0
                     state.copy(
-                        focus = state.focus.copy(
-                            remainingSeconds = nextRemaining,
-                            phase = if (nextRemaining == 0) FocusPhase.Review else FocusPhase.Running,
-                        ),
+                        focus = state.focus.copy(remainingSeconds = nextRemaining)
+                            .readyAfterCompletion(),
                     )
                 }
-                if (_uiState.value.focus.phase == FocusPhase.Review) {
+                if (focusCompleted) {
+                    pendingFocusSync = false
                     focusSessionStore.save(_uiState.value.focus)
+                    releaseTransportIfIdle()
                 }
                 // A persistent Focus or Live session must recover even if an
                 // Android GATT callback races the one-shot reconnect job. This
@@ -399,7 +401,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setRadioPolicy(policy: RadioPolicyUiState) {
         val normalized = policy.copy(
-            fastWindowMinutes = policy.fastWindowMinutes.coerceIn(1, 30),
+            fastWindowMinutes = policy.fastWindowMinutes.coerceIn(0, 30),
             standbyIntervalSeconds = policy.standbyIntervalSeconds.coerceIn(10, 300),
             connectedIntervalMs = policy.connectedIntervalMs.coerceIn(500, 4_000),
             sleepAfterMinutes = policy.sleepAfterMinutes.coerceIn(
@@ -498,15 +500,9 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun setDuration(minutes: Int) {
-        val bounded = minutes.coerceIn(5, 60)
         _uiState.update { state ->
             if (state.focus.phase != FocusPhase.Setup) state
-            else state.copy(
-                focus = state.focus.copy(
-                    selectedMinutes = bounded,
-                    remainingSeconds = bounded * 60,
-                ),
-            )
+            else state.copy(focus = state.focus.withSelectedDuration(minutes))
         }
         focusSessionStore.save(_uiState.value.focus)
     }

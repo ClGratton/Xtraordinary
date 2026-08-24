@@ -1,6 +1,7 @@
 package com.xteink.companion.ui
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class FocusSessionStoreTest {
@@ -19,7 +20,7 @@ class FocusSessionStoreTest {
     }
 
     @Test
-    fun elapsedRunningSessionRestoresToReview() {
+    fun elapsedRunningSessionRestoresToReadyStartFocusState() {
         val restored = PersistedFocusSession(
             task = "Write",
             selectedMinutes = 25,
@@ -28,8 +29,50 @@ class FocusSessionStoreTest {
             deadlineEpochMs = 99_000L,
         ).restoreAt(nowEpochMs = 100_000L)
 
-        assertEquals(FocusPhase.Review, restored.phase)
-        assertEquals(0, restored.remainingSeconds)
+        assertEquals(FocusPhase.Setup, restored.phase)
+        assertEquals(1_500, restored.remainingSeconds)
+        assertNull(restored.pendingAction)
+    }
+
+    @Test
+    fun completedPhoneFocusResetsLocallyWithoutAnX3ExitAction() {
+        val ready = FocusUiState(
+            selectedMinutes = 5,
+            remainingSeconds = 0,
+            phase = FocusPhase.Running,
+        ).readyAfterCompletion()
+
+        assertEquals(FocusPhase.Setup, ready.phase)
+        assertEquals(300, ready.remainingSeconds)
+        assertNull(ready.pendingAction)
+    }
+
+    @Test
+    fun legacyReviewStateAlsoRestoresToReadyStartFocus() {
+        val ready = PersistedFocusSession(
+            task = "Write",
+            selectedMinutes = 25,
+            remainingSeconds = 0,
+            phase = FocusPhase.Review,
+            deadlineEpochMs = 0L,
+        ).restoreAt(nowEpochMs = 100_000L)
+
+        assertEquals(FocusPhase.Setup, ready.phase)
+        assertEquals(1_500, ready.remainingSeconds)
+        assertNull(ready.pendingAction)
+    }
+
+    @Test
+    fun durationSelectionWorksImmediatelyAfterPhoneCompletion() {
+        val changed = FocusUiState(
+            selectedMinutes = 25,
+            remainingSeconds = 0,
+            phase = FocusPhase.Running,
+        ).readyAfterCompletion().withSelectedDuration(45)
+
+        assertEquals(FocusPhase.Setup, changed.phase)
+        assertEquals(45, changed.selectedMinutes)
+        assertEquals(2_700, changed.remainingSeconds)
     }
 
     @Test

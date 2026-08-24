@@ -16,6 +16,20 @@
       "message": "Focus applied phases must be reduced from acknowledged commands and clear pending state."
     },
     {
+      "id": "focus-completion-returns-phone-to-start-without-x3-polling",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/ui/FocusSessionStore.kt",
+      "pattern": "readyAfterCompletion[\\s\\S]*?phase = FocusPhase\\.Setup[\\s\\S]*?remainingSeconds = selectedMinutes.*?pendingAction = null",
+      "message": "Completed Focus must return the phone to Setup with a full duration and no pending X3 action."
+    },
+    {
+      "id": "focus-start-uses-bounded-balanced-lease",
+      "type": "required_pattern",
+      "path": "app/src/main/java/com/xteink/companion/data/BluetoothCompanionClient.kt",
+      "pattern": "acquireInteractiveLease[\\s\\S]*?requestBalancedConnectionPriority\\(\\)[\\s\\S]*?AcquireInteractiveLease[\\s\\S]*?requestBalancedConnectionPriority[\\s\\S]*?CONNECTION_PRIORITY_BALANCED",
+      "message": "Interactive Focus commands must use the reusable bounded balanced lease, not bulk-transfer high priority."
+    },
+    {
       "id": "usb-commands-refresh-device-activity",
       "type": "required_pattern",
       "path": "firmware/src/main.cpp",
