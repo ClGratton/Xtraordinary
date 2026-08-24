@@ -93,6 +93,7 @@ fun X3CompanionApp(
     onConnectDevice: (String) -> Unit = {},
     onCheckFirmware: (String, FirmwareSource) -> Unit = { _, _ -> },
     onFlashFirmware: () -> Unit = {},
+    onFlashFirmwareManagedBle: () -> Unit = {},
     onResetX3Setup: () -> Unit = {},
     cloudBackupState: CloudBackupState = CloudBackupState(),
     onSyncGoogleBackup: () -> Unit = {},
@@ -329,6 +330,7 @@ fun X3CompanionApp(
             onConnect = onConnectDevice,
             onCheckFirmware = onCheckFirmware,
             onFlashFirmware = onFlashFirmware,
+            onFlashFirmwareManagedBle = onFlashFirmwareManagedBle,
             onResetUsbSetup = onResetX3Setup,
         )
     }

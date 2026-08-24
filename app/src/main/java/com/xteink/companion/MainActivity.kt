@@ -344,6 +344,7 @@ class MainActivity : ComponentActivity() {
                         onConnectDevice = connectDevice,
                         onCheckFirmware = checkFirmware,
                         onFlashFirmware = viewModel::flashLatestFirmware,
+                        onFlashFirmwareManagedBle = viewModel::flashLatestFirmwareManagedBle,
                         onResetX3Setup = viewModel::resetX3SetupOverUsb,
                         cloudBackupState = cloudState,
                         onSyncGoogleBackup = {
@@ -375,6 +376,7 @@ class MainActivity : ComponentActivity() {
                         onConnectDevice = connectDevice,
                         onCheckFirmware = checkFirmware,
                         onFlashFirmware = viewModel::flashLatestFirmware,
+                        onFlashFirmwareManagedBle = viewModel::flashLatestFirmwareManagedBle,
                         cloudBackupState = cloudState,
                         cloudConsentAccepted = cloudConsentAccepted,
                         onCloudConsentChanged = { cloudConsentAccepted = it },

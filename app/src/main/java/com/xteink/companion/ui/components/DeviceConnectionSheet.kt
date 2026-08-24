@@ -70,6 +70,8 @@ import com.xteink.companion.ui.DeviceUiState
 import com.xteink.companion.ui.DevicePresence
 import com.xteink.companion.ui.FirmwareCheckPhase
 import com.xteink.companion.ui.firmwareInstallAvailable
+import com.xteink.companion.ui.firmwareInstallRoutes
+import com.xteink.companion.ui.FirmwareInstallRoute
 import com.xteink.companion.ui.devicePresence
 
 enum class DeviceSetupStep {
@@ -104,6 +106,7 @@ fun DeviceConnectionSheet(
     onConnect: (String) -> Unit = {},
     onCheckFirmware: (String, FirmwareSource) -> Unit = { _, _ -> },
     onFlashFirmware: () -> Unit = {},
+    onFlashFirmwareManagedBle: () -> Unit = {},
     onResetUsbSetup: () -> Unit = {},
     showFirmwareUpdate: Boolean = true,
     initialStep: DeviceSetupStep = DeviceSetupStep.Devices,
@@ -123,6 +126,7 @@ fun DeviceConnectionSheet(
             onConnect = onConnect,
             onCheckFirmware = onCheckFirmware,
             onFlashFirmware = onFlashFirmware,
+            onFlashFirmwareManagedBle = onFlashFirmwareManagedBle,
             onResetUsbSetup = onResetUsbSetup,
             showFirmwareUpdate = showFirmwareUpdate,
             initialStep = initialStep,
@@ -143,6 +147,7 @@ fun DeviceConnectionSheetContent(
     onConnect: (String) -> Unit = {},
     onCheckFirmware: (String, FirmwareSource) -> Unit = { _, _ -> },
     onFlashFirmware: () -> Unit = {},
+    onFlashFirmwareManagedBle: () -> Unit = {},
     onResetUsbSetup: () -> Unit = {},
     showFirmwareUpdate: Boolean = true,
     startWithFirstTimeFlash: Boolean = false,
@@ -229,6 +234,7 @@ fun DeviceConnectionSheetContent(
                 device = device,
                 onCheckFirmware = { onCheckFirmware(selectedModel.label, FirmwareSource.Xtraordinary) },
                 onFlashFirmware = onFlashFirmware,
+                onFlashFirmwareManagedBle = onFlashFirmwareManagedBle,
                 onChooseAlternative = {
                     firmwareSourceName = FirmwareSource.XteinkStock.name
                     onCheckFirmware(selectedModel.label, FirmwareSource.XteinkStock)
@@ -244,6 +250,7 @@ fun DeviceConnectionSheetContent(
                     onCheckFirmware(selectedModel.label, source)
                 },
                 onFlashFirmware = onFlashFirmware,
+                onFlashFirmwareManagedBle = onFlashFirmwareManagedBle,
                 onResetUsbSetup = onResetUsbSetup,
             )
         }
@@ -626,6 +633,7 @@ private fun DefaultFirmwarePage(
     device: DeviceUiState,
     onCheckFirmware: () -> Unit,
     onFlashFirmware: () -> Unit,
+    onFlashFirmwareManagedBle: () -> Unit,
     onChooseAlternative: () -> Unit,
 ) {
     LaunchedEffect(model) {
@@ -645,6 +653,7 @@ private fun DefaultFirmwarePage(
             selected = true,
             onSelect = null,
             onFlashFirmware = onFlashFirmware,
+            onFlashFirmwareManagedBle = onFlashFirmwareManagedBle,
         )
         Spacer(Modifier.height(8.dp))
         TextButton(onClick = onChooseAlternative, modifier = Modifier.align(Alignment.CenterHorizontally)) {
@@ -660,6 +669,7 @@ private fun FirmwareSourcePicker(
     selectedSource: FirmwareSource,
     onSelectSource: (FirmwareSource) -> Unit,
     onFlashFirmware: () -> Unit,
+    onFlashFirmwareManagedBle: () -> Unit,
     onResetUsbSetup: () -> Unit,
 ) {
     val alternatives = listOf(
@@ -805,6 +815,7 @@ private fun FirmwareSourceCard(
                         phase = sourcePhase,
                         device = device,
                         onFlashFirmware = onFlashFirmware,
+                        onFlashFirmwareManagedBle = onFlashFirmwareManagedBle,
                     )
                 }
             }
@@ -817,11 +828,19 @@ private fun FirmwareInstallAction(
     phase: FirmwareCheckPhase,
     device: DeviceUiState,
     onFlashFirmware: () -> Unit,
+    onFlashFirmwareManagedBle: () -> Unit,
 ) {
     val canFlash = firmwareInstallAvailable(
         phase = phase,
         usbConnected = device.usbConnected,
         managedBleFirmwareReady = device.managedBleFirmwareReady,
+    )
+    val routes = firmwareInstallRoutes(
+        phase = phase,
+        source = device.firmwareSource,
+        usbConnected = device.usbConnected,
+        managedBleFirmwareReady = device.managedBleFirmwareReady,
+        selectedVersion = device.latestFirmwareVersion,
     )
     AnimatedContent(
         targetState = phase,
@@ -833,17 +852,32 @@ private fun FirmwareInstallAction(
     ) { currentPhase ->
         when (currentPhase) {
             FirmwareCheckPhase.Available, FirmwareCheckPhase.UpToDate -> Column {
-                Button(
-                    onClick = onFlashFirmware,
-                    enabled = canFlash,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp),
-                ) {
-                    Text(
-                        stringResource(if (canFlash) R.string.install_firmware else R.string.wake_x3_to_flash),
-                        textAlign = TextAlign.Center,
-                    )
+                if (FirmwareInstallRoute.ManagedBle in routes) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Button(
+                            onClick = onFlashFirmwareManagedBle,
+                            enabled = canFlash,
+                            modifier = Modifier.weight(1f).heightIn(min = 58.dp),
+                        ) { Text(stringResource(R.string.install_firmware_ota), textAlign = TextAlign.Center) }
+                        OutlinedButton(
+                            onClick = onFlashFirmware,
+                            enabled = FirmwareInstallRoute.GuardedUsb in routes,
+                            modifier = Modifier.weight(1f).heightIn(min = 58.dp),
+                        ) { Text(stringResource(if (FirmwareInstallRoute.GuardedUsb in routes) R.string.install_firmware_usb else R.string.connect_usb_for_firmware), textAlign = TextAlign.Center) }
+                    }
+                } else {
+                    Button(
+                        onClick = onFlashFirmware,
+                        enabled = canFlash,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp),
+                    ) {
+                        Text(
+                            stringResource(if (canFlash) R.string.install_firmware else R.string.wake_x3_to_flash),
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                 }
-                if (!canFlash) {
+                if (!canFlash && routes.isEmpty()) {
                     Text(
                         text = stringResource(R.string.wake_x3_to_flash_help),
                         style = MaterialTheme.typography.bodySmall,

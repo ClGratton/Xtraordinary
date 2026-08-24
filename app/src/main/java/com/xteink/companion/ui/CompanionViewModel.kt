@@ -947,7 +947,9 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun flashLatestFirmware() {
+    fun flashLatestFirmwareManagedBle() = flashLatestFirmware(forceManagedBle = true)
+
+    fun flashLatestFirmware(forceManagedBle: Boolean = false) {
         val release = latestRelease ?: run {
             reportDeviceError(IllegalStateException("Firmware selection is no longer available"))
             return
@@ -956,11 +958,11 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         // always uses the guarded USB takeover path. Managed BLE is an explicit
         // capability-bound path for Xtraordinary-to-Xtraordinary only, never a
         // silent replacement for LocalFile/stock/CrossPoint upload.
-        val useUsb = _uiState.value.device.usbConnected
+        val useUsb = !forceManagedBle && _uiState.value.device.usbConnected
         val link = companionClient.state.value
         val companionFamily = release.source == FirmwareSource.Xtraordinary ||
             (release.source == FirmwareSource.LocalFile && isXtraordinaryCompanionFirmware(release))
-        val useManagedBle = !useUsb && companionFamily &&
+        val useManagedBle = companionFamily &&
             _uiState.value.isX3TransportConnected && link.phase == LinkPhase.Connected &&
             link.capabilities?.supportsFirmwareUpdate == true
         if (!useUsb && !useManagedBle) {
