@@ -355,3 +355,8 @@
 
 - Fresh BLE matched X3 `7C:E8:B1:71:13:3E` at RSSI -41, opened GATT, discovered 3 services, negotiated MTU 256, subscribed notifications, and received Capabilities, two StatusChanged, four LibraryPage messages, and ACK traffic without a crash.
 - Guarded diagnostics returned active `RUNTIME_TRACE_ACTIVE boot=13 reset=8 ...` but no `RUNTIME_TRACE_OTA`; `dev33` is retained crash-report content only. Selected-slot dev38 deployment remained blocked before mutation; no reset, slot write, flash, bond/app-data/timeout/NVS/SD/book mutation occurred.
+
+## 2026-08-24 - Fresh version and deterministic OTA-proof blocker
+
+- Pushed `9fb5c4a` adds bounded logging of accepted fresh Capabilities. Retained-data Community reinstall used APK `0.2.0-dev49`, 85,782,220 bytes, SHA-256 `3E6A6F98A4D9E9F33F7FBCDACFFFB13D22BCA4DC475298C8AC231347D744B90F`; fresh BLE reported `xtraordinary-v0.2.6-dev37-book-reconciliation-local`, followed by StatusChanged, revisioned LibraryPage, and policy ACK evidence. No crash, bond, or data loss.
+- Source/history inspection proves OTA output was added in `de1fae5`; the live ACTIVE/PREVIOUS trace is short and the 4 KiB reader/filter would preserve OTA, so absence is an installed-runtime capability gap, not truncation/parser filtering. A safe retry then timed out reading the diagnostic command while Pixel USB briefly enumerated VID:PID `303A:1001`; current USB state is disconnected/unconfigured. Deployment remains fail-closed before reset/write; no flash or slot assumption.

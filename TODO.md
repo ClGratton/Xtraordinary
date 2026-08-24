@@ -128,6 +128,8 @@ This is the actionable backlog. Older unchecked items in `docs/x3-takeover-track
 
 ## Workflow and continuity requirements
 
+- [!] 2026-08-24 selected-slot deployment remains protected-blocked: fresh BLE Capabilities reports `xtraordinary-v0.2.6-dev37-book-reconciliation-local` and the fresh StatusChanged/LibraryPage/ACK chain is stable, but Pixel-host `READ_X3_DIAGNOSTICS` cannot currently complete (`Timed out reading X3 diagnostic command`) and no `RUNTIME_TRACE_OTA` proves running == next boot. Do not flash or infer a slot; retry only after live USB transport returns.
+
 - [x] Commit and push the durable Windows ADB/X3 discovery workflow correction after its focused fixtures and engineering-policy validation pass (`cc2bb15`).
 - [ ] One user-visible Codex task owns one substantial milestone. It checkpoints source, evidence, `TODO.md`, tracker, and handoff before ending.
 - [ ] The next milestone starts in a fresh user-visible task with a compact packet derived from this file and directly relevant policy/evidence only; automatically open that task in the Codex app so the user never has to inspect Subagents or say “go on”.

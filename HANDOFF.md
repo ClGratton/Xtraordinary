@@ -1,5 +1,13 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-24 fresh Capabilities and selected-slot proof boundary
+
+Pushed `9fb5c4a` adds a bounded accepted-Capabilities log. After the retained-data Community reinstall (dev49/code 50, APK 85,782,220 bytes, SHA-256 `3E6A6F98A4D9E9F33F7FBCDACFFFB13D22BCA4DC475298C8AC231347D744B90F`), fresh BLE evidence logged firmware `xtraordinary-v0.2.6-dev37-book-reconciliation-local`, then fresh StatusChanged, revisioned LibraryPage pages, and matching policy ACKs. No crash occurred; bond and app data were retained.
+
+The source trace path is now classified: `READ_X3_DIAGNOSTICS` calls the guarded USB `CRASH_REPORT` and `RUNTIME_TRACE` commands; the runtime reader retains `RUNTIME_TRACE_` lines, bounds the response at 4 KiB, and completes on `RUNTIME_TRACE_ACTIVE`. Firmware commit `de1fae5` introduced `RUNTIME_TRACE_OTA` before ACTIVE. The live trace contains ACTIVE/PREVIOUS but no OTA line, and the response is far below 4 KiB, so this is not page truncation or Android filtering; the installed dev37 runtime predates the OTA trace feature. The guarded flasher has no Android otadata fallback and still fails closed before reset/write without the running/next-boot equality proof.
+
+A read-only retry while Pixel logs showed X3 VID:PID `303A:1001` briefly enumerated ended with `Timed out reading X3 diagnostic command`; current `dumpsys usb` is again `host_connected=true`, `connected=false`, `configured=false`. No reset, slot read, flash, bond/app-data/timeout/NVS/SD/book mutation occurred. Minimum next transition is restoring stable Pixel-host USB transport (or an authorized physical target transition to a host exposing the guarded serial path); do not assume `0x10000` or rewrite otadata. Screenshot/UI verification remains explicitly skipped.
+
 ## 2026-08-24 BLE bootstrap crash containment checkpoint
 
 The live Pixel crash was reproduced twice on the `a57565b` candidate: `IllegalArgumentException: Invalid UTF-8 field length` at `PayloadCodec.decodeCapabilities` (`Payloads.kt:472/297`) from `BluetoothCompanionClient.handleEnvelope:895`. The cause was confirmed in source: `runCatching { EnvelopeCodec.decode(bytes) }.onSuccess { ... payload decode ... }` did not contain exceptions thrown inside `onSuccess`, so malformed Capabilities killed the main process. Pushed `77d58b0` wraps decode and dispatch independently, logs only message type/id, payload size, and a 16-byte hex prefix on rejection, and transitions the link to error without process death. No unverified wire-format fallback was added; all repository firmware versions emit two-byte length-prefixed capability fields.
