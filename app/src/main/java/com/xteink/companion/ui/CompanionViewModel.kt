@@ -898,6 +898,12 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
             runCatching { firmwareReleases.localFor(model, uri) }
                 .onSuccess { release ->
                     latestRelease = release
+                    // Keep a companion-family local selection on the reusable interactive
+                    // transport lease so the managed BLE action remains available after the
+                    // file picker closes and the one-shot bootstrap link would otherwise idle.
+                    if (isXtraordinaryCompanionFirmware(release)) {
+                        acquireInteractiveTransport(FirmwareTransferOwner)
+                    }
                     _uiState.update {
                         it.copy(device = it.device.copy(
                             firmwareCheckPhase = FirmwareCheckPhase.Available,
@@ -2093,6 +2099,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
 
     private companion object {
         val TicketTransferOwner = InteractiveTransportOwner("ticket-transfer")
+        val FirmwareTransferOwner = InteractiveTransportOwner("firmware-transfer")
         val FocusCommandOwner = InteractiveTransportOwner("focus-command")
         const val BackgroundDisconnectGraceMs = 1_500L
         const val LastConnectedModelKey = "last_connected_model"
