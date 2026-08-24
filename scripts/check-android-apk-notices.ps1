@@ -25,7 +25,7 @@ try {
         try {
             $stream = $entries[$entryName].Open()
             try {
-                $apkHash = [Convert]::ToHexString($sha.ComputeHash($stream)).ToLowerInvariant()
+                $apkHash = ([BitConverter]::ToString($sha.ComputeHash($stream)) -replace '-', '').ToLowerInvariant()
             } finally {
                 $stream.Dispose()
             }
