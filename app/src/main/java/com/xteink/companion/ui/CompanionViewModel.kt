@@ -263,6 +263,7 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
                             firmwareVersion = capabilities?.firmwareVersion ?: state.device.firmwareVersion,
                             libraryRevision = capabilities?.libraryRevision ?: state.device.libraryRevision,
                             firmwareProgress = link.transferProgress ?: state.device.firmwareProgress,
+                            managedBleFirmwareReady = transportConnected && capabilities?.supportsFirmwareUpdate == true,
                             batteryPercentage = link.deviceStatus?.batteryPercentage
                                 ?: state.device.batteryPercentage,
                             charging = transportConnected && link.deviceStatus?.charging == true,

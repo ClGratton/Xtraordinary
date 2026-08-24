@@ -234,6 +234,7 @@ data class DeviceUiState(
     val transportBlocker: com.xteink.companion.data.LinkBlocker? = null,
     val message: String? = null,
     val usbConnected: Boolean = false,
+    val managedBleFirmwareReady: Boolean = false,
     val usbPhase: String = "Disconnected",
     val usbMessage: String? = null,
     val firmwareVersion: String? = null,

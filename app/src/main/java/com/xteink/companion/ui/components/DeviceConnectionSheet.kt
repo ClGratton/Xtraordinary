@@ -817,7 +817,11 @@ private fun FirmwareInstallAction(
     device: DeviceUiState,
     onFlashFirmware: () -> Unit,
 ) {
-    val canFlash = device.usbConnected
+    val canFlash = firmwareInstallAvailable(
+        phase = phase,
+        usbConnected = device.usbConnected,
+        managedBleFirmwareReady = device.managedBleFirmwareReady,
+    )
     AnimatedContent(
         targetState = phase,
         transitionSpec = {
