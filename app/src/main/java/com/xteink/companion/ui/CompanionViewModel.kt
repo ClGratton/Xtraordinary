@@ -16,6 +16,8 @@ import com.xteink.companion.data.BookUploadPersistence
 import com.xteink.companion.data.FirmwareRelease
 import com.xteink.companion.data.FirmwareReleaseRepository
 import com.xteink.companion.data.FirmwareSource
+import com.xteink.companion.data.FirmwareTransport
+import com.xteink.companion.data.selectFirmwareTransport
 import com.xteink.companion.data.FlightBarcodeFormat
 import com.xteink.companion.data.FlightIdentity
 import com.xteink.companion.data.FlightStatusRefreshPolicy
@@ -932,17 +934,17 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun flashLatestFirmware() {
         val release = latestRelease ?: return
-        val useUsb = _uiState.value.device.usbConnected
-        if (release.source != FirmwareSource.Xtraordinary && !useUsb) {
-            _uiState.update {
-                it.copy(notice = UiNotice.DeviceMessage("Connect the X3 to this phone by USB before flashing"))
-            }
+        val link = companionClient.state.value
+        val transport = selectFirmwareTransport(
+            usbConnected = _uiState.value.device.usbConnected,
+            bleConnected = _uiState.value.isX3TransportConnected && link.phase == LinkPhase.Connected,
+            bleSupportsFirmwareUpdate = link.capabilities?.supportsFirmwareUpdate == true,
+        )
+        if (transport == FirmwareTransport.Unavailable) {
+            _uiState.update { it.copy(notice = UiNotice.DeviceMessage("Connected X3 does not advertise managed firmware update support")) }
             return
         }
-        if (!useUsb && !_uiState.value.isX3Connected) {
-            _uiState.update { it.copy(notice = UiNotice.DeviceMessage("Connect the X3 to this phone by USB before flashing")) }
-            return
-        }
+        val useUsb = transport == FirmwareTransport.GuardedUsb
         if (!useUsb) ensureTransportConnected()
         viewModelScope.launch {
             _uiState.update {
