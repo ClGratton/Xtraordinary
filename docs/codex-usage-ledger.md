@@ -1,5 +1,10 @@
 # Codex usage ledger
 
+## 2026-08-24 - Dev51 canonical build stopped at Focus unit regression
+
+- Android candidate bump `dcbea9d` set dev51/versionCode 52. The one canonical focused wrapper reached compile but failed both Community and Play unit suites at `FocusSessionTest.elapsedRunningSessionRestoresToReadyStartFocusState`: Setup was returned with zero seconds instead of the selected 1,500 seconds. Source-only correction `dff5ac6` fixes the ordering; no second wrapper run was made.
+- No dev51 APK install/hash, fresh Focus/Passes screenshots, firmware build, X3 deployment, maintenance lease activation/expiry proof, or device mutation occurred. Pixel timeout lifecycle was restored and verified at `1800000` ms.
+
 ## 2026-08-24 - ADB identity recovery and clean phone boundary
 
 - The saved current endpoint `192.168.1.61:36221` was retried once after normal-user ADB restart; it recovered exactly one Pixel 10. mDNS remains empty, but canonical phone resolution passes. Timeout was restored immediately and verified at `1800000` ms.

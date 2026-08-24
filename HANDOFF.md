@@ -1,5 +1,9 @@
 # Xtraordinary release handoff — 2026-08-13
 
+## 2026-08-24 dev51 integrated build boundary
+
+The candidate bump `dcbea9d` set Android dev51/versionCode 52. The one canonical focused wrapper passed policy provenance with 64 explicitly deferred UI-review findings and reached compilation, but both Community and Play unit suites failed the same Focus regression: `FocusSessionTest.elapsedRunningSessionRestoresToReadyStartFocusState` expected Setup with 1,500 seconds while `restoreAt()` returned Setup with zero because completion normalization ran after the phase had already changed. Source correction `dff5ac6` now restores the selected duration directly; no second build was run under this milestone. No dev51 APK install, fresh screenshots, firmware build/deploy, X3 maintenance lease, or X3 mutation occurred. Pixel timeout was restored and verified at `1800000` ms.
+
 ## 2026-08-24 Focus completion and Passes viewport source checkpoint
 
 Two user-reported regressions were reproduced against the retained dev50 app on the real Pixel 10 (`1080x2424`, 420 dpi, `font_scale=1.15`) before editing. The initial Focus slider is healthy and changed 25 to 45 minutes; the broken `00:00` path was the completed-session state. Natural completion had left Android in `FocusPhase.Review` with zero remaining seconds, so duration changes could not restore the normal composition. Pushed `2fb38fd` makes natural and restored elapsed sessions return the phone to Setup with the full selected duration and the exact existing **Start focus** action. Completion clears pending transport and releases idle GATT without sending an X3 exit/poll command; X3 owns and retains its Done screen until device input leaves it. A zero-minute fast-discovery window is valid, and a phone start uses the bounded balanced interactive lease rather than standby-slow or transfer-fast radio policy.
