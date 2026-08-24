@@ -1,11 +1,11 @@
 package com.xteink.companion.ui
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
 
 class FirmwareInstallPendingTest {
     private val pending = PendingFirmwareInstall("X3", "dev38", 42, "ab".repeat(32))
@@ -24,7 +24,7 @@ class FirmwareInstallPendingTest {
     @Test fun physicalConfirmNackAllowsOneReplayThenClears() {
         val retry = FirmwareInstallPendingPolicy.afterNack(pending)
         assertNotNull(retry)
-        assertEquals(1, retry.attempt)
+        assertEquals(1, retry!!.attempt)
         assertNull(FirmwareInstallPendingPolicy.afterNack(retry))
     }
 }
