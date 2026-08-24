@@ -15,6 +15,11 @@
 - Readiness receipt: pushed source `bfb088d` produced Community dev50/versionCode 51 APK, 85,625,905 bytes, SHA-256 `A5E21CD2A865A319791CC3C57531160152B1D4B5804A7F1ABA3F3E2317323D35`; retained-data installer succeeded and `dumpsys` plus on-device `base.apk` SHA matched. Pixel timeout verified at `1800000` ms.
 - Android wrapper completed compile/unit/lint/assembly but failed only on the known deferred screenshot validations (32/32 per flavor); no screenshot baseline or reviewer work was performed. Sequential firmware wrapper stopped before compiler because the Release policy gate reported 9 UI-review violations. No firmware artifact, USB read/write, flash, reboot, or X3 mutation occurred. Deployment remains blocked until the protected gate and Android otadata read primitive are resolved.
 
+## 2026-08-24 - Guarded USB target-resolution boundary
+
+- Source/build: esptool C3 v2 stub asset and read-only MEM/READ_FLASH framing are pushed through `8697a9f`; firmware waiver is machine-limited to Release/FirmwareRelease UI debt. Firmware dev50 USB-first artifact is 5,456,336 bytes, SHA-256 `743D3CC6BD9AE0BC54232807E439E701D864F5231427070097C59F7715030846`.
+- Install/target: retained-data Community dev50 APK installed. Canonical resolver found wireless Pixel `192.168.1.61:36221`; dumpsys USB reports `host_connected=true`, `connected=false`, `configured=false`, `kernel_state=DISCONNECTED`, with no VID:303A:1001 X3. No stub upload, otadata read, selected-slot write, reboot, or data mutation occurred. Pixel timeout verified at `1800000` ms.
+
 ## 2026-08-24 - Automatic Confirm-window retry boundary
 
 - Repository-resolved ADB relaunched the retained-data app; fresh dev37 Capabilities, StatusChanged, revisioned LibraryPage, policy ACKs, and lease ACK arrived. The pending dev38 transaction automatically emitted BEGIN at 19:39:24.794 and 19:39:30.242; X3 returned NACK at 19:39:25.023 and 19:39:30.485 before chunks, matching the physical Confirm guard. No transfer, reboot, flash, reset, pairing, or data mutation occurred.
