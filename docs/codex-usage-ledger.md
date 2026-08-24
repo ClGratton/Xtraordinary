@@ -360,3 +360,8 @@
 
 - Pushed `9fb5c4a` adds bounded logging of accepted fresh Capabilities. Retained-data Community reinstall used APK `0.2.0-dev49`, 85,782,220 bytes, SHA-256 `3E6A6F98A4D9E9F33F7FBCDACFFFB13D22BCA4DC475298C8AC231347D744B90F`; fresh BLE reported `xtraordinary-v0.2.6-dev37-book-reconciliation-local`, followed by StatusChanged, revisioned LibraryPage, and policy ACK evidence. No crash, bond, or data loss.
 - Source/history inspection proves OTA output was added in `de1fae5`; the live ACTIVE/PREVIOUS trace is short and the 4 KiB reader/filter would preserve OTA, so absence is an installed-runtime capability gap, not truncation/parser filtering. A safe retry then timed out reading the diagnostic command while Pixel USB briefly enumerated VID:PID `303A:1001`; current USB state is disconnected/unconfigured. Deployment remains fail-closed before reset/write; no flash or slot assumption.
+
+## 2026-08-24 - Managed OTA safety decision
+
+- Source inspection confirms the existing BLE `BEGIN_FIRMWARE`/chunk/commit/apply path is inactive-slot-safe: firmware stores and hashes the SD image, validates it, selects `esp_ota_get_next_update_partition(nullptr)`, and calls `ota_boot::switchTo`; it does not require an Android address or rewrite raw otadata. Dev37 Capabilities advertises firmware update support.
+- The same source requires `MappedInputManager::Button::Confirm` physically pressed when `BEGIN_FIRMWARE` arrives. No unauthorized transfer was attempted. Minimum physical action is pressing/holding Confirm while launching the existing in-app install; then accept only fresh post-reboot Capabilities, StatusChanged, revisioned LibraryPage, and matching ACKs. Pixel timeout restoration was run at the boundary.
