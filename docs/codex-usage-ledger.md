@@ -1,5 +1,12 @@
 # Codex usage ledger
 
+## 2026-08-24 - Selected-slot Android screenshot checkpoint
+
+- Task: `01a03418-5baa-70e0-bf5f-14f9670160e5`. Entry passed at 27% of the 10,080-minute signed-in window with 0-point task growth. Compiler entry passed at 28% and 1-point growth. The post-build audit passed at 29% and 2-point growth, resetting at Unix `1788169810`, with no replay/budget violation.
+- Post-attempt token evidence: 21 model calls; 1,198,588 input, 1,136,384 cached input, 62,204 uncached input, 6,599 output, 2,842 reasoning-output, and 1,205,187 total tokens; replay median 61,052, maximum 74,871, and recent median 73,679 after 119% growth.
+- Build boundary: clean pushed `beca301` passed usage, source provenance, notices, artwork provenance, and the 165-rule gate with only the documented 46-item UI debt deferred. Gradle completed protocol tests, Community/Play compilation, unit tests, and APK assembly, then both 32-case screenshot validations failed on the same 10 image-backed/adaptive cases. The wrapper never reached post-Gradle APK-notice verification, so the assembled APKs are not accepted for deployment.
+- User-directed stop: no further screenshot investigation, build, firmware, target discovery, install, flash, live-slot read, or BLE/device action is authorized in this task. The phone and X3 were untouched. No automatic continuation task was created.
+
 ## 2026-08-24 - Selected-slot protected-build checkpoint
 
 - Task: `01a0340f-8c19-7153-a870-15917f706dff`. Entry returned `warming-up`. The compiler-bound audit passed at 25% of the 10,080-minute signed-in window, 2-point task-local growth, 49,628 replay median, and no replay/budget violations; the environment-corrected retry audit also passed at 26% and 3-point growth.
