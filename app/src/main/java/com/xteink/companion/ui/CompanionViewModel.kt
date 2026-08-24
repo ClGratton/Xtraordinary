@@ -812,7 +812,14 @@ class CompanionViewModel(application: Application) : AndroidViewModel(applicatio
         _uiState.update {
             it.copy(
                 isX3TransportConnected = false,
-                device = it.device.copy(reconnecting = false, message = "X3 is ready to restart"),
+                // Releasing GATT is only preparation for exclusive USB access.
+                // Do not imply the firmware was written or that a reboot is
+                // pending before the flasher has selected, written and verified
+                // the application slot.
+                device = it.device.copy(
+                    reconnecting = false,
+                    message = "Preparing X3 for USB maintenance",
+                ),
             )
         }
     }

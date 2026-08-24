@@ -38,9 +38,20 @@ The phone recognizes the ESP32-C3 USB/JTAG serial interface as USB VID/PID `303A
 7. Hard-reset the X3.
 8. If the USB/JTAG interface disappears, preserve `ReconnectRequired` and show **Disconnect and reconnect X3 USB to continue** until it re-enumerates.
 
+Releasing Bluetooth/GATT before step 2 is preparation only. The app must say that
+USB maintenance is being prepared; it must not say flashed, installed, verified,
+ready to reboot, or restarting until the corresponding write, ROM MD5 verification,
+and hard-reset phase has actually succeeded. A failure during stub upload or slot
+selection therefore remains a pre-write failure in both protocol state and user copy.
+
 Do not replace step 8 with a generic disconnected state. OEM firmware may stop exposing USB/JTAG after boot even while the cable remains physically attached. The instruction tells the user which physical action is required and prevents a successful flash from looking like an unexplained failure.
 
 On Windows, preflight the same identity through `scripts/resolve-xtraordinary-deployment-targets.ps1`: inspect present `VID_303A:1001` composite/interface PnP records before selecting the associated serial interface. A ports-only scan is not evidence that X3 is absent, and discovery must not open the serial port.
+
+When X3 is attached to the Pixel, Android's `host_manager.devices` inventory is
+authoritative. The Pixel's separate gadget/device-manager `connected=false` state
+describes whether the phone itself is attached as a USB peripheral; it must never
+negate a present host-side `303A:1001` X3.
 
 ### Application firmware regions
 
