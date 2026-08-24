@@ -848,7 +848,12 @@ private fun FirmwareInstallAction(
         selectedVersion = device.latestFirmwareVersion,
         managedDeviceKnown = managedDeviceKnown,
     )
-    var selectedRouteName by rememberSaveable { mutableStateOf(FirmwareInstallRoute.ManagedBle.name) }
+    val preferredRouteName = if (FirmwareInstallRoute.ManagedBle in routes) {
+        FirmwareInstallRoute.ManagedBle.name
+    } else {
+        FirmwareInstallRoute.GuardedUsb.name
+    }
+    var selectedRouteName by rememberSaveable { mutableStateOf(preferredRouteName) }
     LaunchedEffect(routes) {
         if (selectedRouteName !in routes.map { it.name }) {
             selectedRouteName = when {
