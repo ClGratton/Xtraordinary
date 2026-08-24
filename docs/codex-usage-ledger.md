@@ -374,3 +374,8 @@
 ## 2026-08-24 - Managed OTA retry transport boundary
 
 - One bounded retry after navigation-button wake waited roughly 75 seconds. The app logged only `connect requested model=X3 phase=Disconnected`; no BLE scan/GATT/notifications or USB enumeration reached the install path. `BEGIN_FIRMWARE` was never sent, so Confirm timing was not exercised and no transfer/reboot/device mutation occurred.
+
+## 2026-08-24 - Android BLE lifecycle diagnosis
+
+- Repository ADB proved Bluetooth enabled, companion process alive, and `BLUETOOTH_SCAN`/`CONNECT` granted. Force-stop/relaunch retained data and started one fresh connect request; no scan callback/failure, GATT, notification, or USB event arrived through the bounded standby interval.
+- `BluetoothCompanionClient.connect()` already performs idempotent disconnect/stopScan before each low-latency scan. No stale scan job/backoff/cancellation defect is evidenced; no speculative source fix, Bluetooth cycle, pairing reset, or OTA mutation was performed.

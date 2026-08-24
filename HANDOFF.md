@@ -16,6 +16,10 @@ The existing BLE `BEGIN_FIRMWARE`/chunk/commit/apply path is present in the inst
 
 The canonical dev38 artifact was copied to Pixel Downloads and the app verified version `xtraordinary-v0.2.6-dev38-selected-slot-local` with SHA-256 `E0E8FA4E3347BB4533CAF34E8CCF7CC25A4306E5988A7CBA64204190A0F389FE`. Relaunch produced only `connect requested model=X3 phase=Disconnected`; no BLE advertisement arrived and Pixel USB was `connected=false/configured=false`. `BEGIN_FIRMWARE` was never sent, so Confirm was not consumed and no transfer, commit/apply, reboot, or device-state mutation occurred.
 
+## 2026-08-24 Android BLE lifecycle diagnosis
+
+Repository-resolved ADB confirmed Bluetooth enabled (`mQuietEnable=false`), companion process alive, `BLUETOOTH_SCAN` and `BLUETOOTH_CONNECT` granted, and no stale companion service. Force-stop/relaunch with retained data produced one `connect requested model=X3 phase=Disconnected`; a bounded scan through the standby interval produced no scan callback, scan failure, X3 GATT/services, notifications, or USB enumeration. Source review confirms `connect()` first calls idempotent `disconnect()`/`stopScan()` and starts a fresh low-latency scan; no stale scan job, backoff, or cancellation defect is evidenced. No speculative BLE source change, pairing reset, Bluetooth cycle, OTA transfer, or device mutation was made.
+
 ## 2026-08-24 managed OTA retry boundary
 
 One bounded retry after a navigation-button wake waited about 75 seconds (the configured standby interval plus margin). The installed app again logged only `connect requested model=X3 phase=Disconnected`; no X3 scan match, GATT, service discovery, notifications, or USB enumeration occurred. The verified local dev38 artifact remained selected but `BEGIN_FIRMWARE` was never sent, so no Confirm timing retry applies and no transfer, reboot, or device-state mutation occurred.
